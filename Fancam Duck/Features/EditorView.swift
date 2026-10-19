@@ -8,7 +8,6 @@ struct EditorView: View {
     @State private var redactionStrengthEditing=false
     @State private var showRedactionHelp=false
     @State private var drawnBox: NormalizedRect?
-    @State private var showLeaveConfirmation = false
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -51,7 +50,7 @@ struct EditorView: View {
             desktopWorkspace
             #else
             VStack(spacing: 0) {
-                header
+                header.zIndex(100)
                 WorkspaceArrangement(size:CGSize(width:geometry.size.width,height:max(1,geometry.size.height-52))) {
                     VStack(spacing:0) {
                         sourceStage.accessibilityElement(children:.contain).accessibilityIdentifier("editorStage")
@@ -81,10 +80,6 @@ struct EditorView: View {
         .animation(reduceMotion ? nil : .smooth(duration:0.28),value:workspaceState)
         .animation(reduceMotion ? nil : .smooth(duration:0.28),value:activeTool)
         .background { StudioBackground() }.foregroundStyle(.white).preferredColorScheme(.dark)
-        .alert("保存并返回首页？", isPresented: $showLeaveConfirmation) {
-            Button("取消", role: .cancel) {}
-            Button("保存并返回") { model.goHome() }
-        } message: { Text("当前任务将暂停，可以在最近项目中重新打开。") }
         .sheet(isPresented:$savingFile) {if let url=model.outputURL {SaveVideoPicker(url:url)}}
         .onChange(of:model.hasCompletedTracking) {_,complete in
             if complete && model.phase == .editing {selectTool(.composition)}
@@ -128,7 +123,7 @@ struct EditorView: View {
                 }
                 Spacer(minLength:8)
 
-            }.padding(.horizontal,20).frame(height:64).background(DesktopPalette.panel)
+            }.padding(.horizontal,20).frame(height:64).background(DesktopPalette.panel).zIndex(100)
             Divider()
             HStack(spacing:0) {
                 VStack(spacing:0) {
@@ -190,8 +185,7 @@ struct EditorView: View {
     private var desktopRedactionSettings:some View {redactionPanel}
     #endif
     private func returnToHome() {
-        if model.isDemo {model.goHome()}
-        else {showLeaveConfirmation=true}
+        model.goHome()
     }
     private var header: some View {
         HStack {
@@ -228,14 +222,18 @@ struct EditorView: View {
             let rect=CropGeometry.aspectFit(video:(showsComposition || isCompleted) ? (model.project?.settings.aspectRatio ?? .portrait).size : source,container:area).offsetBy(dx:inset,dy:0)
             ZStack(alignment: .bottom) {
                 Group {
-                    if isCompleted,let player=model.previewPlayer {PlayerSurface(player:player)}
-                    else {CompositionVideoViewport(model:model,source:source,viewport:rect.size,composition:showsComposition)}
+                    if isCompleted,let player=model.previewPlayer {
+                        PlayerSurface(player:player).frame(width:rect.width,height:rect.height)
+                            .position(x:rect.midX,y:rect.midY)
+                    } else {
+                        CompositionVideoViewport(model:model,source:source,viewport:rect.size,composition:showsComposition,
+                            canvas:geometry.size,viewportOrigin:rect.origin)
+                    }
                 }
-                    .frame(width:rect.width,height:rect.height)
+                    .frame(width:geometry.size.width,height:geometry.size.height)
                     .accessibilityElement(children:showsComposition ? .contain : .ignore)
                     .accessibilityLabel(isCompleted ? "成片预览" : showsComposition ? "构图预览" : "原片画面")
                     .accessibilityIdentifier(showsComposition ? "compositionViewport" : "sourceVideoSurface")
-                    .position(x:rect.midX,y:rect.midY)
                 if !model.redactionEditing && !model.compositionEditing && model.controlsEnabled && (!model.hasCompletedTracking || isBlocked) && !isCompleted && !model.manualSelection && !model.isPlaying && !timelineTrimming {
                     ForEach(people, id: \.id) { person in
                         let number = person.number, box = person.box
@@ -270,7 +268,8 @@ struct EditorView: View {
                     }.padding(.horizontal, 20).frame(height: 44).allowsHitTesting(false)
                 }
             }
-        }.animation(reduceMotion ? nil : .smooth(duration:0.32),value:showsComposition)
+        }.clipped()
+            .animation(reduceMotion ? nil : .smooth(duration:0.32),value:showsComposition)
             .animation(reduceMotion ? nil : .smooth(duration:0.32),value:model.project?.settings.aspectRatio)
     }
     private var sourceHint: String {
@@ -385,18 +384,19 @@ struct EditorView: View {
                         }
                     }
                 } label: {
-                    HStack(spacing:8) {
+                    HStack(spacing:6) {
                         Text(isProcessing ? (model.generatingVideo ? "正在生成" : isPaused ? "继续分析" : "正在分析") : startTitle)
                             .font(.subheadline.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5)
                         if isProcessing {
                             Image(systemName:isPaused ? "play.fill" : "pause.fill").font(.system(size:12))
-                            Spacer(minLength:12)
+                            Spacer(minLength:4)
                             Text(processingPercent).font(.subheadline.weight(.semibold)).monospacedDigit()
+                                .lineLimit(1).fixedSize(horizontal:true,vertical:false).layoutPriority(1)
                                 .contentTransition(.numericText()).accessibilityIdentifier("processingProgress")
                         } else {
                             Image(systemName:"arrow.right").font(.system(size:16,weight:.medium))
                         }
-                    }.padding(.horizontal,isProcessing ? 22 : 14)
+                    }.padding(.horizontal,14)
                         .frame(maxWidth:isProcessing || usesExpandedWorkspace || !model.hasCompletedTracking ? .infinity : nil).frame(width:isProcessing || usesExpandedWorkspace || !model.hasCompletedTracking ? nil : 132,height:bottomControlHeight)
                         .background {
                             if isProcessing {

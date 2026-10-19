@@ -258,6 +258,15 @@ final class EditorFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["构图水平居中"].isEnabled)
         XCTAssertEqual(app.scrollViews.count,0)
         capture(app,"native-aspect-segments")
+        let broadCanvas=app.descendants(matching:.any).matching(identifier:"compositionCanvas").firstMatch
+        XCTAssertTrue(broadCanvas.exists)
+        XCTAssertGreaterThan(broadCanvas.frame.width,app.frame.width*0.9)
+        app.buttons["构图放大"].tap()
+        let beforeOutsideDrag=broadCanvas.value as? String
+        broadCanvas.coordinate(withNormalizedOffset:CGVector(dx:0.04,dy:0.45))
+            .press(forDuration:0.15,thenDragTo:broadCanvas.coordinate(withNormalizedOffset:CGVector(dx:0.17,dy:0.50)))
+        XCTAssertNotEqual(broadCanvas.value as? String,beforeOutsideDrag)
+        capture(app,"composition-frosted-outside-drag")
         tools.buttons["打码"].tap()
         let panel=app.descendants(matching:.any).matching(identifier:"adjustmentPanel").firstMatch
         let region=app.buttons["redactionRegionMenu"],style=app.segmentedControls["redactionStyle"]
@@ -316,6 +325,15 @@ final class EditorFlowTests: XCTestCase {
         XCTAssertTrue(picker.waitForExistence(timeout:5))
         XCTAssertTrue(first.isSelected)
         capture(app,"native-tool-and-redaction-segments")
+        let endHandle=app.descendants(matching:.any).matching(NSPredicate(format:"label == %@","裁剪终点")).firstMatch
+        XCTAssertTrue(endHandle.isHittable)
+        let previousEnd=endHandle.value as? String
+        let handlePoint=endHandle.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5))
+        handlePoint.press(forDuration:0.1,thenDragTo:handlePoint.withOffset(CGVector(dx:-60,dy:0)))
+        XCTAssertNotEqual(endHandle.value as? String,previousEnd)
+        XCTAssertTrue(tools.exists,"Trimming within analyzed footage keeps settings available")
+        capture(app,"settings-selected-time-range")
+        ready(app.buttons["primaryAction"])
         app.buttons["primaryAction"].tap()
         let generatingStage=app.descendants(matching:.any).matching(identifier:"editorStage").firstMatch
         XCTAssertTrue(generatingStage.waitForExistence(timeout:3))

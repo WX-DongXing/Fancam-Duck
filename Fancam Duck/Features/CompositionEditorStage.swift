@@ -7,20 +7,33 @@ struct CompositionVideoViewport: View {
     let source: CGSize
     let viewport: CGSize
     let composition: Bool
+    let canvas: CGSize
+    let viewportOrigin: CGPoint
     var body: some View {
         let crop=composition ? model.compositionCrop ?? CGRect(origin:.zero,size:source) : CGRect(origin:.zero,size:source)
         let scale=viewport.width/max(1,crop.width)
+        let window=CGRect(origin:viewportOrigin,size:viewport)
         ZStack(alignment:.topLeading) {
-            Color.black
+            Color.black.frame(width:viewport.width,height:viewport.height)
+                .offset(x:viewportOrigin.x,y:viewportOrigin.y)
             // Keep the source surface at the same structural identity through tool and aspect changes.
             sourceContent.frame(width:source.width*scale,height:source.height*scale)
-                .offset(x:-crop.minX*scale,y:-crop.minY*scale)
+                .offset(x:viewportOrigin.x-crop.minX*scale,y:viewportOrigin.y-crop.minY*scale)
                 .opacity(composition && model.isPlaying ? 0 : 1)
             if let player=model.previewPlayer {
                 PlayerSurface(player:player).frame(width:viewport.width,height:viewport.height)
+                    .offset(x:viewportOrigin.x,y:viewportOrigin.y)
                     .opacity(composition && model.isPlaying ? 1 : 0).allowsHitTesting(false).accessibilityHidden(true)
             }
             if composition {
+                Rectangle().fill(.regularMaterial)
+                    .overlay(Color.black.opacity(0.12))
+                    .frame(width:canvas.width,height:canvas.height)
+                    .mask {
+                        Path {path in
+                            path.addRect(CGRect(origin:.zero,size:canvas));path.addRect(window)
+                        }.fill(style:FillStyle(eoFill:true))
+                    }.allowsHitTesting(false).accessibilityHidden(true)
                 if model.compositionAdjusting {
                     Path { path in
                         for fraction in [1.0/3,2.0/3] {
@@ -29,22 +42,28 @@ struct CompositionVideoViewport: View {
                             path.move(to:.init(x:0,y:viewport.height*fraction))
                             path.addLine(to:.init(x:viewport.width,y:viewport.height*fraction))
                         }
-                    }.stroke(.white.opacity(0.5),lineWidth:0.5).allowsHitTesting(false)
+                    }.stroke(.white.opacity(0.5),lineWidth:0.5)
+                        .frame(width:viewport.width,height:viewport.height)
+                        .offset(x:viewportOrigin.x,y:viewportOrigin.y).allowsHitTesting(false)
                 }
                 CompositionGestureSurface(enabled:model.compositionEditing && model.settingsEnabled && !model.redactionEditing && !model.compositionBusy && !model.isPlaying,
-                    crop:{model.compositionCrop ?? .zero},begin:{model.beginCompositionGesture()},
+                    viewport:window, crop:{model.compositionCrop ?? .zero},begin:{model.beginCompositionGesture()},
                     change:{model.applyCompositionCrop($0)},end:{model.endCompositionGesture(cancelled:$0)},
                     value:"\(model.project?.settings.compositionScale ?? 1),\(model.project?.settings.compositionX ?? 0),\(model.project?.settings.compositionY ?? 0)")
-                    .frame(width:viewport.width,height:viewport.height)
+                    .frame(width:canvas.width,height:canvas.height)
                     .accessibilityAction(named:"放大") {model.compositionZoom(1.1)}
                     .accessibilityAction(named:"缩小") {model.compositionZoom(1/1.1)}
                     .accessibilityAction(named:"向左移动") {model.compositionMove(x:-0.03,y:0)}
                     .accessibilityAction(named:"向右移动") {model.compositionMove(x:0.03,y:0)}
             }
-        }.frame(width:viewport.width,height:viewport.height,alignment:.topLeading)
+        }.frame(width:canvas.width,height:canvas.height,alignment:.topLeading)
             .contentShape(Rectangle()).clipped()
             .overlay {
-                if composition {Rectangle().stroke(.white.opacity(0.35),lineWidth:1).allowsHitTesting(false)}
+                if composition {
+                    Rectangle().stroke(.white.opacity(0.5),lineWidth:1)
+                        .frame(width:viewport.width,height:viewport.height)
+                        .position(x:window.midX,y:window.midY).allowsHitTesting(false)
+                }
             }
     }
     private var sourceContent: some View {
@@ -59,6 +78,7 @@ struct CompositionVideoViewport: View {
 
 private struct CompositionGestureSurface:UIViewRepresentable {
     var enabled:Bool
+    var viewport:CGRect
     var crop:()->CGRect
     var begin:()->Void
     var change:(CGRect)->Void
@@ -85,8 +105,9 @@ private struct CompositionGestureSurface:UIViewRepresentable {
         func gestureRecognizer(_ a:UIGestureRecognizer,shouldRecognizeSimultaneouslyWith b:UIGestureRecognizer) -> Bool {a.view===self && b.view===self}
         private func rebase() {
             base=callbacks?.crop() ?? .zero;pan.setTranslation(.zero,in:self);pinch.scale=1
-            let point=pinch.numberOfTouches>=2 ? pinch.location(in:self) : .init(x:bounds.midX,y:bounds.midY)
-            anchor = .init(x:point.x/max(1,bounds.width),y:point.y/max(1,bounds.height))
+            let window=callbacks?.viewport ?? bounds
+            let point=pinch.numberOfTouches>=2 ? pinch.location(in:self) : .init(x:window.midX,y:window.midY)
+            anchor = .init(x:(point.x-window.minX)/max(1,window.width),y:(point.y-window.minY)/max(1,window.height))
         }
         @objc private func handle(_ recognizer:UIGestureRecognizer) {
             let id=ObjectIdentifier(recognizer)
@@ -94,7 +115,7 @@ private struct CompositionGestureSurface:UIViewRepresentable {
             case .began:
                 if active.isEmpty {callbacks?.begin()};active.insert(id);rebase()
             case .changed:
-                callbacks?.change(CompositionGeometry.transformed(base,scale:Double(pinch.scale),translation:CGSize(width:pan.translation(in:self).x,height:pan.translation(in:self).y),anchor:anchor,viewport:bounds.size))
+                callbacks?.change(CompositionGeometry.transformed(base,scale:Double(pinch.scale),translation:CGSize(width:pan.translation(in:self).x,height:pan.translation(in:self).y),anchor:anchor,viewport:callbacks?.viewport.size ?? bounds.size))
             case .ended,.cancelled,.failed:
                 guard active.contains(id) else {return}
                 active.remove(id)

@@ -65,6 +65,11 @@ private actor WorkflowExporter:VideoExporting {
         XCTAssertTrue(try XCTUnwrap(model.project).settings.redaction.enabled)
         XCTAssertEqual(model.compositionCrop,crop)
         model.clearRedactions();model.finishRedaction(commit:true)
+        model.updateRange(start:0.2,end:0.8,previewTime:0.2)
+        try await wait {!model.compositionBusy}
+        XCTAssertTrue(model.hasCompletedTracking)
+        XCTAssertEqual(model.currentTime,0.2,accuracy:0.001)
+        XCTAssertEqual(model.project?.settings.end,0.8)
         let saved=try XCTUnwrap(model.project)
         model.goHome()
         let fresh=WorkflowTracker(),restored=AppModel(store:store,pipeline:fresh,exporter:exporter)
@@ -106,6 +111,29 @@ private actor WorkflowExporter:VideoExporting {
         restored.goHome()
         XCTAssertEqual(restored.project?.settings.aspectRatio,.square,"Leaving during preview preparation must preserve immediate settings")
 
+    }
+    func testExtendingRangeBeyondAnalyzedFramesRequiresAnalysisAndRetainsComposition() async throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer {try? FileManager.default.removeItem(at:root)}
+        let model=AppModel(store:ProjectStore(directory:root),pipeline:WorkflowTracker(),exporter:WorkflowExporter())
+        model.startDemo();defer {model.goHome()}
+        model.selectTarget(.init(x:0.3,y:0.2,width:0.2,height:0.6))
+        model.project?.isDemo=false;model.project?.metadata = .init(width:1280,height:720,duration:2,frameRate:30)
+        model.project?.targetTime=0.5
+        model.project?.settings.start=0.2;model.project?.settings.end=1
+        model.targetSamples=(2...10).map {.init(time:Double($0)/10,body:model.project!.target!)}
+        model.hasCompletedTracking=true
+        model.beginComposition();try await wait {!model.compositionBusy}
+        let scale=model.project?.settings.compositionScale
+        model.updateRange(end:1.5,previewTime:1.5)
+        XCTAssertFalse(model.hasCompletedTracking)
+        XCTAssertFalse(model.compositionEditing)
+        XCTAssertNil(model.previewPlayer)
+        XCTAssertEqual(model.project?.settings.end,1.5)
+        XCTAssertEqual(model.project?.settings.compositionScale,scale)
+        XCTAssertTrue(model.canConfirm)
+        model.updateRange(end:1)
+        XCTAssertTrue(model.hasCompletedTracking,"Returning inside cached analysis reuses it")
     }
     private func wait(line:UInt = #line,_ condition:()->Bool) async throws {
         for _ in 0..<1000 {if condition(){return};try await Task.sleep(for:.milliseconds(10))}

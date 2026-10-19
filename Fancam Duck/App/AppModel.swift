@@ -559,14 +559,23 @@ final class AppModel {
         } else { seek(to:currentTime) }
     }
     func updateRange(start: Double? = nil, end: Double? = nil, previewTime: Double? = nil) {
-        guard settingsEnabled,!compositionBusy,!compositionAdjusting, let project else { return }
+        guard settingsEnabled,!compositionBusy,!compositionAdjusting,
+              start?.isFinite != false,end?.isFinite != false,previewTime?.isFinite != false,
+              let project else { return }
+        pausePreview(refresh:false)
+        let wasAnalyzed=hasCompletedTracking
         let minimum = min(0.5, project.metadata.duration)
         var settings = project.settings
         if let start { settings.start = min(max(0, start), max(0, min(project.metadata.duration, end ?? settings.end) - minimum)) }
         if let end { settings.end = min(project.metadata.duration, max(settings.start + minimum, end)) }
         self.project?.settings = settings
         if let selected=self.project {
-            hasCompletedTracking = !targetSamples.isEmpty && (try? VideoExporter.validateTrajectory(targetSamples,project:selected)) != nil
+            if selected.isDemo {
+                hasCompletedTracking = targetSamples.first.map {$0.time<=settings.start} == true
+                    && targetSamples.last.map {$0.time>=settings.end} == true
+            } else {
+                hasCompletedTracking = !targetSamples.isEmpty && (try? VideoExporter.validateTrajectory(targetSamples,project:selected)) != nil
+            }
         }
         if !hasCompletedTracking,let selected=self.project,selected.target != nil,
            selected.targetTime<selected.settings.start || selected.targetTime>selected.settings.end {
@@ -576,6 +585,13 @@ final class AppModel {
            anchor.time<settings.start || anchor.time>settings.end {self.project?.settings.compositionAnchor=nil}
         let updated = self.project!.settings
         let time = previewTime ?? (end != nil ? updated.end : updated.start)
+        if wasAnalyzed && !hasCompletedTracking {
+            if redactionEditing {finishRedaction(commit:true)}
+            if compositionEditing {finishComposition(commit:true,refreshDetections:false)}
+            previewPlayer?.pause();previewPlayer=nil
+            targetExplicitlySelected=self.project?.target != nil
+            seek(to:time);persist();return
+        }
         if compositionEditing {
             // Timeline edits are global; cancelling a composition only rolls back its viewport.
             compositionSnapshot?.start = updated.start
@@ -595,6 +611,7 @@ final class AppModel {
                 refreshComposition()
             }
         } else { seek(to: time) }
+        persist()
     }
     func persist() {
         guard var project,!project.isDemo else { return }
