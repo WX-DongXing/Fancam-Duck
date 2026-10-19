@@ -1044,6 +1044,7 @@ extension AppModel {
     func setRedactionRegion(_ region:RedactionSettings.Region) {
         guard settingsEnabled,project?.settings.redaction.region != region else {return}
         project?.settings.redaction.region=region;project?.redactionPlan=nil
+        if region == .person,project?.settings.redaction.style == .image {project?.settings.redaction.style = .frosted}
         refreshRedactionPreview();persist()
     }
     func setRedactionStrength(_ value:Double) {
@@ -1122,20 +1123,26 @@ extension AppModel {
 
 extension AppModel {
     func setRedactionStyle(_ style:RedactionSettings.Style) {
-        guard settingsEnabled else {return}
-        if style == .image {
-            guard let data=UIImage(named:"BrandLogo")?.pngData() else {errorMessage="内置 Logo 无法读取";return}
+        guard settingsEnabled,style != .image || project?.settings.redaction.region == .face else {return}
+        if style == .image,project?.settings.redaction.imageData == nil {
+            guard let data=RedactionSticker.duck.data else {errorMessage="内置贴片无法读取";return}
             project?.settings.redaction.imageData=data
         }
         project?.settings.redaction.style=style
         refreshRedactionPreview();persist()
     }
+    func setRedactionSticker(_ sticker:RedactionSticker) {
+        guard settingsEnabled,project?.settings.redaction.region == .face,let data=sticker.data else {return}
+        project?.settings.redaction.imageData=data;project?.settings.redaction.style = .image
+        refreshRedactionPreview();persist()
+    }
     func importRedactionImage(_ data:Data) async {
-        guard settingsEnabled,redactionEditing,let projectID=project?.id else {return}
+        guard settingsEnabled,redactionEditing,project?.settings.redaction.region == .face,let projectID=project?.id else {return}
         let id=UUID();redactionImageID=id;importingRedactionImage=true
         do {
             let prepared=try await Task.detached(priority:.userInitiated) {try RedactionImage.prepare(data)}.value
             guard redactionImageID==id,project?.id==projectID,redactionEditing else {return}
+            guard project?.settings.redaction.region == .face else {importingRedactionImage=false;return}
             project?.settings.redaction.imageData=prepared;project?.settings.redaction.style = .image
             importingRedactionImage=false;refreshRedactionPreview();persist()
         } catch {

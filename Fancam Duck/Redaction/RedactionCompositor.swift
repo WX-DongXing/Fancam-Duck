@@ -93,10 +93,12 @@ enum RedactionRenderer {
             let rect=CGRect(x:box.x*source.width,y:(1-box.y-box.height)*source.height,width:box.width*source.width,height:box.height*source.height).applying(transform)
             guard rect.intersects(extent) else { continue }
             if style == .image,let sticker {
-                // Fill with a small, fixed overscan. Transparent image edges retain their own shape;
+                // Enlarge face sticker content by 18% over the previous 1.12 scale.
+                // Preserve the protected coverage boundary so it cannot reach neighboring people.
+                // Transparent image edges retain their own shape;
                 // no generated backing, blurred outline or shadow is composited behind the sticker.
                 let coverage=rect
-                let fit=max(coverage.width/sticker.extent.width,coverage.height/sticker.extent.height)*1.12
+                let fit=max(coverage.width/sticker.extent.width,coverage.height/sticker.extent.height)*(region == .face ? 1.32 : 1.12)
                 let fitted=sticker.transformed(by:.init(translationX:-sticker.extent.minX,y:-sticker.extent.minY))
                     .transformed(by:.init(scaleX:fit,y:fit))
                     .transformed(by:.init(translationX:coverage.midX-sticker.extent.width*fit/2,y:coverage.midY-sticker.extent.height*fit/2))

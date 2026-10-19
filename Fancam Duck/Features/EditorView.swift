@@ -6,6 +6,7 @@ struct EditorView: View {
     @State private var savingFile=false
     @State private var generatedPlaying=false
     @State private var redactionStrengthEditing=false
+    @State private var showRedactionHelp=false
     @State private var drawnBox: NormalizedRect?
     @State private var showLeaveConfirmation = false
     @Environment(\.scenePhase) private var scenePhase
@@ -525,7 +526,101 @@ struct EditorView: View {
     private let panelSpacing:CGFloat = 0
     private let panelInset:CGFloat = 12
     private var panelFont:Font {.caption}
-    private var redactionPanel: some View {
+    @ViewBuilder private var redactionPanel: some View {
+        #if targetEnvironment(macCatalyst)
+        fullRedactionPanel
+        #else
+        if horizontalSizeClass == .compact {phoneRedactionPanel}
+        else {fullRedactionPanel}
+        #endif
+    }
+    private var phoneRedactionPanel: some View {
+        VStack(spacing:8) {
+            HStack(spacing:12) {
+                Toggle(isOn:Binding(
+                    get:{model.project?.settings.redaction.enabled == true},
+                    set:{if $0 {model.enableAutomaticRedaction()} else {model.clearRedactions()}}
+                )) {
+                    HStack(spacing:4) {
+                        Text("打码")
+                        Button {showRedactionHelp=true} label: {
+                            Image(systemName:"questionmark.circle").font(.subheadline)
+                                .frame(width:44,height:44,alignment:.leading).contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityLabel("打码说明").accessibilityIdentifier("redactionHelp")
+                        .popover(isPresented:$showRedactionHelp,attachmentAnchor:.point(UnitPoint(x:0.18,y:0.5)),arrowEdge:.bottom) {
+                            Text("对主角外人物进行打码")
+                                .font(.subheadline).padding(16)
+                                .presentationCompactAdaptation(.popover)
+                        }
+                    }
+                }
+                .font(.subheadline.weight(.medium)).toggleStyle(.switch)
+                .accessibilityIdentifier("redactionEnabled")
+                ZStack {
+                if model.project?.settings.redaction.enabled == true {
+                Menu {
+                    Picker("打码范围",selection:Binding(
+                        get:{model.project?.settings.redaction.region ?? .face},
+                        set:{model.setRedactionRegion($0)}
+                    )) {
+                        ForEach(RedactionSettings.Region.allCases,id:\.self) {region in
+                            Text(region == .face ? "人脸" : "全身").tag(region)
+                        }
+                    }
+                    if model.redactionPrimaryBody == nil {
+                        Divider()
+                        Button("回到选人帧",systemImage:"viewfinder") {model.seek(to:model.project?.targetTime ?? 0)}
+                    }
+                } label: {
+                    HStack(spacing:5) {
+                        Text(model.project?.settings.redaction.region == .person ? "全身" : "人脸")
+                            .lineLimit(1).minimumScaleFactor(0.8)
+                        Image(systemName:"chevron.down").font(.caption2.weight(.semibold))
+                    }.font(.subheadline).padding(.horizontal,10).frame(minWidth:76,minHeight:44)
+                        .background(.white.opacity(0.06),in:Capsule())
+                }.accessibilityLabel("打码范围")
+                    .accessibilityValue(model.project?.settings.redaction.region == .person ? "全身" : "人脸")
+                    .accessibilityIdentifier("redactionRegionMenu")
+                    .transition(reduceMotion ? .identity : .opacity.combined(with:.offset(y:4)))
+                }
+                }.frame(width:88,height:44)
+                    .animation(reduceMotion ? nil : .easeInOut(duration:0.22),value:model.project?.settings.redaction.enabled)
+            }.frame(height:44)
+            NativeSegmentedControl(title:"打码样式",options:RedactionSettings.Style.allCases.filter {model.project?.settings.redaction.region != .person || $0 != .image},selection:Binding(
+                get:{model.project?.settings.redaction.style ?? .frosted},set:{model.setRedactionStyle($0)}
+            ),label:{$0 == .image ? "贴片" : $0.rawValue})
+            .frame(height:48).accessibilityIdentifier("redactionStyle")
+            HStack(spacing:10) {
+                if model.project?.settings.redaction.style == .image {
+                    ForEach(RedactionSticker.allCases) {sticker in
+                        Button {model.setRedactionSticker(sticker)} label: {
+                            if let image=sticker.image {
+                                Image(uiImage:image).resizable().scaledToFit().frame(width:34,height:34)
+                                    .frame(maxWidth:.infinity,minHeight:44)
+                                    .background(model.project?.settings.redaction.imageData == sticker.data ? .white.opacity(0.16) : .clear,in:RoundedRectangle(cornerRadius:12))
+                            }
+                        }.buttonStyle(.plain).accessibilityLabel(sticker.title+"贴片")
+                            .accessibilityIdentifier("redactionSticker-"+sticker.rawValue)
+                            .accessibilityAddTraits(model.project?.settings.redaction.imageData == sticker.data ? .isSelected : [])
+                    }
+                } else {
+                    Text("强度").font(.caption)
+                    Slider(value:Binding(
+                        get:{model.project?.settings.redaction.strength ?? 0.65},
+                        set:{model.setRedactionStrength($0)}
+                    ),in:0.3...1)
+                    .tint(.white).accessibilityLabel("打码强度")
+                    .accessibilityIdentifier("redactionStrength")
+                    Text("\(Int((model.project?.settings.redaction.strength ?? 0.65)*100))%")
+                        .font(.caption.monospacedDigit()).frame(width:34,alignment:.trailing)
+                        .accessibilityHidden(true)
+                }
+            }.frame(height:44)
+        }.padding(12)
+            .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24)))
+            .accessibilityElement(children:.contain)
+    }
+    private var fullRedactionPanel: some View {
         VStack(spacing:max(8,panelSpacing)) {
             if redactionStrengthEditing && model.project?.settings.redaction.style != .image {
                 HStack(spacing:12) {
@@ -540,7 +635,7 @@ struct EditorView: View {
                 .frame(height:48)
                 .accessibilityIdentifier("redactionRegion")
             }
-            NativeSegmentedControl(title:"打码样式",options:RedactionSettings.Style.allCases,selection:Binding(
+            NativeSegmentedControl(title:"打码样式",options:RedactionSettings.Style.allCases.filter {model.project?.settings.redaction.region != .person || $0 != .image},selection:Binding(
                 get:{model.project?.settings.redaction.style ?? .frosted},set:{model.setRedactionStyle($0)}
             ),label:{$0.rawValue})
             .frame(height:48)

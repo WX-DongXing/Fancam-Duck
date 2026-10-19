@@ -82,6 +82,28 @@ private actor RedactionReviewPipeline: TargetTracking {
         XCTAssertEqual(analyses,0,"Camera analysis remains reusable")
         XCTAssertEqual(masks,1,"Confirm must generate the edited mask region")
     }
+    func testBuiltInStickersPersistPixelsAndFullBodyRejectsImageStyle() throws {
+        let model=AppModel();model.startDemo()
+        defer {model.goHome()}
+        model.selectTarget(DemoStage.body(index:1,time:0));model.beginRedaction()
+        for sticker in RedactionSticker.allCases {
+            let data=try XCTUnwrap(sticker.data)
+            let image=try XCTUnwrap(RedactionImage.decode(data))
+            XCTAssertNotEqual(image.alphaInfo,.none)
+            model.setRedactionSticker(sticker)
+            XCTAssertEqual(model.project?.settings.redaction.imageData,data)
+            XCTAssertEqual(model.project?.settings.redaction.style,.image)
+        }
+        let saved=try JSONEncoder().encode(model.project!.settings.redaction)
+        let restored=try JSONDecoder().decode(RedactionSettings.self,from:saved)
+        XCTAssertEqual(restored.imageData,RedactionSticker.alien.data)
+        model.setRedactionRegion(.person)
+        XCTAssertEqual(model.project?.settings.redaction.style,.frosted)
+        model.setRedactionStyle(.image);model.setRedactionSticker(.cat)
+        XCTAssertEqual(model.project?.settings.redaction.style,.frosted)
+        model.setRedactionRegion(.face);model.setRedactionStyle(.image)
+        XCTAssertEqual(model.project?.settings.redaction.imageData,restored.imageData)
+    }
     func testImmediateMaskSettingsPreserveDisabledChoiceAcrossTools() async throws {
         let model=AppModel();model.startDemo()
         let primary=DemoStage.body(index:1,time:0)
