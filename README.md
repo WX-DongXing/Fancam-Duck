@@ -128,3 +128,7 @@ xcodebuild -project 'Fancam Duck.xcodeproj' -scheme 'Fancam Duck' \
 ## 第三方模型与许可
 
 TrackTrack 和 OSNet 参考源码许可位于 `tools/reference`。Ultralytics 模型／软件、预训练权重及数据集的使用条件需分别核查，不能仅凭参考源码许可认定全部模型可商用；发布前需完成相应授权确认。模型来源说明中保留了相关链接。
+
+## macOS 安装包
+
+运行 `tools/release/build-macos.sh --local` 生成双架构本地试用 App 和 ZIP。Developer ID 签名及 Apple 公证参数见 [macOS 发布指南](docs/ai/macos-release.md)。产物默认保存在已忽略的 `build/macos/`。

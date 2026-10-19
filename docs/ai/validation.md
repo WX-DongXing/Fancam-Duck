@@ -28,6 +28,10 @@ A1 图标覆盖 iPhone、iPad／Duo 和 Mac Catalyst；素材及重建步骤见 
 
 脚本验证资源编译和应用构建，不代表签名、商店上传、启动器显示或实际设备 UI 验收。页面 Logo 替换后再次通过上述三平台 Release 构建；已覆盖安装并启动 iPhone 17 Pro（iOS 26.3.1）与 Duo（iOS 27.1），实际检查手机和宽屏首页 Logo 显示正常。Mac 页面仅完成构建验证。未运行单元或真实视频性能测试。
 
+## macOS 发布脚本
+
+入口和签名／公证参数见 [macOS 发布指南](macos-release.md)。2026-10-19 在 `058e324` 基础的工作区中使用 Xcode 27.1 验证 `tools/release/build-macos.sh --local`：Release 通用架构构建、ad-hoc 签名、严格签名校验、AppIcon 与两个模型资源检查、ZIP 完整性及 SHA-256 校验均通过。帮助信息及未知参数、缺失公证 profile、local 模式请求公证、缺失团队 ID 的拒绝路径通过。Developer ID 归档／导出与 Apple 公证未实际运行，不能据此认定正式发布链路已通过。
+
 ## 按改动选择测试
 
 | 修改范围 | 优先套件 |
