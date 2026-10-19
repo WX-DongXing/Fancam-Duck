@@ -175,10 +175,16 @@ struct EditorView: View {
                                 .background(selected ? DesktopPalette.raised : .clear,in:RoundedRectangle(cornerRadius:7))
                         }.buttonStyle(.plain).foregroundStyle(selected ? .white : .secondary)
                             .accessibilityIdentifier("tool-"+tool.rawValue).accessibilityAddTraits(selected ? .isSelected : [])
-                            .disabled(!model.settingsEnabled || timelineTrimming || model.compositionBusy || model.compositionAdjusting || (tool != .selection && (model.project?.target == nil || model.detecting)))
+                            .disabled(!model.settingsEnabled || timelineTrimming || model.compositionBusy || model.compositionAdjusting || (tool != .selection && model.project?.target == nil))
                     }
                 }.padding(4).background(DesktopPalette.background,in:RoundedRectangle(cornerRadius:10))
                     .accessibilityElement(children:.contain).accessibilityIdentifier("editorToolbar")
+                if let activity=model.editorActivityText {
+                    HStack(spacing:8) {
+                        ProgressView().controlSize(.small)
+                        Text(activity).font(.system(size:11)).foregroundStyle(.secondary)
+                    }.accessibilityElement(children:.combine).accessibilityIdentifier("editorActivity")
+                }
                 if activeTool == .composition {desktopCompositionSettings}
                 else if activeTool == .redaction {desktopRedactionSettings}
                 else {
@@ -210,7 +216,7 @@ struct EditorView: View {
                     withAnimation(reduceMotion ? nil : .smooth(duration:0.32)) {model.setCompositionAspect(value)}
                 })) {ForEach(OutputAspectRatio.allCases) {Text($0.rawValue).tag($0)}}
                     .pickerStyle(.segmented).labelsHidden().accessibilityIdentifier("compositionAspect")
-            }
+            }.disabled(compositionControlsDisabled)
             DesktopSection(title:"位置与缩放") {
                 HStack(spacing:8) {
                     Button {model.compositionZoom(1/1.1)} label:{Label("缩小",systemImage:"minus.magnifyingglass").frame(maxWidth:.infinity)}
@@ -220,11 +226,11 @@ struct EditorView: View {
                     Button {model.centerComposition(horizontal:true)} label:{Label("水平居中",systemImage:"align.horizontal.center").frame(maxWidth:.infinity)}
                     Button {model.centerComposition(horizontal:false)} label:{Label("垂直居中",systemImage:"align.vertical.center").frame(maxWidth:.infinity)}
                 }.buttonStyle(DesktopButtonStyle())
-                Text(model.compositionNotice ?? "直接拖动画面调整位置，双指缩放。")
+                Text(model.editorActivityText ?? model.compositionNotice ?? "直接拖动画面调整位置，双指缩放。")
                     .font(.system(size:11)).foregroundStyle(.secondary)
-            }
+            }.disabled(compositionControlsDisabled)
             HStack {toolCancel;Spacer();toolCommit}
-        }.disabled(compositionControlsDisabled)
+        }
             .accessibilityElement(children:.contain).accessibilityIdentifier("adjustmentPanel")
     }
     private var desktopRedactionSettings:some View {
@@ -336,9 +342,14 @@ struct EditorView: View {
             .animation(reduceMotion ? nil : .smooth(duration:0.32),value:model.project?.settings.aspectRatio)
     }
     private var sourceHint: String {
+        if model.manualSelection { return "拖动框体移动 · 拖四角调整" }
+        if let activity=model.editorActivityText {return activity}
+        if model.phase == .editing,model.hasCompletedTracking,let project=model.project,
+           project.settings.redaction.enabled,project.redactionPlan?.covers(project) != true {
+            return "打码已更改 · 重新生成后可播放"
+        }
         if model.redactionIssue != nil {return "轻点需要继续打码的同一人物"}
         if model.redactionEditing {return model.project?.settings.redaction.enabled == true ? "自动遮挡所有其他人物 · 主角保持清晰" : "打码已关闭"}
-        if model.manualSelection { return "拖动框体移动 · 拖四角调整" }
         if isBlocked { return "轻点原片中的目标舞者" }
         if model.detecting { return "正在识别人物" }
         if let notice = model.detectionNotice { return notice }
@@ -412,7 +423,7 @@ struct EditorView: View {
                                     .contentShape(Capsule())
                             }.buttonStyle(.plain).accessibilityIdentifier("tool-" + tool.rawValue)
                                 .accessibilityAddTraits(selected ? .isSelected : [])
-                                .disabled(!model.settingsEnabled || timelineTrimming || model.compositionBusy || model.compositionAdjusting || ((tool == .composition || tool == .redaction) && (model.project?.target == nil || model.detecting)))
+                                .disabled(!model.settingsEnabled || timelineTrimming || model.compositionBusy || model.compositionAdjusting || ((tool == .composition || tool == .redaction) && model.project?.target == nil))
                         }
                     }.padding(4).modifier(StudioGlassSurface(shape: Capsule()))
                         .accessibilityElement(children: .contain).accessibilityIdentifier("editorToolbar")
@@ -532,7 +543,7 @@ struct EditorView: View {
                                         .modifier(StudioGlassSelection(selected:selected,namespace:toolSelection,selectionID:"expanded-tool",optionID:tool.rawValue))
                                 }.buttonStyle(.plain).accessibilityIdentifier("tool-"+tool.rawValue)
                                     .accessibilityAddTraits(selected ? .isSelected : [])
-                                    .disabled(!model.settingsEnabled || timelineTrimming || model.compositionBusy || model.compositionAdjusting || (tool != .selection && (model.project?.target == nil || model.detecting)))
+                                    .disabled(!model.settingsEnabled || timelineTrimming || model.compositionBusy || model.compositionAdjusting || (tool != .selection && model.project?.target == nil))
                             }
                         }.padding(4).modifier(StudioGlassSurface(shape:Capsule()))
                             .accessibilityElement(children:.contain).accessibilityIdentifier("editorToolbar")
@@ -555,6 +566,11 @@ struct EditorView: View {
     }
     private var canStart: Bool { !timelineTrimming && model.canConfirm }
     private var startTitle: String {
+        if model.restoringTracking {return "正在恢复项目…"}
+        if model.compositionBusy {return "正在准备预览…"}
+        if model.importingRedactionImage {return "正在准备图片…"}
+        if model.detecting {return "正在识别人物…"}
+        if model.isPlaying {return "请先暂停预览"}
         if model.needsRegeneration {return "重新生成"}
         if activeTool == .composition { return "确认并处理" }
         return model.hasReusableOutput ? "预览成片" : "开始处理"
@@ -588,7 +604,7 @@ struct EditorView: View {
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             finishTool(commit: true)
-            model.pausePreview(refresh: false); model.manualSelection = true
+            model.beginManualSelection()
             drawnBox = model.project?.target ?? .init(x: 0.32, y: 0.12, width: 0.36, height: 0.76)
         }
     }
@@ -708,7 +724,7 @@ struct EditorView: View {
             HStack(spacing: 8) {
                 toolCancel
                 Spacer(minLength: 0)
-                Text(model.compositionNotice ?? "拖动位置 · 双指缩放")
+                Text(model.editorActivityText ?? model.compositionNotice ?? "拖动位置 · 双指缩放")
                     .font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
                 toolCommit
@@ -729,7 +745,7 @@ struct EditorView: View {
             Text("完成").font(.subheadline.weight(.semibold))
                 .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
         }
-            .buttonStyle(.plain).accessibilityLabel("确定调整").accessibilityIdentifier("commitTool").disabled(compositionControlsDisabled)
+            .buttonStyle(.plain).accessibilityLabel("确定调整").accessibilityIdentifier("commitTool").disabled(compositionControlsDisabled || model.importingRedactionImage)
     }
     private func compositionControl(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {

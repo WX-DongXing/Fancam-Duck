@@ -122,6 +122,8 @@ struct StudioIcon: View {
         Button(action: action) {
             Image(systemName: symbol).symbolRenderingMode(.monochrome)
                 .font(.system(size: 17, weight: .regular)).frame(width: 44, height: 44)
+                // Include the empty space around the glyph in the button's hit area.
+                .contentShape(Circle())
         }.buttonStyle(.plain).foregroundStyle(.white).frame(width: 44, height: 44)
             .contentShape(Circle()).modifier(StudioGlassSurface(shape: Circle(), selected: selected))
             .accessibilityLabel(label)

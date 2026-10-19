@@ -2,7 +2,9 @@
 
 ## 工具链
 
-部署基线 iOS18，当前验证使用 Xcode27.1。Duo 的原生分区布局在 iOS27.1 SDK 路径下启用。使用 `xcodebuild -showdestinations -project 'Fancam Duck.xcodeproj' -scheme 'Fancam Duck'` 查看本机目标，不在文档固化模拟器 UUID。
+部署基线 iOS18。历史验证使用 Xcode27.1；2026-10-19 当前本机工具链为 Xcode27.0（27A266a）。Duo 原生分区布局需要含相应 API 的 SDK 及显式编译标志，默认使用自适应布局。使用 `xcodebuild -showdestinations -project 'Fancam Duck.xcodeproj' -scheme 'Fancam Duck'` 查看本机目标，不在文档固化模拟器 UUID。
+
+Xcode 27.0 的 SwiftUI SDK 不含 `ArrangementView`，仅用 `#available(iOS 27.1, *)` 仍会编译失败。工程默认采用既有 `AnyLayout` 自适应布局，支持手机、宽屏与 Mac；只有确认所用 SDK 包含 ArrangementView 及相关修饰符时，才在 Swift Active Compilation Conditions 中追加 `FANCAM_DUCK_NATIVE_ARRANGEMENT` 启用原生分区分支。不要在旧 SDK 下设置该标志。
 
 ```sh
 # 单元与媒体集成
@@ -35,6 +37,10 @@ A1 图标覆盖 iPhone、iPad／Duo 和 Mac Catalyst；素材及重建步骤见 
 `.env.release` 一键入口追加验证（2026-10-19）：`release-macos.sh --local` 实际读取本地配置并完成双架构构建、ad-hoc 签名与 ZIP 打包，ZIP 完整性和 SHA-256 校验通过。隔离配置测试覆盖默认公证参数传递、带空格 profile、local／signed-only 覆盖、非法模式／布尔值／版本／构建号拒绝；缺失团队 ID 在构建前失败。实际配置已被 Git 忽略且权限为 600。正式 Developer ID 签名及公证仍未实测。
 
 ## 按改动选择测试
+
+真实编辑链路专项：显式设置 `TEST_RUNNER_FANCAM_DUCK_REAL_EDITOR_VALIDATION=1` 和 `TEST_RUNNER_FANCAM_DUCK_TEST_VIDEO=<本地人物视频>`，执行 `RealEditorInteractionTests`。该用例使用生产 CoreMLTrackingPipeline、AppModel、ProjectStore、VideoExporter，以真实检测选出的主角完成全时长分析与导出，再修改打码并重新生成；没有使用替身检测或模拟人物。它覆盖真实媒体驱动的状态与设置操作，不等同于窗口点击、布局或性能验收。Mac 仅运行单元测试时，可用临时移除 UI Testable 的 Scheme 避开现有 UI 测试的 pinch 编译限制，验证后移除临时 Scheme。
+
+2026-10-19：桌面本地真实视频（1280×720、42.733 秒）完整时长验证通过，1 项通过、0 跳过、0 失败。检测待完成时进入构图／打码／手动框选、构图与打码取消回滚、候选检测恢复、真实 MP4 生成及修改为人脸马赛克后重新生成均通过。为控制验证产物体积，输出设为 180×320；未据此推断默认输出分辨率性能。最终窗口点击仍因界面控制工具无法访问新应用标识而未验证。
 
 | 修改范围 | 优先套件 |
 | --- | --- |

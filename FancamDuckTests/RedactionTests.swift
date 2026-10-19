@@ -49,6 +49,25 @@ final class RedactionTests: XCTestCase {
         XCTAssertEqual(AutomaticRedaction.candidates([left,right],primary:right.body).map(\.id),[left.id])
         XCTAssertEqual(AutomaticRedaction.candidates([right,left],primary:left.body).map(\.id),[right.id])
     }
+    func testAutomaticMasksAllowBystanderPredictionToLeaveFrame() throws {
+        var project=VideoProject.demo;project.settings.start=0;project.settings.end=1.6
+        project.settings.redaction = .init(region:.person,allOthers:true)
+        let primary=observation(id:1,x:0.1)
+        project.target=primary.body
+        let frames=(0...16).map { index -> (Double,DetectionBatch) in
+            var people=[primary]
+            if index<8 {
+                let other=PersonObservation(id:2,body:.init(x:0.72+Double(index)*0.03,y:0.2,width:0.05,height:0.65),confidence:0.95,keypoints:[],embedding:[0,1])
+                people.append(other)
+            }
+            return (Double(index)/10,.init(primary:people,relaxed:[]))
+        }
+        let samples=(0...16).map {TargetSample(time:Double($0)/10,body:primary.body)}
+        let plan=try AutomaticRedaction.build(frames:frames,project:project,samples:samples)
+        XCTAssertTrue(plan.covers(project))
+        XCTAssertFalse(plan.rectangles(at:0.5).isEmpty)
+        XCTAssertTrue(plan.rectangles(at:1.6).isEmpty)
+    }
     func testSmoothingAlwaysContainsObservationsAndDoesNotFlicker() throws {
         let input=(0...30).map { index -> RedactionFrame in
             let jitter=index.isMultiple(of:2) ? 0.006 : -0.006

@@ -18,7 +18,8 @@ struct WorkspaceArrangement<Canvas:View,Controls:View>:View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     private var columns:Bool {WorkspaceLayout.usesColumns(in:size)}
     @ViewBuilder var body:some View {
-        #if !targetEnvironment(macCatalyst)
+        // Availability checks cannot hide unknown symbols from an older SDK.
+        #if FANCAM_DUCK_NATIVE_ARRANGEMENT && !targetEnvironment(macCatalyst)
         if #available(iOS 27.1,*),horizontalSizeClass == .regular {
             ArrangementView {
                 canvas.frame(maxWidth:.infinity,maxHeight:.infinity)

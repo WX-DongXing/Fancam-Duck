@@ -152,7 +152,15 @@ final class EditorFlowTests: XCTestCase {
         app.buttons["dancer1"].tap();app.buttons["primaryAction"].tap()
         XCTAssertTrue(app.staticTexts["exportTitle"].waitForExistence(timeout:15))
         let play=app.buttons["播放成片"]
-        XCTAssertTrue(play.waitForExistence(timeout:5));play.tap()
+        XCTAssertTrue(play.waitForExistence(timeout:5))
+        // Tap inside the circular control but outside the small play/pause glyph.
+        for offset in [CGVector(dx:0.15,dy:0.5),CGVector(dx:0.85,dy:0.5)] {
+            play.coordinate(withNormalizedOffset:offset).tap()
+            XCTAssertTrue(app.buttons["暂停成片"].exists,"The full circular control must accept a single click")
+            app.buttons["暂停成片"].coordinate(withNormalizedOffset:offset).tap()
+            XCTAssertTrue(play.exists)
+        }
+        play.tap()
         XCTAssertTrue(app.buttons["暂停成片"].exists)
         XCUIDevice.shared.press(.home);app.activate()
         XCTAssertTrue(play.waitForExistence(timeout:5),"Backgrounding pauses the player and must reset its control")

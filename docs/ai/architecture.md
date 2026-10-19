@@ -30,6 +30,8 @@ editing → processing → readyToExport → exporting → completed
 
 `togglePreview` 和普通 `scrub` 仅在 editing 允许。`seek` 仍用于阻塞纠正中的明确帧检查。不能为了禁用普通时间轴把全部纠正寻帧也禁掉。
 
+编辑期候选检测不应阻止已有主角的构图、打码设置。进入构图或手动框选会使旧候选检测失效；检测任务退出时仅清理同项目、同 detectionID 的忙碌状态，避免旧任务清掉新任务状态。项目恢复、构图预览准备及图片准备期间通过 `editorActivityText` 和主按钮说明等待原因。构图取消不随面板计算禁用；处理／导出／身份阻塞的业务限制保持独立。
+
 ## 异步任务
 
 AppModel 保存多个 Task，并以 operationID、detectionID、compositionID、restorationID 等代次标识过滤旧结果。更新前还需核对 projectID。取消 Task 后不能假设底层服务立即停止，晚到进度、错误与完成回调仍可能发生。

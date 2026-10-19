@@ -114,6 +114,13 @@ final class AppModel {
     }
     var controlsEnabled: Bool { phase.canEditTarget }
     var settingsEnabled: Bool { phase == .editing && !restoringTracking }
+    var editorActivityText: String? {
+        if restoringTracking {return "正在恢复项目 · 设置稍后可用"}
+        if compositionBusy {return "正在准备构图预览 · 可取消"}
+        if importingRedactionImage {return "正在准备遮挡图片"}
+        if detecting {return project?.target == nil ? "正在识别人物 · 请稍候" : "正在识别当前帧 · 可调整设置"}
+        return nil
+    }
     var statusText: String {
         switch phase {
         case .editing:
@@ -692,6 +699,9 @@ final class AppModel {
         detectionTask?.cancel();observations=[];detecting=true;detectionNotice=nil
         let time = currentTime
         detectionTask = Task {
+            defer {
+                if detectionID==id,self.project?.id==project.id {detecting=false}
+            }
             do {
                 try await Task.sleep(for:.milliseconds(120))
                 let found = try await pipeline.detections(source: source, time: time, region: region)
@@ -707,6 +717,12 @@ final class AppModel {
                 detecting=false;errorMessage=error.localizedDescription
             }
         }
+    }
+    func beginManualSelection() {
+        guard controlsEnabled else {return}
+        pausePreview(refresh:false)
+        detectionID=UUID();detectionTask?.cancel();detecting=false
+        manualSelection=true
     }
     func finishManualBox(_ box: NormalizedRect) {
         guard controlsEnabled,box.isValid else { return }
@@ -750,7 +766,9 @@ extension AppModel {
         return [.init(time:project.targetTime,body:target,protection:observation.flatMap {$0.body.iou(target)>0.7 ? $0.protectionBody : nil},focusX:observation?.focusX)]
     }
     func beginComposition() {
-        guard settingsEnabled,project?.target != nil,!detecting else { return }
+        guard settingsEnabled,project?.target != nil else { return }
+        // Composition uses the selected anchor, not the pending frame's candidates.
+        detectionID=UUID();detectionTask?.cancel();detecting=false
         pausePreview(refresh:false);selectedTool=nil;manualSelection=false
         compositionSnapshot=project?.settings;compositionUndo=[];compositionEditing=true;compositionNotice=nil
         compositionCrop=nil;compositionAutomatic=nil;compositionFrames=[];compositionAutomaticFrames=[];compositionAutomaticSettings=nil

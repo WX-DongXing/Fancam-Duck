@@ -37,6 +37,9 @@ enum AutomaticRedaction {
                     lastSeen[track.id]=(time,body,mask)
                 } else {
                     guard let prior=lastSeen[track.id],time-prior.time<=0.6 else {continue}
+                    // An absent bystander may be predicted entirely outside the image.
+                    // End its visible segment rather than rejecting the whole clip.
+                    guard !track.filter.box.cgRect.intersection(CGRect(x:0,y:0,width:1,height:1)).isEmpty else {continue}
                     body=RedactionMotion.clamped(track.filter.box.cgRect)
                     // Don't let an old bystander prediction attach itself to the primary.
                     guard body.iou(primary)<0.35 else {continue}

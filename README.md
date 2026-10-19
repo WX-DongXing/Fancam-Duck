@@ -46,7 +46,7 @@ Mac Catalyst 工作台：
 工程与 Scheme 名称为 `Fancam Duck`，Swift 模块为 `FancamDuck`。中文应用名为「直拍鸭」，英文应用名为「Fancam Duck」。旧安装的签名标识保持兼容，历史项目目录在首次打开时迁移。
 
 - 部署基线：iOS 18；Mac 版本使用 Mac Catalyst。
-- 当前验证工具链：Xcode 27.1。iPhone Duo 的布局使用相应 SDK 的适配能力，建议使用同版本工具链。
+- 支持 Xcode 27.0 的自适应布局构建；原生 Duo 分区布局需包含相应 API 的 SDK，并显式启用编译标志，见 [工具链说明](docs/ai/validation.md#工具链)。历史验证使用过 Xcode 27.1。
 - 模型已包含在 `Fancam Duck/Models`，由 Xcode 编译，无需运行时下载；正常构建不需要 Python 环境。
 
 打开工程：

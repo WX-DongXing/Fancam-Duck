@@ -104,6 +104,55 @@ private actor ReviewExporter:VideoExporting {
         XCTAssertFalse(model.detecting);XCTAssertTrue(model.observations.isEmpty);XCTAssertNil(model.errorMessage)
         model.selectTarget(.init(x:0.3,y:0.2,width:0.2,height:0.6));XCTAssertTrue(model.canConfirm)
     }
+    func testDetectionAtOldFrameReleasesBusyState() async throws {
+        let gate=ReviewGate()
+        let delayed=ReviewTracker(detectionGate:gate)
+        let model=AppModel(store:store,pipeline:delayed)
+        model.open(try await project())
+        try await waitUntil {await gate.waiting>0}
+        model.currentTime=0.3
+        await gate.release()
+        try await waitUntil {await delayed.detectionsFinished>0}
+        try await Task.sleep(for:.milliseconds(30))
+        XCTAssertFalse(model.detecting,"A stale frame must not leave the editor busy")
+        XCTAssertTrue(model.observations.isEmpty)
+        model.goHome()
+    }
+    func testCompositionCanOpenAndCancelWhileDetectionIsPending() async throws {
+        let gate=ReviewGate()
+        let delayed=ReviewTracker(detectionGate:gate)
+        let model=AppModel(store:store,pipeline:delayed)
+        var p=try await project();p.target = .init(x:0.3,y:0.2,width:0.2,height:0.6)
+        model.open(p)
+        try await waitUntil {let waiting=await gate.waiting;return !model.restoringTracking && waiting>0}
+        XCTAssertNotNil(model.editorActivityText)
+        model.beginComposition()
+        XCTAssertTrue(model.compositionEditing)
+        XCTAssertFalse(model.detecting)
+        XCTAssertTrue(model.compositionBusy)
+        model.finishComposition(commit:false)
+        XCTAssertFalse(model.compositionEditing)
+        XCTAssertFalse(model.compositionBusy)
+        await gate.release()
+        try await waitUntil {await delayed.detectionsFinished>0}
+        XCTAssertTrue(model.observations.isEmpty,"Late detection must not reopen cancelled settings")
+        model.goHome()
+    }
+    func testManualSelectionSurvivesLateDetection() async throws {
+        let gate=ReviewGate()
+        let tracker=ReviewTracker(detectionGate:gate)
+        let model=AppModel(store:store,pipeline:tracker)
+        model.open(try await project())
+        try await waitUntil {await gate.waiting>0}
+        model.beginManualSelection()
+        XCTAssertFalse(model.detecting)
+        await gate.release()
+        try await waitUntil {await tracker.detectionsFinished>0}
+        try await Task.sleep(for:.milliseconds(30))
+        XCTAssertTrue(model.manualSelection,"Late candidates must not dismiss the drawing tool")
+        XCTAssertTrue(model.observations.isEmpty)
+        model.goHome()
+    }
     func testFinishingCancelledPreviewCannotNavigateAwayFromHome() async throws {
         let gate=ReviewGate(),exporter=ReviewExporter(previewGate:gate)
         let model=AppModel(store:store,pipeline:ReviewTracker(),exporter:exporter)
