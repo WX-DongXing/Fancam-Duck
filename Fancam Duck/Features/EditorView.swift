@@ -6,16 +6,12 @@ struct EditorView: View {
     @State private var savingFile=false
     @State private var generatedPlaying=false
     @State private var redactionStrengthEditing=false
-    @Namespace private var redactionStyleSelection
     @State private var drawnBox: NormalizedRect?
     @State private var showLeaveConfirmation = false
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .body) private var settingsHeight = 154
-    @Namespace private var aspectSelection
-    @Namespace private var redactionSelection
-    @Namespace private var toolSelection
     @State private var activeTool: WorkspaceTool?
     @State private var lastSettingsTool:WorkspaceTool = .composition
     @State private var timelineTrimming = false
@@ -70,7 +66,7 @@ struct EditorView: View {
                                 editorTimeline
                                 if let tool=displayedTool,!isProcessing {
                                     inlineSettings(tool)
-                                        .frame(height:tool == .redaction ? min(164,geometry.size.height*0.30) : min(settingsHeight,208,geometry.size.height*0.38))
+                                        .frame(height:tool == .redaction ? min(184,geometry.size.height*0.30) : min(settingsHeight,208,geometry.size.height*0.38))
                                         .transition(.opacity.combined(with:.move(edge:.bottom)))
                                 }
                                 bottomToolbar.padding(.top,12).padding(.bottom,8)
@@ -154,21 +150,6 @@ struct EditorView: View {
         }.background(DesktopPalette.background)
             .accessibilityElement(children:.contain).accessibilityIdentifier("desktopWorkspace")
     }
-    private var desktopPrimaryAction:some View {
-        Button {
-            if isProcessing {if isPaused {model.resume()} else {model.pause()}}
-            else {finishTool(commit:true);model.advanceWorkflow()}
-        } label: {
-            HStack(spacing:12) {
-                Image(systemName:isProcessing ? (isPaused ? "play.fill" : "pause.fill") : "sparkles")
-                Text(isProcessing ? (isPaused ? "继续处理" : "处理中") : startTitle)
-                if isProcessing {Text(processingPercent).monospacedDigit().accessibilityIdentifier("processingProgress")}
-            }.frame(maxWidth:.infinity).frame(height:58)
-        }.buttonStyle(DesktopButtonStyle(prominent:true))
-            .disabled(isProcessing ? !isPaused : !canStart).opacity(!isProcessing && !canStart ? 0.45 : 1)
-            .accessibilityIdentifier("primaryAction")
-            .accessibilityValue(isProcessing ? processingPercent : "")
-    }
     private var desktopInspector:some View {
         VStack(alignment:.leading,spacing:18) {
             if isBlocked || model.manualSelection {
@@ -197,9 +178,9 @@ struct EditorView: View {
                     processingAction
                 }
             } else {
-                HStack(spacing:10) {
+                HStack(spacing:12) {
                     if model.hasCompletedTracking {toolSelector.frame(width:156)}
-                    desktopPrimaryAction.frame(maxWidth:.infinity)
+                    processingAction.frame(maxWidth:.infinity)
                 }
             }
         }.padding(20).frame(maxHeight:.infinity,alignment:.top)
@@ -359,24 +340,14 @@ struct EditorView: View {
     private var displayedTool:WorkspaceTool? {
         model.hasCompletedTracking && model.phase == .editing ? (activeTool ?? lastSettingsTool) : activeTool
     }
+    private let bottomControlHeight:CGFloat = 56
     private var toolSelector:some View {
-        StudioGlassGroup(spacing:4) {
-            HStack(spacing:0) {
-                ForEach(availableTools,id:\.self) {tool in
-                    let selected=displayedTool==tool
-                    Button {selectTool(tool)} label: {
-                        VStack(spacing:3) {
-                            Image(systemName:tool.symbol).font(.system(size:20))
-                            Text(tool.rawValue).font(toolLabelFont)
-                        }.frame(maxWidth:.infinity).frame(height:50)
-                            .foregroundStyle(.white.opacity(selected ? 1 : 0.6))
-                            .modifier(StudioGlassSelection(selected:selected,namespace:toolSelection,selectionID:"workspace-tool",optionID:tool.rawValue))
-                    }.buttonStyle(.plain).accessibilityIdentifier("tool-"+tool.rawValue)
-                        .accessibilityAddTraits(selected ? .isSelected : [])
-                        .disabled(!model.settingsEnabled || timelineTrimming || model.compositionBusy || model.compositionAdjusting)
-                }
-            }.padding(4).modifier(StudioGlassSurface(shape:Capsule()))
-        }.accessibilityElement(children:.contain).accessibilityIdentifier("editorToolbar")
+        NativeSegmentedControl(title:"编辑工具",options:availableTools,selection:Binding(
+            get:{displayedTool ?? .composition},set:{selectTool($0)}
+        ),label:{$0.rawValue},symbol:{$0.symbol},height:bottomControlHeight)
+        .frame(height:bottomControlHeight)
+        .accessibilityIdentifier("editorToolbar")
+        .disabled(!model.settingsEnabled || timelineTrimming || model.compositionAdjusting)
     }
     private var bottomToolbar: some View {
         StudioGlassGroup(spacing: 12) {
@@ -418,7 +389,7 @@ struct EditorView: View {
                             Image(systemName:"arrow.right").font(.system(size:16,weight:.medium))
                         }
                     }.padding(.horizontal,isProcessing ? 22 : 14)
-                        .frame(maxWidth:isProcessing || usesExpandedWorkspace || !model.hasCompletedTracking ? .infinity : nil).frame(width:isProcessing || usesExpandedWorkspace || !model.hasCompletedTracking ? nil : 132,height:56)
+                        .frame(maxWidth:isProcessing || usesExpandedWorkspace || !model.hasCompletedTracking ? .infinity : nil).frame(width:isProcessing || usesExpandedWorkspace || !model.hasCompletedTracking ? nil : 132,height:bottomControlHeight)
                         .background {
                             if isProcessing {
                                 ProcessingButtonFill(progress:min(1,max(0,model.phase.progress)),paused:isPaused)
@@ -476,7 +447,7 @@ struct EditorView: View {
                 Text(model.generatingVideo ? "正在生成视频" : isPaused ? "分析已暂停" : "正在分析人物").font(.subheadline).padding(.horizontal,18)
             } else if isCompleted {completedActions}
             else if let tool=displayedTool {
-                inlineSettings(tool).frame(height:tool == .composition ? 154 : tool == .redaction ? 164 : 104)
+                inlineSettings(tool).frame(height:tool == .composition ? 154 : tool == .redaction ? 184 : 104)
             } else {
                 VStack(alignment:.leading,spacing:12) {
                     Text(model.project?.target == nil ? "在原片中轻点主角" : "主角已选中")
@@ -509,7 +480,7 @@ struct EditorView: View {
     }
 
     private func selectTool(_ tool: WorkspaceTool) {
-        guard model.hasCompletedTracking,!model.compositionBusy, !model.compositionAdjusting else { return }
+        guard model.hasCompletedTracking,!model.compositionAdjusting else { return }
         guard activeTool != tool else {return}
         finishTool(commit: true)
         model.pausePreview(refresh: false)
@@ -521,7 +492,7 @@ struct EditorView: View {
     }
     private func finishTool(commit: Bool) {
         guard let tool = activeTool else { return }
-        if commit && (model.compositionBusy || model.compositionAdjusting) { return }
+        if commit && model.compositionAdjusting { return }
         switch tool {
         case .composition: model.finishComposition(commit: commit,refreshDetections:false)
         case .redaction: model.finishRedaction(commit:commit)
@@ -550,50 +521,12 @@ struct EditorView: View {
         }.dynamicTypeSize(...DynamicTypeSize.xxxLarge).padding(.horizontal, 18)
             .accessibilityElement(children: .contain).accessibilityIdentifier("adjustmentPanel")
     }
-    private var panelSpacing:CGFloat {
-        #if targetEnvironment(macCatalyst)
-        12
-        #else
-        0
-        #endif
-    }
-    private var panelInset:CGFloat {
-        #if targetEnvironment(macCatalyst)
-        16
-        #else
-        12
-        #endif
-    }
-    private var panelActionWidth:CGFloat? {
-        #if targetEnvironment(macCatalyst)
-        .infinity
-        #else
-        nil
-        #endif
-    }
-    private var toolLabelFont:Font {
-        #if targetEnvironment(macCatalyst)
-        .system(size:13)
-        #else
-        .caption2
-        #endif
-    }
-    private var regionLabelFont:Font {
-        #if targetEnvironment(macCatalyst)
-        panelFont
-        #else
-        .subheadline
-        #endif
-    }
-    private var panelFont:Font {
-        #if targetEnvironment(macCatalyst)
-        .system(size:14)
-        #else
-        .caption
-        #endif
-    }
+    // Shared control sizing and spacing for phone, wide layouts and Mac Catalyst.
+    private let panelSpacing:CGFloat = 0
+    private let panelInset:CGFloat = 12
+    private var panelFont:Font {.caption}
     private var redactionPanel: some View {
-        VStack(spacing:panelSpacing) {
+        VStack(spacing:max(8,panelSpacing)) {
             if redactionStrengthEditing && model.project?.settings.redaction.style != .image {
                 HStack(spacing:12) {
                     Text("强度").font(.caption)
@@ -601,75 +534,42 @@ struct EditorView: View {
                         .tint(.white).accessibilityLabel("打码强度").accessibilityIdentifier("redactionStrength")
                 }.frame(height:50)
             } else {
-            StudioGlassGroup(spacing:4) {
-                HStack(spacing:4) {
-                    ForEach(RedactionSettings.Region.allCases,id:\.self) { region in
-                        let selected=model.project?.settings.redaction.region == region
-                        Button {withAnimation(reduceMotion ? nil : .smooth(duration:0.25)) {model.setRedactionRegion(region)}} label: {
-                            Text(region.rawValue).font(regionLabelFont.weight(selected ? .semibold : .regular))
-                                .frame(maxWidth:.infinity).frame(height:44)
-                                .modifier(StudioGlassSelection(selected:selected,namespace:redactionSelection,selectionID:"redaction-region",optionID:region.rawValue))
-                        }.buttonStyle(.plain).accessibilityIdentifier("redaction-"+region.rawValue)
-                            .accessibilityAddTraits(selected ? .isSelected : [])
-                    }
-                }.padding(3).background(.black.opacity(0.14),in:Capsule())
+                NativeSegmentedControl(title:"打码范围",options:RedactionSettings.Region.allCases,selection:Binding(
+                    get:{model.project?.settings.redaction.region ?? .face},set:{model.setRedactionRegion($0)}
+                ),label:{$0.rawValue})
+                .frame(height:48)
+                .accessibilityIdentifier("redactionRegion")
             }
-            }
-            StudioGlassGroup(spacing:4) {
-                HStack(spacing:4) {
-                    ForEach(RedactionSettings.Style.allCases,id:\.self) { style in
-                        let selected=model.project?.settings.redaction.style == style
-                        Button {
-                            withAnimation(reduceMotion ? nil : .smooth(duration:0.25)) {model.setRedactionStyle(style)}
-                        } label: {
-                            Text(style.rawValue).font(panelFont.weight(selected ? .semibold : .regular))
-                                .frame(maxWidth:.infinity).frame(height:44)
-                                .modifier(StudioGlassSelection(selected:selected,namespace:redactionStyleSelection,selectionID:"redaction-style",optionID:style.rawValue))
-                        }.buttonStyle(.plain).accessibilityIdentifier("redaction-style-"+style.rawValue)
-                            .accessibilityAddTraits(selected ? .isSelected : [])
-                    }
-                }.padding(3).background(.black.opacity(0.14),in:Capsule())
-            }
-            HStack(spacing:8) {
+            NativeSegmentedControl(title:"打码样式",options:RedactionSettings.Style.allCases,selection:Binding(
+                get:{model.project?.settings.redaction.style ?? .frosted},set:{model.setRedactionStyle($0)}
+            ),label:{$0.rawValue})
+            .frame(height:48)
+            .accessibilityIdentifier("redactionStyle")
+            HStack(spacing:12) {
                 if model.importingRedactionImage {ProgressView().frame(width:44,height:44)}
                 else if model.redactionPrimaryBody == nil {
-                    Button("预览遮挡") {model.seek(to:model.project?.targetTime ?? 0)}.font(panelFont).frame(maxWidth:panelActionWidth,minHeight:44)
+                    Button("预览遮挡") {model.seek(to:model.project?.targetTime ?? 0)}.font(panelFont).frame(maxWidth:.infinity,minHeight:44)
                 } else if model.project?.settings.redaction.style == .image {
                     Label {Text("直拍鸭 Logo").font(.caption)} icon: {Image("BrandLogo").resizable().scaledToFit().frame(width:24,height:24)}
                 } else {
                     Button(redactionStrengthEditing ? "范围" : "强度") {redactionStrengthEditing.toggle()}
-                        .font(panelFont).frame(maxWidth:panelActionWidth,minHeight:44).accessibilityLabel("打码强度设置")
+                        .font(panelFont).frame(maxWidth:.infinity,minHeight:44).accessibilityLabel("打码强度设置")
                 }
                 Button(model.project?.settings.redaction.enabled == true ? "关闭打码" : "开启打码") {
                     if model.project?.settings.redaction.enabled == true {model.clearRedactions()} else {model.enableAutomaticRedaction()}
-                }.font(panelFont).frame(maxWidth:panelActionWidth,minHeight:44)
+                }.font(panelFont).frame(maxWidth:.infinity,minHeight:44)
             }.buttonStyle(.plain)
         }.padding(panelInset)
             .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24)))
     }
     private var compositionPanel: some View {
         VStack(spacing:max(6,panelSpacing)) {
-            StudioGlassGroup(spacing:4) {
-                HStack(spacing: 4) {
-                    ForEach(OutputAspectRatio.allCases) { aspect in
-                        let selected = model.project?.settings.aspectRatio == aspect
-                        Button {
-                            withAnimation(reduceMotion ? nil : .smooth(duration:0.32)) { model.setCompositionAspect(aspect) }
-                        } label: {
-                            Text(aspect.rawValue).font(.system(.subheadline, design: .rounded).weight(selected ? .semibold : .regular))
-                                .frame(maxWidth: .infinity).frame(height: 44)
-                                .foregroundStyle(.white.opacity(selected ? 1 : 0.6))
-                                .modifier(StudioGlassSelection(selected:selected,namespace:aspectSelection,selectionID:"selected-aspect",optionID:aspect.rawValue))
-                                .contentShape(Capsule())
-                        }.buttonStyle(.plain).accessibilityLabel(aspect.rawValue)
-                            .accessibilityIdentifier("aspect-" + aspect.rawValue)
-                            .accessibilityAddTraits(selected ? .isSelected : [])
-                    }
-                }.padding(3).background(.black.opacity(0.14), in: Capsule())
-                    .accessibilityElement(children: .contain).accessibilityLabel("画面比例")
-                    .accessibilityIdentifier("compositionAspect")
-                    .disabled(compositionControlsDisabled)
-            }
+            NativeSegmentedControl(title:"画面比例",options:OutputAspectRatio.allCases,selection:Binding(
+                get:{model.project?.settings.aspectRatio ?? .portrait},set:{model.setCompositionAspect($0)}
+            ),label:{$0.rawValue})
+            .frame(height:48)
+            .accessibilityIdentifier("compositionAspect")
+            .disabled(compositionControlsDisabled)
             HStack(spacing: 0) {
                 compositionControl("缩小", symbol: "minus.magnifyingglass") { model.compositionZoom(1 / 1.1) }
                 compositionControl("放大", symbol: "plus.magnifyingglass") { model.compositionZoom(1.1) }
@@ -677,6 +577,8 @@ struct EditorView: View {
                 compositionControl("水平居中", symbol: "align.horizontal.center") { model.centerComposition(horizontal: true) }
                 compositionControl("垂直居中", symbol: "align.vertical.center") { model.centerComposition(horizontal: false) }
             }.disabled(compositionControlsDisabled)
+                // Keep the control appearance stable while the asynchronous preview catches up.
+                .allowsHitTesting(!model.compositionBusy)
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
                 Text(model.editorActivityText ?? model.compositionNotice ?? "拖动位置 · 双指缩放")
@@ -686,7 +588,7 @@ struct EditorView: View {
         }.padding(panelInset)
             .modifier(StudioGlassSurface(shape: RoundedRectangle(cornerRadius: 24)))
     }
-    private var compositionControlsDisabled: Bool { timelineTrimming || model.compositionBusy || model.compositionAdjusting }
+    private var compositionControlsDisabled: Bool { timelineTrimming || model.compositionAdjusting }
     private func compositionControl(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 5) {

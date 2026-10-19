@@ -36,6 +36,20 @@ A1 图标覆盖 iPhone、iPad／Duo 和 Mac Catalyst；素材及重建步骤见 
 
 `.env.release` 一键入口追加验证（2026-10-19）：`release-macos.sh --local` 实际读取本地配置并完成双架构构建、ad-hoc 签名与 ZIP 打包，ZIP 完整性和 SHA-256 校验通过。隔离配置测试覆盖默认公证参数传递、带空格 profile、local／signed-only 覆盖、非法模式／布尔值／版本／构建号拒绝；缺失团队 ID 在构建前失败。实际配置已被 Git 忽略且权限为 600。正式 Developer ID 签名及公证仍未实测。
 
+清理后重建（2026-10-19）：按用户要求移除本项目 `build` 和此前 fancamduck 临时构建目录，随后使用 `release-macos.sh --signed-only` 从零归档并导出 `0.1.0 (1)` Developer ID 包。arm64／x86_64、Developer ID 与 Hardened Runtime、严格签名、AppIcon／模型资源、ZIP 完整性及 SHA-256 校验通过。本轮不提交公证，产物状态为 `developer-id-signed (not notarized)`。
+
+## 原生构图比例切换
+
+2026-10-20，Xcode 27.1、iPhone 17 Pro／iOS 26.3.1：比例切换改用原生 segmented Picker，移除覆盖整个状态变更的显式动画及构图忙碌导致的面板禁用样式。新比例可取消并覆盖旧预览任务，保留 compositionID、项目 ID 和取消检查。构图／异步套件执行 28 项，12 项通过、16 项因未配置本地视频跳过，0 失败；新增快速连续切换回归通过。新增 UI 用例验证完成演示分析后原生分段控件可点击及按住横拖、选中项正确、其他构图按钮保持 enabled、手机无 ScrollView，1 项通过。此为模拟交互验证，不代表真实视频性能测量。
+
+原生分段控件增高与统一（2026-10-20）：比例、工具、打码范围、打码样式采用同一 `NativeSegmentedControl`（系统 UISegmentedControl），真实控件高度 48pt，更新选中项时不重建所有分段。iPhone 17 Pro／iOS 26.3.1 的 UI 回归验证原生控件类型、实际高度、工具互切、范围／样式点击与横拖、构图选择保留及页面不滚动，1 项通过；构图套件 12 项中 10 项通过、2 项因缺少私人视频跳过。此轮不含真实视频性能测量。
+
+图标与打码间距复核（2026-10-20）：原生工具分段恢复 SF Symbols 图标加文字，图像按视图 displayScale 绘制且保留分段辅助功能名称；打码行间距至少 8pt，底部操作等宽、间隔 12pt，手机面板预留 184pt。更新后的 iPhone UI 用例重新编译并通过，核对工具可访问名称、切换、拖动及两组打码控件实际间距，模拟人物截图确认图标显示正常。
+
+底部控件对齐（2026-10-20）：构图／打码分段与生成视频按钮共用 56pt 高度，iPhone UI 回归新增实际 frame 高度和 midY 对齐断言，1 项通过。
+
+Mac 控件统一（2026-10-20）：Mac Inspector 直接复用手机的 `processingAction`、原生工具／比例／打码分段，以及面板内边距和组间距，移除独立的桌面主按钮实现。Mac Catalyst Debug 构建通过并已打开模拟人物演示。新增 `MacNativeControlsTests` 专项用例，运行时临时排除既有 iPhone 手势 UI 文件；测试与 App 编译通过，但运行器在连接测试服务前被系统终止（bootstrapping 失败、signal kill），无用例实际执行。窗口控制也发生 ScreenCaptureKit 错误和超时，因此不能声称 Mac 窗口交互或高度实测已通过；手机同源控件的既有 UI 通过结果仍只代表 iPhone。
+
 ## 按改动选择测试
 
 真实编辑链路专项：显式设置 `TEST_RUNNER_FANCAM_DUCK_REAL_EDITOR_VALIDATION=1` 和 `TEST_RUNNER_FANCAM_DUCK_TEST_VIDEO=<本地人物视频>`，执行 `RealEditorInteractionTests`。该用例使用生产 CoreMLTrackingPipeline、AppModel、ProjectStore、VideoExporter，以真实检测选出的主角完成全时长分析与导出，再修改打码并重新生成；没有使用替身检测或模拟人物。它覆盖真实媒体驱动的状态与设置操作，不等同于窗口点击、布局或性能验收。Mac 仅运行单元测试时，可用临时移除 UI Testable 的 Scheme 避开现有 UI 测试的 pinch 编译限制，验证后移除临时 Scheme。

@@ -58,6 +58,34 @@ final class CompositionTests:XCTestCase {
         model.finishComposition(commit:false);XCTAssertEqual(model.project?.settings,original)
         model.goHome()
     }
+    @MainActor func testRapidAspectChangesWhilePreviewBusyKeepLatestSelection() async throws {
+        let model=AppModel();model.startDemo();model.selectTarget(DemoStage.body(index:1,time:0))
+        let original=try XCTUnwrap(model.project?.settings)
+        model.beginComposition()
+        for _ in 0..<400 {
+            if !model.compositionBusy {break}
+            try await Task.sleep(for:.milliseconds(10))
+        }
+        XCTAssertNotNil(model.compositionCrop)
+        // No suspension between selections: all changes arrive before the first task completes.
+        for aspect:OutputAspectRatio in [.square,.classic,.portrait,.square] {
+            model.setCompositionAspect(aspect)
+            XCTAssertEqual(model.project?.settings.aspectRatio,aspect)
+            let crop=try XCTUnwrap(model.compositionCrop)
+            XCTAssertEqual(crop.width/crop.height,aspect.value,accuracy:0.0001)
+        }
+        for _ in 0..<400 {
+            if !model.compositionBusy {break}
+            try await Task.sleep(for:.milliseconds(10))
+        }
+        XCTAssertFalse(model.compositionBusy)
+        XCTAssertEqual(model.project?.settings.aspectRatio,.square)
+        let crop=try XCTUnwrap(model.compositionCrop)
+        XCTAssertEqual(crop.width/crop.height,1,accuracy:0.0001)
+        model.finishComposition(commit:false)
+        XCTAssertEqual(model.project?.settings,original)
+        model.goHome()
+    }
     func testChosenViewportSurvivesFullTrajectoryAndProtectionRecalculation() throws {
         let source=CGSize(width:3840,height:2160)
         let body=NormalizedRect(x:0.43,y:0.44,width:0.05,height:0.27)

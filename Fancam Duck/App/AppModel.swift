@@ -851,7 +851,7 @@ extension AppModel {
                     self.compositionNotice="打码设置已更改，确认处理后可播放"
                 } else if self.hasCompletedTracking,let url=self.store.sourceURL(for:project) {
                     let item=try await self.exporter.preview(source:url,project:project,samples:samples)
-                    guard !Task.isCancelled,self.compositionEditing,self.compositionID==id else { return }
+                    guard !Task.isCancelled,self.compositionEditing,self.compositionID==id,self.project?.id==project.id else { return }
                     if let player=self.previewPlayer {player.replaceCurrentItem(with:item)}
                     else {self.previewPlayer=AVPlayer(playerItem:item)}
                     self.previewPlayer?.seek(to:CMTime(seconds:self.currentTime-settings.start,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero,completionHandler:{_ in})
@@ -912,7 +912,8 @@ extension AppModel {
         beginCompositionGesture();applyCompositionCrop(crop.offsetBy(dx:-x*crop.width,dy:-y*crop.height));endCompositionGesture()
     }
     func setCompositionAspect(_ aspect: OutputAspectRatio) {
-        guard compositionEditing,!compositionBusy,!compositionAdjusting,
+        // A newer selection supersedes the pending preview through compositionID/cancellation.
+        guard compositionEditing,!compositionAdjusting,
               let project,project.settings.aspectRatio != aspect else {return}
         pausePreview(refresh:false)
         compositionUndo.append(project.settings)

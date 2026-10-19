@@ -229,6 +229,55 @@ final class EditorFlowTests: XCTestCase {
         XCTAssertEqual(canvas.value as? String, committed, "Cancel restores the committed crop")
         commit.tap(); XCTAssertEqual(action.frame, fixed)
     }
+    @MainActor func testNativeAspectSegmentsSupportDraggingWithoutDisablingPanel() throws {
+        let app=launch()
+        app.buttons["dancer1"].tap()
+        app.buttons["primaryAction"].tap()
+        let recovery=app.buttons["dancer0"]
+        XCTAssertTrue(recovery.waitForExistence(timeout:15))
+        recovery.tap()
+        app.buttons["primaryAction"].tap()
+        let tools=app.segmentedControls["editorToolbar"]
+        let tool=tools.buttons["构图"]
+        XCTAssertTrue(tool.waitForExistence(timeout:15))
+        tool.tap()
+        let picker=app.segmentedControls["compositionAspect"]
+        XCTAssertTrue(picker.waitForExistence(timeout:5))
+        XCTAssertEqual(tools.frame.height,app.buttons["primaryAction"].frame.height,accuracy:1)
+        XCTAssertEqual(tools.frame.midY,app.buttons["primaryAction"].frame.midY,accuracy:1)
+        let first=picker.buttons.element(boundBy:0),last=picker.buttons.element(boundBy:2)
+        XCTAssertEqual(picker.buttons.count,3)
+        XCTAssertGreaterThanOrEqual(picker.frame.height,47)
+        last.tap()
+        XCTAssertTrue(last.isSelected)
+        XCTAssertTrue(picker.isEnabled)
+        XCTAssertTrue(app.buttons["构图放大"].isEnabled)
+        last.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5))
+            .press(forDuration:0.1,thenDragTo:first.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)))
+        XCTAssertTrue(first.isSelected)
+        XCTAssertTrue(app.buttons["构图水平居中"].isEnabled)
+        XCTAssertEqual(app.scrollViews.count,0)
+        capture(app,"native-aspect-segments")
+        tools.buttons["打码"].tap()
+        let region=app.segmentedControls["redactionRegion"],style=app.segmentedControls["redactionStyle"]
+        XCTAssertTrue(region.waitForExistence(timeout:5))
+        XCTAssertEqual(region.buttons.count,2)
+        XCTAssertEqual(style.buttons.count,3)
+        XCTAssertGreaterThanOrEqual(region.frame.height,47)
+        XCTAssertGreaterThanOrEqual(style.frame.minY-region.frame.maxY,7)
+        region.buttons.element(boundBy:1).tap()
+        XCTAssertTrue(region.buttons.element(boundBy:1).isSelected)
+        style.buttons.element(boundBy:1).tap()
+        XCTAssertTrue(style.buttons.element(boundBy:1).isSelected)
+        style.buttons.element(boundBy:1).coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5))
+            .press(forDuration:0.1,thenDragTo:style.buttons.element(boundBy:0).coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)))
+        XCTAssertTrue(style.buttons.element(boundBy:0).isSelected)
+        XCTAssertEqual(app.scrollViews.count,0)
+        tools.buttons["构图"].tap()
+        XCTAssertTrue(picker.waitForExistence(timeout:5))
+        XCTAssertTrue(first.isSelected)
+        capture(app,"native-tool-and-redaction-segments")
+    }
     @MainActor func testOutputAspectsAndIndependentCentering() throws {
         let app=launch();app.buttons["dancer1"].tap();app.buttons["tool-构图"].tap()
         let commit=app.buttons["commitTool"],canvas=app.otherElements["compositionCanvas"]
