@@ -15,6 +15,10 @@ Environment:
   FANCAM_DUCK_RELEASE_ROOT       Output parent (default: build/macos).
   FANCAM_DUCK_MAC_DERIVED_DATA   Build cache (default: build/macos/DerivedData).
 
+  APPLE_SIGNING_CERTIFICATE      Export certificate name or SHA-1 (default: Developer ID Application).
+  FANCAM_DUCK_VERSION            Optional MARKETING_VERSION override.
+  FANCAM_DUCK_BUILD_NUMBER       Optional CURRENT_PROJECT_VERSION override.
+
 Each run creates a new output directory; existing packages are never overwritten.
 HELP
 }
@@ -36,6 +40,9 @@ done
 if [[ "$mode" == developer-id ]]; then
   [[ "${APPLE_TEAM_ID:-}" =~ ^[A-Z0-9]{10}$ ]] || fail 'Set APPLE_TEAM_ID to your 10-character Apple Developer team ID'
 fi
+for release_value in "${FANCAM_DUCK_VERSION:-}" "${FANCAM_DUCK_BUILD_NUMBER:-}"; do
+  [[ -z "$release_value" || "$release_value" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] || fail 'Version and build number must contain 1–3 numeric components'
+done
 cd "$(dirname "$0")/../.."
 release_root="${FANCAM_DUCK_RELEASE_ROOT:-$PWD/build/macos}"
 mkdir -p "$release_root"
@@ -46,6 +53,8 @@ trap 'echo "Build failed. Logs and intermediate artifacts: $run_dir" >&2' ERR
 common=(-project 'Fancam Duck.xcodeproj' -scheme 'Fancam Duck'
   -configuration Release -destination 'generic/platform=macOS,variant=Mac Catalyst'
   -derivedDataPath "$cache" 'ARCHS=arm64 x86_64' ONLY_ACTIVE_ARCH=NO)
+if [[ -n "${FANCAM_DUCK_VERSION:-}" ]]; then common+=("MARKETING_VERSION=$FANCAM_DUCK_VERSION"); fi
+if [[ -n "${FANCAM_DUCK_BUILD_NUMBER:-}" ]]; then common+=("CURRENT_PROJECT_VERSION=$FANCAM_DUCK_BUILD_NUMBER"); fi
 run_xcode() {
   local log="$1"; shift
   if ! xcodebuild "$@" > "$log" 2>&1; then
@@ -76,6 +85,7 @@ else
 <key>signingCertificate</key><string>Developer ID Application</string>
 </dict></plist>
 PLIST
+  /usr/bin/plutil -replace signingCertificate -string "${APPLE_SIGNING_CERTIFICATE:-Developer ID Application}" "$options"
   run_xcode "$run_dir/export.log" -exportArchive -archivePath "$archive" \
     -exportOptionsPlist "$options" -exportPath "$run_dir/export"
   app="$run_dir/export/Fancam Duck.app"

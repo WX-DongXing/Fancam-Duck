@@ -2,6 +2,40 @@
 
 当前桌面端为 Mac Catalyst。入口：`tools/release/build-macos.sh`，可从任意工作目录调用。使用本机 Xcode、macOS 自带打包／签名工具；产物不纳入 Git。
 
+## 一键配置入口
+
+本地 `.env.release` 已创建并被 Git 忽略，权限为 600。仓库只维护不含凭据的 `.env.release.example`，换机器时先执行 `cp .env.release.example .env.release`。配置文件是可信的 Bash 文件，不要复制未知来源的命令；脚本不输出文件内容。
+
+关键值：
+
+| 变量 | 用途 |
+| --- | --- |
+| `RELEASE_MODE` | `developer-id` 正式签名或 `local` 本地签名 |
+| `APPLE_TEAM_ID` | 十位开发者团队 ID |
+| `APPLE_SIGNING_CERTIFICATE` | 导出证书名称或 SHA-1，默认 Developer ID Application |
+| `RELEASE_NOTARIZE` | `true` 上传 Apple 公证并装订；`false` 仅签名 |
+| `APPLE_NOTARY_PROFILE` | 已存入钥匙串的 notarytool profile 名称 |
+| `FANCAM_DUCK_VERSION` / `FANCAM_DUCK_BUILD_NUMBER` | 可选版本／构建号，留空沿用工程 |
+| `FANCAM_DUCK_RELEASE_ROOT` / `FANCAM_DUCK_MAC_DERIVED_DATA` | 产物与缓存目录 |
+
+密码、私钥和 API 密钥使用钥匙串存储，配置中仅填写 profile 名称。所有相对路径相对于仓库根目录。`.env.release` 的值覆盖同名进程环境变量；命令行 `--local` 或 `--signed-only` 再覆盖模式／公证设置。
+
+```sh
+# 填好配置后：构建 → 签名 → 按配置公证 → 装订 → 打包和校验
+tools/release/release-macos.sh
+
+# 只检查配置格式，不验证证书或凭据，不构建、不上传
+tools/release/release-macos.sh --check
+
+# 临时只生成本地试用包
+tools/release/release-macos.sh --local
+
+# 临时只进行 Developer ID 签名，不上传 Apple
+tools/release/release-macos.sh --signed-only
+```
+
+模板默认正式签名并公证，但团队 ID 与 profile 留空。未填写会在构建前明确失败，不会自动降级为本地包。`local` 模式始终不上传，即使配置里公证开关为 true。底层 `build-macos.sh` 仍可直接通过环境变量调用，不会自行加载配置。
+
 ## 本地试用包
 
 ```sh

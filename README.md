@@ -131,4 +131,4 @@ TrackTrack 和 OSNet 参考源码许可位于 `tools/reference`。Ultralytics �
 
 ## macOS 安装包
 
-运行 `tools/release/build-macos.sh --local` 生成双架构本地试用 App 和 ZIP。Developer ID 签名及 Apple 公证参数见 [macOS 发布指南](docs/ai/macos-release.md)。产物默认保存在已忽略的 `build/macos/`。
+本地 `.env.release` 配置团队 ID、证书、公证 profile、版本号和输出路径后，运行 `tools/release/release-macos.sh` 一键构建签名发布包；临时本地试用可运行 `tools/release/release-macos.sh --local`。配置模板为 `.env.release.example`，实际配置不提交。Developer ID 签名及 Apple 公证参数见 [macOS 发布指南](docs/ai/macos-release.md)。产物默认保存在已忽略的 `build/macos/`。

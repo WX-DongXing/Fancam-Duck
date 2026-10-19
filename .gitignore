@@ -27,3 +27,8 @@ __pycache__/
 *.mov
 *.avi
 *.m4v
+
+# Local release configuration; only the placeholder example is versioned.
+/.env.release
+/.env.release.*
+!/.env.release.example

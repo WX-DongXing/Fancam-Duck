@@ -32,6 +32,8 @@ A1 图标覆盖 iPhone、iPad／Duo 和 Mac Catalyst；素材及重建步骤见 
 
 入口和签名／公证参数见 [macOS 发布指南](macos-release.md)。2026-10-19 在 `058e324` 基础的工作区中使用 Xcode 27.1 验证 `tools/release/build-macos.sh --local`：Release 通用架构构建、ad-hoc 签名、严格签名校验、AppIcon 与两个模型资源检查、ZIP 完整性及 SHA-256 校验均通过。帮助信息及未知参数、缺失公证 profile、local 模式请求公证、缺失团队 ID 的拒绝路径通过。Developer ID 归档／导出与 Apple 公证未实际运行，不能据此认定正式发布链路已通过。
 
+`.env.release` 一键入口追加验证（2026-10-19）：`release-macos.sh --local` 实际读取本地配置并完成双架构构建、ad-hoc 签名与 ZIP 打包，ZIP 完整性和 SHA-256 校验通过。隔离配置测试覆盖默认公证参数传递、带空格 profile、local／signed-only 覆盖、非法模式／布尔值／版本／构建号拒绝；缺失团队 ID 在构建前失败。实际配置已被 Git 忽略且权限为 600。正式 Developer ID 签名及公证仍未实测。
+
 ## 按改动选择测试
 
 | 修改范围 | 优先套件 |
