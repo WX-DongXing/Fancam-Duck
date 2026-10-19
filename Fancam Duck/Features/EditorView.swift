@@ -119,7 +119,7 @@ struct EditorView: View {
     private var desktopWorkspace:some View {
         VStack(spacing:0) {
             HStack(spacing:16) {
-                Button {showLeaveConfirmation=true} label: {Label("项目",systemImage:"chevron.left")}
+                Button {returnToHome()} label: {Label("项目",systemImage:"chevron.left")}
                     .buttonStyle(DesktopButtonStyle()).accessibilityLabel("返回项目首页")
                 Rectangle().fill(DesktopPalette.border).frame(width:1,height:24)
                 VStack(alignment:.leading,spacing:3) {
@@ -189,9 +189,13 @@ struct EditorView: View {
     private var desktopCompositionSettings:some View {compositionPanel}
     private var desktopRedactionSettings:some View {redactionPanel}
     #endif
+    private func returnToHome() {
+        if model.isDemo {model.goHome()}
+        else {showLeaveConfirmation=true}
+    }
     private var header: some View {
         HStack {
-            StudioIcon(symbol: "chevron.left", label: "返回项目首页") { showLeaveConfirmation = true }
+            StudioIcon(symbol: "chevron.left", label: "返回项目首页") { returnToHome() }
             Spacer()
             Group {
                 if isBlocked {

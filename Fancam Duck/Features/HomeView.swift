@@ -26,16 +26,17 @@ struct HomeView: View {
                         Spacer()
                     }
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("视频项目").font(.largeTitle.bold())
+                        Text("直拍快剪").font(.largeTitle.bold())
                         Text("选择舞者，让镜头跟上动作。").font(.subheadline).foregroundStyle(.secondary)
                     }.padding(.vertical, 8)
-                    Button { model.showGuide=true } label: {
+                    Button { model.startDemo() } label: {
                         HStack(spacing:12) {
                             Image(systemName:"play.rectangle").font(.system(size:22)).frame(width:42,height:42).background(Color.primary.opacity(0.04),in:RoundedRectangle(cornerRadius:12))
                             VStack(alignment:.leading,spacing:4) { Text("第一次使用？").font(.system(size:14,weight:.semibold)); Text("了解选人、跟随和纠正").font(.system(size:12)).foregroundStyle(.secondary) }
                             Spacer(); Image(systemName:"arrow.up.right").font(.system(size:13))
                         }.foregroundStyle(.primary).padding(14).background(.white.opacity(0.045),in:RoundedRectangle(cornerRadius:20))
-                    }.buttonStyle(.plain).accessibilityLabel("查看操作指引，视频待补充")
+                    }.buttonStyle(.plain).accessibilityLabel("第一次使用？了解选人、跟随和纠正")
+                        .accessibilityIdentifier("startDemo")
                 }
                 .listRowInsets(EdgeInsets(top:24,leading:24,bottom:24,trailing:24))
                 .listRowSeparator(.hidden).listRowBackground(Color.clear)
@@ -52,7 +53,7 @@ struct HomeView: View {
                         .listRowSeparator(.hidden).listRowBackground(Color.clear)
                 }
                 ForEach(model.projects) { project in
-                    RecentProjectRow(project:project,onOpen:{ model.open(project) },onDelete:{ pendingDelete=project })
+                    RecentProjectRow(project:project,onOpen:{ model.open(project) })
                         .listRowInsets(EdgeInsets(top:6,leading:24,bottom:6,trailing:24))
                         .listRowSeparator(.hidden).listRowBackground(Color.clear)
                         .swipeActions(edge:.trailing,allowsFullSwipe:false) {
@@ -60,14 +61,6 @@ struct HomeView: View {
                                 .tint(.red).accessibilityIdentifier("deleteProject-\(project.id)")
                         }
                 }
-                VStack(spacing:8) {
-                    Button("体验演示流程") { model.startDemo() }
-                        .font(.subheadline).frame(maxWidth:.infinity,minHeight:44)
-                        .accessibilityIdentifier("startDemo")
-                    Text("演示模式仅展示交互，不执行真实人物识别。")
-                        .font(.caption).foregroundStyle(.secondary).frame(maxWidth:.infinity)
-                }.listRowInsets(EdgeInsets(top:18,leading:24,bottom:24,trailing:24))
-                    .listRowSeparator(.hidden).listRowBackground(Color.clear)
             }.frame(maxWidth:900).frame(maxWidth:.infinity).listStyle(.plain).scrollContentBackground(.hidden)
             }
             }
@@ -148,7 +141,7 @@ struct HomeView: View {
                             BrandLogo(size: 32)
                             Text("直拍鸭").font(.headline)
                         }
-                        Text("视频项目").font(.largeTitle.bold())
+                        Text("直拍快剪").font(.largeTitle.bold())
                         Text("选择主角，让镜头跟上动作。").font(.subheadline).foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -213,7 +206,7 @@ struct HomeView: View {
             VStack(alignment:.leading,spacing:24) {
                 HStack(alignment:.center) {
                     VStack(alignment:.leading,spacing:7) {
-                        Text("视频项目").font(.system(size:26,weight:.semibold))
+                        Text("直拍快剪").font(.system(size:26,weight:.semibold))
                         Text("让镜头专注主角，留下完整动作。").font(.system(size:12)).foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -282,7 +275,6 @@ struct HomeView: View {
 private struct RecentProjectRow:View {
     let project:VideoProject
     let onOpen:() -> Void
-    let onDelete:() -> Void
     var body:some View {
         HStack(spacing:0) {
             Button(action:onOpen) {
@@ -296,10 +288,6 @@ private struct RecentProjectRow:View {
                     Spacer(minLength:4)
                 }.frame(maxWidth:.infinity,alignment:.leading).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityIdentifier("openProject-\(project.id)")
-            Menu {
-                Button("删除项目",systemImage:"trash",role:.destructive,action:onDelete)
-            } label: { Image(systemName:"ellipsis").foregroundStyle(.secondary).frame(width:44,height:44) }
-                .accessibilityLabel("项目更多操作")
         }.padding(12).background(.white.opacity(0.045),in:RoundedRectangle(cornerRadius:18))
             .overlay { RoundedRectangle(cornerRadius:18).stroke(.white.opacity(0.06),lineWidth:0.5) }
             .accessibilityIdentifier("projectRow-\(project.id)")
