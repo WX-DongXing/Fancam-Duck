@@ -304,6 +304,16 @@ final class EditorFlowTests: XCTestCase {
             .press(forDuration:0.15,thenDragTo:broadCanvas.coordinate(withNormalizedOffset:CGVector(dx:0.17,dy:0.50)))
         XCTAssertNotEqual(broadCanvas.value as? String,beforeOutsideDrag)
         capture(app,"composition-frosted-outside-drag")
+        tools.buttons["运镜"].tap()
+        let motion=app.segmentedControls["motionSpeed"]
+        XCTAssertTrue(motion.waitForExistence(timeout:5))
+        XCTAssertEqual(motion.frame.height,48,accuracy:1)
+        for speed in ["标准","灵敏","舒缓"] {
+            motion.buttons[speed].tap()
+            XCTAssertTrue(motion.buttons[speed].isSelected)
+        }
+        XCTAssertTrue(tools.buttons["运镜"].isSelected)
+        XCTAssertEqual(app.scrollViews.count,0)
         tools.buttons["打码"].tap()
         let panel=app.descendants(matching:.any).matching(identifier:"adjustmentPanel").firstMatch
         let region=app.buttons["redactionRegionMenu"],style=app.segmentedControls["redactionStyle"]

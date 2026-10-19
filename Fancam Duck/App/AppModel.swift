@@ -1008,7 +1008,7 @@ extension AppModel {
         project?.settings=before;refreshComposition()
     }
     func setFollowSpeed(_ speed: EditSettings.FollowSpeed) {
-        guard settingsEnabled, !compositionBusy, !compositionAdjusting,
+        guard settingsEnabled, !compositionAdjusting,
               project?.settings.followSpeed != speed else { return }
         pausePreview(refresh: false)
         project?.settings.followSpeed = speed

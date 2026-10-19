@@ -17,10 +17,11 @@ struct EditorView: View {
     @State private var timelineTrimming = false
 
     private enum WorkspaceTool: String, CaseIterable {
-        case composition = "构图", redaction = "打码"
+        case composition = "构图", motion = "运镜", redaction = "打码"
         var symbol: String {
             switch self {
             case .composition: "crop"
+            case .motion: "video"
             case .redaction: "square.on.circle"
             }
         }
@@ -35,7 +36,7 @@ struct EditorView: View {
         return model.hasCompletedTracking ? "settings" : "selection"
     }
     private var isCompleted:Bool {if case .completed = model.phase {return true};return false}
-    private var availableTools:[WorkspaceTool] {model.hasCompletedTracking ? [.composition,.redaction] : []}
+    private var availableTools:[WorkspaceTool] {model.hasCompletedTracking ? [.composition,.motion,.redaction] : []}
     private var isProcessing: Bool {
         switch model.phase { case .processing, .paused: true; default: false }
     }
@@ -157,6 +158,7 @@ struct EditorView: View {
             } else if !isProcessing {
                 if model.hasCompletedTracking {
                     if displayedTool == .composition {desktopCompositionSettings}
+                    else if displayedTool == .motion {motionPanel}
                     else if displayedTool == .redaction {desktopRedactionSettings}
                 } else {Text(model.project?.target == nil ? "请在画面中选择主角" : "主角已选择").font(.subheadline)}
                 if let activity=model.editorActivityText {
@@ -490,7 +492,7 @@ struct EditorView: View {
         finishTool(commit: true)
         model.pausePreview(refresh: false)
         withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
-            if tool == .composition { model.beginComposition(); guard model.compositionEditing else { return } }
+            if tool == .composition || tool == .motion { model.beginComposition(); guard model.compositionEditing else { return } }
             if tool == .redaction {redactionStrengthEditing=false;model.beginRedaction()}
             activeTool = tool;lastSettingsTool=tool
         }
@@ -499,7 +501,7 @@ struct EditorView: View {
         guard let tool = activeTool else { return }
         if commit && model.compositionAdjusting { return }
         switch tool {
-        case .composition: model.finishComposition(commit: commit,refreshDetections:false)
+        case .composition, .motion: model.finishComposition(commit: commit,refreshDetections:false)
         case .redaction: model.finishRedaction(commit:commit)
         }
         withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { activeTool = nil }
@@ -519,6 +521,8 @@ struct EditorView: View {
         Group {
             if tool == .composition {
                 compositionPanel
+            } else if tool == .motion {
+                motionPanel
             } else if tool == .redaction {
                 redactionPanel
             }
@@ -661,6 +665,25 @@ struct EditorView: View {
             }.buttonStyle(.plain)
         }.padding(panelInset)
             .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24)))
+    }
+    private var motionPanel: some View {
+        VStack(alignment:.leading,spacing:12) {
+            NativeSegmentedControl(title:"运镜速度",options:EditSettings.FollowSpeed.allCases,selection:Binding(
+                get:{model.project?.settings.followSpeed ?? .gentle},set:{model.setFollowSpeed($0)}
+            ),label:{$0.rawValue})
+            .frame(height:48).accessibilityIdentifier("motionSpeed")
+            .disabled(compositionControlsDisabled)
+            Text(motionDescription)
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
+        }.padding(panelInset)
+            .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24)))
+    }
+    private var motionDescription:String {
+        switch model.project?.settings.followSpeed ?? .gentle {
+        case .gentle: "平缓跟随主角，减少画面移动。"
+        case .standard: "兼顾画面稳定与跟随速度。"
+        case .responsive: "快速跟随主角，适合大幅移动。"
+        }
     }
     private var compositionPanel: some View {
         VStack(spacing:max(6,panelSpacing)) {

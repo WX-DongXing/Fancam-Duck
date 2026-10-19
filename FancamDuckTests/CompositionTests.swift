@@ -86,6 +86,26 @@ final class CompositionTests:XCTestCase {
         XCTAssertEqual(model.project?.settings,original)
         model.goHome()
     }
+    @MainActor func testRapidMotionChangesKeepLatestSpeedAndComposition() async throws {
+        let model=AppModel();model.startDemo();model.selectTarget(DemoStage.body(index:1,time:0))
+        model.beginComposition()
+        let original=try XCTUnwrap(model.project?.settings)
+        for speed:EditSettings.FollowSpeed in [.standard,.responsive,.gentle,.responsive] {
+            model.setFollowSpeed(speed)
+            XCTAssertEqual(model.project?.settings.followSpeed,speed)
+        }
+        for _ in 0..<400 {
+            if !model.compositionBusy {break}
+            try await Task.sleep(for:.milliseconds(10))
+        }
+        XCTAssertFalse(model.compositionBusy)
+        XCTAssertNotNil(model.compositionCrop)
+        XCTAssertEqual(model.project?.settings.compositionAnchor,original.compositionAnchor)
+        XCTAssertEqual(model.project?.settings.aspectRatio,original.aspectRatio)
+        model.finishComposition(commit:true)
+        XCTAssertEqual(model.project?.settings.followSpeed,.responsive)
+        model.goHome()
+    }
     func testChosenViewportSurvivesFullTrajectoryAndProtectionRecalculation() throws {
         let source=CGSize(width:3840,height:2160)
         let body=NormalizedRect(x:0.43,y:0.44,width:0.05,height:0.27)
