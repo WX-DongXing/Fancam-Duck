@@ -1,0 +1,39 @@
+{
+  "input_sha256": "aaf13bac532294a93ee1075e15fba0a7fd536560f38706a216895221fcdf3a0e",
+  "source": {
+    "height": 2160,
+    "frameRate": 25,
+    "duration": 37.92,
+    "width": 3840
+  },
+  "source_import": "Lossless MOV remux with import-date metadata; original MP4 unchanged",
+  "samples": 382,
+  "estimated_samples": 0,
+  "manual_corrections": 0,
+  "analysis_seconds": 86.36682605743408,
+  "export_seconds": 21.380218029022217,
+  "output": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_type": "audio",
+        "r_frame_rate": "0/0",
+        "duration": "37.919025"
+      },
+      {
+        "codec_type": "video",
+        "width": 1080,
+        "height": 1920,
+        "r_frame_rate": "25/1",
+        "duration": "37.920000"
+      }
+    ]
+  },
+  "device": "iPhone 17 Pro iOS 26.3 simulator on M4",
+  "ui_verification": {
+    "iPhone 17 Pro": "5 editor tests and cancel/confirm history delete passed",
+    "iPhone 16e": "5 editor tests and cancel/confirm history delete passed",
+    "final_formatting": "4K floating-resolution panel, camera controls and history delete passed after numeric label formatting"
+  }
+}

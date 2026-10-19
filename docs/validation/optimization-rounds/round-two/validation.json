@@ -1,0 +1,89 @@
+{
+  "status": "passed",
+  "before": {
+    "source": {
+      "duration": 37.92,
+      "frameRate": 25,
+      "width": 3840,
+      "height": 2160
+    },
+    "samples": 382,
+    "metrics": {
+      "reidInferenceSeconds": 8.708993077278137,
+      "previewCalls": 380,
+      "previewSeconds": 13.782937407493591,
+      "reidCalls": 4010,
+      "poseSeconds": 17.704948902130127,
+      "detectionSeconds": 53.99638473987579,
+      "bufferRenderSeconds": 25.108051538467407,
+      "bufferAcquireSeconds": 1.0859780311584473,
+      "reidSeconds": 33.031744599342346,
+      "poolRequests": 0,
+      "poseCalls": 383,
+      "reidReadSeconds": 0.4209522008895874,
+      "bufferAllocations": 4393
+    },
+    "label": "round2-before",
+    "analysisSeconds": 68.31048607826233,
+    "output": {
+      "duration": 37.92,
+      "height": 1920,
+      "frameRate": 25,
+      "width": 1080
+    },
+    "exportSeconds": 17.919317960739136,
+    "planSeconds": 0.07424402236938477
+  },
+  "after": {
+    "planSeconds": 0.07160806655883789,
+    "source": {
+      "height": 2160,
+      "duration": 37.92,
+      "frameRate": 25,
+      "width": 3840
+    },
+    "exportSeconds": 17.745046973228455,
+    "metrics": {
+      "bufferAcquireSeconds": 0.5457797050476074,
+      "poolRequests": 4393,
+      "detectionSeconds": 53.267396688461304,
+      "bufferRenderSeconds": 24.784470200538635,
+      "reidInferenceSeconds": 8.907387018203735,
+      "poseCalls": 383,
+      "reidSeconds": 32.47534799575806,
+      "reidReadSeconds": 0.4291316270828247,
+      "previewSeconds": 6.797042012214661,
+      "poseSeconds": 17.538200855255127,
+      "reidCalls": 4010,
+      "bufferAllocations": 0,
+      "previewCalls": 191
+    },
+    "samples": 382,
+    "analysisSeconds": 60.52820801734924,
+    "output": {
+      "duration": 37.92,
+      "width": 1080,
+      "frameRate": 25,
+      "height": 1920
+    },
+    "label": "round2-after"
+  },
+  "analysisReductionPercent": 11.392508687461312,
+  "targetSamplesExactlyEqual": true,
+  "cameraPlanExactlyEqual": true,
+  "renderedCameraExactlyEqual": true,
+  "decodedFrames": 948,
+  "decodedVideoFramesExactlyEqual": true,
+  "unitTests": {
+    "total": 61,
+    "passed": 56,
+    "skipped": 5
+  },
+  "editorUITestsPassed": 6,
+  "limits": [
+    "Single sequential before/after pair; not a statistical speed guarantee",
+    "M4 CPU-only simulator, not physical iPhone performance",
+    "Detection remains 10Hz; display images sampled every 0.2 source seconds, with forced status changes and endpoints",
+    "Pool allocation counters count direct CVPixelBufferCreate calls, not physical pool allocations"
+  ]
+}

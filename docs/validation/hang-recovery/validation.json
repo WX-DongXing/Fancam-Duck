@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-18",
+  "confirmed_blocking_call": "AVAssetReaderOutput.copyNextSampleBuffer",
+  "trigger": "Repeated short reverse seeks on the imported 3840x2160 H.264 clip; visible stall near source 21.2s",
+  "source_sha256": "93a991bb0af2f0329c3509c5f16cba75ee36c6d638c7e78113bda4c9501933ad",
+  "selected_range_seconds": [
+    4.690314465408805,
+    30.68578616352201
+  ],
+  "fixes": [
+    "Continuous full-resolution decode and feature preparation, followed by reverse association",
+    "JPEG display thumbnails only; inference uses original full-resolution frames",
+    "Cancellable reads and 10-second read deadlines",
+    "One whole-stream compatibility conversion on AVFoundation decode failure, then retry the same crop; temporary conversion removed afterwards"
+  ],
+  "timings_seconds": {
+    "260_sample_decode": 5.943452,
+    "real_tracking_to_preview": 54.625917,
+    "disk_cached_reopen": 1.425664,
+    "export_with_compatibility_fallback": 49.053314
+  },
+  "checks": {
+    "unit_executed": 67,
+    "unit_passed": 62,
+    "unit_skipped": 5,
+    "unit_failed": 0,
+    "real_project_analysis_reached_preview": true,
+    "real_project_export_completed": true,
+    "full_export_decode_errors": 0,
+    "export_video_size": [
+      1080,
+      1920
+    ],
+    "export_frame_rate": 25,
+    "video_duration": 26,
+    "audio_duration": 25.995011,
+    "audio_start": 0,
+    "video_start": 0,
+    "saved_to_system_photos": false
+  },
+  "artifacts": [
+    "output.mp4",
+    "output-metadata.json",
+    "../../design-assets/phone/export-complete.png"
+  ],
+  "limits": [
+    "Simulator timings are not iPhone device benchmarks",
+    "The compatibility fallback performs an additional encode when required"
+  ]
+}

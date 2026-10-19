@@ -1,0 +1,38 @@
+{
+  "old_camera_recomputed_on_same_new_target_samples": {
+    "zoom_height_range_pixels": 761.8190476190473,
+    "vertical_center_range_pixels": 145.9264285714287,
+    "max_horizontal_acceleration_source_pixels_per_second_squared": 12500.000000236196,
+    "rms_horizontal_acceleration": 1014.2622352257067,
+    "max_log_zoom_rate_per_second": 1.820105631668146
+  },
+  "new_camera": {
+    "zoom_height_range_pixels": 0.0,
+    "vertical_center_range_pixels": 0.0,
+    "max_horizontal_acceleration_source_pixels_per_second_squared": 1093.5756255080455,
+    "rms_horizontal_acceleration": 141.3826201914531,
+    "max_log_zoom_rate_per_second": 0.0
+  },
+  "analysis_seconds": 85.4838479757309,
+  "previous_ui_analysis_seconds": 124.323734998703,
+  "export_seconds": 18.40199601650238,
+  "corrections_in_new_run": 0,
+  "audio_alignment": [
+    {
+      "source_time": 5,
+      "lag_ms": 0.0,
+      "correlation": 0.9998241662979126
+    },
+    {
+      "source_time": 18,
+      "lag_ms": 0.0,
+      "correlation": 0.9999661445617676
+    },
+    {
+      "source_time": 32,
+      "lag_ms": 0.0,
+      "correlation": 0.9999595284461975
+    }
+  ],
+  "comparison_note": "Previous standard-speed planner recomputed on the same new observations; source pixels, not metrics inferred from the previous encoded video."
+}

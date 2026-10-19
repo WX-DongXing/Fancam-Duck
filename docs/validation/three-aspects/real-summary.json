@@ -1,0 +1,8 @@
+{
+  "evidence": "XCTest log",
+  "test": "VideoRatioValidationTests/testRealSquareAndPortraitFlow",
+  "passed": true,
+  "failures": 0,
+  "resultBundleFinalized": false,
+  "note": "The test case and suite reported passed. Xcode result bundle archival has not finished."
+}

@@ -1,0 +1,29 @@
+.DS_Store
+.build/
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcresult
+.venv/
+tools/model_export/weights/
+models-validation/
+
+# Local, private desktop validation fixture
+FancamDuckTests/Fixtures/desktop-occlusion.mp4
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Generated validation movies; keep reports and screenshots
+/docs/validation/**/*.mp4
+/docs/validation/**/*.mov
+/docs/validation/**/*.avi
+/docs/validation/**/*.m4v
+
+# Video fixtures and generated movies stay local and are never published.
+*.mp4
+*.mov
+*.avi
+*.m4v

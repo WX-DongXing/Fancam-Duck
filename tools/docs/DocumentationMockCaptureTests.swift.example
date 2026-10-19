@@ -1,0 +1,57 @@
+import XCTest
+
+final class DocumentationMockCaptureTests:XCTestCase {
+    @MainActor func testCaptureSyntheticDocumentation() throws {
+        let app=XCUIApplication()
+        app.launchArguments=["--ui-test-history","--demo-editor"]
+        app.launch()
+        XCTAssertTrue(app.buttons["dancer1"].waitForExistence(timeout:10))
+        func shot(_ name:String) {
+            let image=XCTAttachment(screenshot:app.screenshot());image.name="mock-"+name;image.lifetime = .keepAlways;add(image)
+        }
+        func ready() {
+            expectation(for:NSPredicate(format:"enabled == true"),evaluatedWith:app.buttons["commitTool"])
+            waitForExpectations(timeout:10)
+        }
+        app.buttons["dancer1"].tap();shot("selection")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        shot("selection-wide")
+        app.buttons["tool-构图"].tap();ready();shot("composition-wide")
+        XCUIDevice.shared.orientation = .portrait;ready();shot("composition")
+        app.buttons["aspect-1:1"].tap();ready();shot("composition-square")
+        app.buttons["cancelTool"].tap()
+        app.buttons["tool-打码"].tap();shot("redaction-face")
+        app.buttons["redaction-整个人物"].tap();shot("redaction-person")
+        XCUIDevice.shared.orientation = .landscapeLeft;shot("redaction-wide")
+        XCUIDevice.shared.orientation = .portrait
+        app.buttons["cancelTool"].tap()
+        let action=app.buttons["primaryAction"]
+        action.tap();shot("processing");action.tap();shot("paused");action.tap()
+        let status=app.staticTexts["processingStatus"]
+        expectation(for:NSPredicate(format:"label CONTAINS %@","阻塞"),evaluatedWith:status);waitForExpectations(timeout:15)
+        shot("recovery");app.buttons["dancer0"].tap();action.tap()
+        XCTAssertTrue(app.staticTexts["exportTitle"].waitForExistence(timeout:15));shot("export-preview")
+        action.tap();shot("export-complete")
+        app.terminate()
+        app.launchArguments=["--ui-test-history"];app.launch()
+        XCTAssertTrue(app.buttons["查看操作指引，视频待补充"].waitForExistence(timeout:10));shot("home")
+        XCUIDevice.shared.orientation = .landscapeLeft;shot("home-wide")
+        XCUIDevice.shared.orientation = .portrait
+    }
+    @MainActor func testCaptureSyntheticStyles() throws {
+        let app=XCUIApplication();app.launchArguments=["--ui-test-history","--demo-editor"];app.launch()
+        XCTAssertTrue(app.buttons["dancer1"].waitForExistence(timeout:10));app.buttons["dancer1"].tap()
+        func shot(_ name:String) {let a=XCTAttachment(screenshot:app.screenshot());a.name="mock-"+name;a.lifetime = .keepAlways;add(a)}
+        app.buttons["tool-打码"].tap()
+        app.buttons["redaction-style-马赛克"].tap();shot("redaction-mosaic")
+        app.buttons["redaction-style-图片"].tap(); XCTAssertTrue(app.buttons["取消"].waitForExistence(timeout:10)); let cell=app.images.matching(identifier:"PXGGridLayout-Info").firstMatch; XCTAssertTrue(cell.waitForExistence(timeout:10));cell.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap()
+        XCTAssertTrue(app.buttons["更换图片"].waitForExistence(timeout:10)); XCTAssertTrue(app.buttons["redaction-style-图片"].isSelected);shot("redaction-image")
+        app.buttons["cancelTool"].tap()
+        app.buttons["tool-构图"].tap()
+        expectation(for:NSPredicate(format:"enabled == true"),evaluatedWith:app.buttons["commitTool"]);waitForExpectations(timeout:10)
+        app.buttons["aspect-4:3"].tap();shot("composition-classic")
+        app.terminate();app.launchArguments=["--ui-test-history"];app.launch()
+        let guide=app.buttons["查看操作指引，视频待补充"];XCTAssertTrue(guide.waitForExistence(timeout:10));guide.tap()
+        XCTAssertTrue(app.staticTexts["一个镜头，跟上动作。"].waitForExistence(timeout:5));shot("guide")
+    }
+}

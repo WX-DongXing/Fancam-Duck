@@ -1,0 +1,100 @@
+{
+  "device": "iPhone 17 Pro iOS 26.3 simulator on M4",
+  "source_sha256": "aaf13bac532294a93ee1075e15fba0a7fd536560f38706a216895221fcdf3a0e",
+  "source": {
+    "width": 3840,
+    "height": 2160,
+    "duration": 37.92,
+    "frameRate": 25
+  },
+  "composition_settings": {
+    "compositionX": 0.05225999175816686,
+    "compositionY": 0.009091197412951236,
+    "personHeight": 0.75,
+    "protectFullBody": false,
+    "compositionScale": 1.1278476414245873,
+    "end": 37.92,
+    "horizontalOffset": 0,
+    "start": 0,
+    "followSpeed": "标准",
+    "resolution": {
+      "width": 1080,
+      "height": 1920
+    }
+  },
+  "preview_export_pixel_checks": [
+    {
+      "meanAbsoluteRGBError": 0.004549178467679435,
+      "time": 0,
+      "correlation": 0.9995616146960157
+    },
+    {
+      "meanAbsoluteRGBError": 0.0043252938907006955,
+      "time": 5,
+      "correlation": 0.9996028333769095
+    },
+    {
+      "meanAbsoluteRGBError": 0.002757029547927954,
+      "time": 18,
+      "correlation": 0.9997700911377257
+    },
+    {
+      "meanAbsoluteRGBError": 0.004317855846038422,
+      "time": 32,
+      "correlation": 0.9995294515757952
+    },
+    {
+      "meanAbsoluteRGBError": 0.0038891555464744907,
+      "time": 37.8,
+      "correlation": 0.9993665267072034
+    }
+  ],
+  "native_ui_partial_check": {
+    "time": 0,
+    "screenshot": "../../design-assets/phone/selection.png",
+    "viewport_pixels": [
+      239,
+      486,
+      560,
+      997
+    ],
+    "compared_region": "Upper viewport only; exclude fine-adjustment overlay and border",
+    "mean_absolute_rgb_error": 0.012205347977700395,
+    "correlation": 0.9951488502658401
+  },
+  "tests": {
+    "unit_media_passed": 45,
+    "ordinary_optional_skips": 5,
+    "iPhone17Pro_editor_ui_passed": 6,
+    "history_delete_ui_passed": 1,
+    "desktop_composition_full_flow_passed": 1,
+    "desktop_preview_export_parity_passed": 1,
+    "iPhone16e_editor_ui_passed": 6
+  },
+  "output": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_type": "audio",
+        "r_frame_rate": "0/0",
+        "duration": "37.919025"
+      },
+      {
+        "codec_type": "video",
+        "width": 1080,
+        "height": 1920,
+        "r_frame_rate": "25/1",
+        "duration": "37.920000"
+      }
+    ]
+  },
+  "limitations": [
+    "Pixel comparison samples five timestamps, not every frame.",
+    "Native static-viewport comparison covers the unobscured upper portion of one screenshot.",
+    "Simulator validation does not establish physical iPhone performance."
+  ],
+  "manual_corrections": 0,
+  "desktop_tracking_seconds": 69.14153897762299,
+  "desktop_export_seconds": 24.356653094291687
+}

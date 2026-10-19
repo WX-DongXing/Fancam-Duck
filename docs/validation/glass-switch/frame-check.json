@@ -1,0 +1,7 @@
+{
+  "sampling": "60fps resampling of simulator recording, not a device FPS measurement",
+  "sampledFrames": 1034,
+  "ROI": "100x200 central viewport pixels in 604-wide recording",
+  "blackFrameIndices": [],
+  "minimumMeanLuma": 47.66505
+}

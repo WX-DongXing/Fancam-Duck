@@ -1,0 +1,13 @@
+{
+  "suite": "Selected tests",
+  "passed": 13,
+  "failed": 0,
+  "checks": [
+    "image overlay without backing or shadow",
+    "transparent padding crop",
+    "fixed image coverage bounds",
+    "preview-export parity",
+    "real desktop video export pixels"
+  ],
+  "log": "/private/tmp/fancamduck-image-no-shadow-fixed.log"
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "sample": "person-mosaic-plan",
+    "tracks": 5,
+    "automatic": true,
+    "maxNormalizedEdgeStep": 0.004627099361889653
+  },
+  {
+    "sample": "face-mosaic-plan",
+    "tracks": 5,
+    "automatic": true,
+    "maxNormalizedEdgeStep": 0.003930185093994121
+  },
+  {
+    "sample": "person-frosted-plan",
+    "tracks": 5,
+    "automatic": true,
+    "maxNormalizedEdgeStep": 0.004627099361889653
+  },
+  {
+    "sample": "face-image-plan",
+    "tracks": 5,
+    "automatic": true,
+    "maxNormalizedEdgeStep": 0.003930185093994121
+  },
+  {
+    "sample": "face-frosted-plan",
+    "tracks": 5,
+    "automatic": true,
+    "maxNormalizedEdgeStep": 0.003930185093994121
+  },
+  {
+    "sample": "person-image-plan",
+    "tracks": 5,
+    "automatic": true,
+    "maxNormalizedEdgeStep": 0.004627099361889653
+  }
+]

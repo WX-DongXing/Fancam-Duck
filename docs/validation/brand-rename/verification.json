@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-19",
+  "product": {
+    "zh-Hans": "直拍鸭",
+    "en": "Fancam Duck"
+  },
+  "project": "Fancam Duck.xcodeproj",
+  "scheme": "Fancam Duck",
+  "swiftModule": "FancamDuck",
+  "bundleIdentifier": "com.aicut.app",
+  "legacyCompatibility": "Legacy AICut Application Support directory is moved only if the Fancam Duck destination does not exist; existing destinations and old files are preserved.",
+  "validation": {
+    "unitAndIntegration": {
+      "executed": 99,
+      "skipped": 6,
+      "failures": 0
+    },
+    "keyUIRegression": {
+      "executed": 2,
+      "failures": 0
+    },
+    "finalLocalizedHomeUI": "passed",
+    "macCatalystBuild": "passed",
+    "localizedNames": "verified in built application",
+    "documentationLinks": 160,
+    "syntheticMediaReferences": 153,
+    "diffCheck": "passed",
+    "withoutBundledVideo": {
+      "executed": 99,
+      "skipped": 43,
+      "failures": 0,
+      "note": "Video-dependent tests skip without an explicit local FANCAM_DUCK_TEST_VIDEO."
+    }
+  },
+  "limits": [
+    "No full private desktop-video performance benchmark rerun.",
+    "Signing identity is intentionally retained for update and data compatibility."
+  ]
+}

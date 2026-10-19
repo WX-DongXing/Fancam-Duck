@@ -1,0 +1,1689 @@
+{
+  "date": "2026-10-19",
+  "scope": "Documentation media only; source fixtures and app behavior unchanged",
+  "replacedImages": [
+    {
+      "path": "docs/design/button-layouts/A.png",
+      "previousSHA256": "6b8587602ea7c6690fea47973c346eeea3f3c80e2af898b38086210fe639febd",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/design/button-layouts/B.png",
+      "previousSHA256": "612dcc8232ce36c738f39b3c32a9e9a07733754327d2cc3e2a541d69df9fc9ec",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/design/button-layouts/C.png",
+      "previousSHA256": "67fac440589f102683d7c1393362c9cbfae4b9f4b933c271c75938ba6091680d",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/design/button-layouts/comparison.png",
+      "previousSHA256": "8bfebc8f766d719e30869b0542baa37fbf51e3ee9f59c585343669867a07c4eb",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/screenshots/B/real-completed.png",
+      "previousSHA256": "1fe780398dcaf4c25b973c4b59ed3feca5336a8409214c98b872c8d7a79ca7c0",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/screenshots/B/real-direct-selection.png",
+      "previousSHA256": "cebd36c2e94def817b521b2d408d51503fa496d037ad41e2f76b59ce4a621c99",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/B/real-selected.png",
+      "previousSHA256": "ed2d32d14b8ec17752a9938ff2373e1c3e757ac773464998653ddecade895915",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/B/real-settings.png",
+      "previousSHA256": "0aa06cf35d6ab24f65b52fb277b6d138572b6e3bfa59b38775257ac5958f0199",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/screenshots/B/real-tracking.png",
+      "previousSHA256": "813e6a8f34f527b89b31200dcf10ef8183b96b4e514fc8de6843882f7fc37ac9",
+      "replacement": "docs/design-assets/phone/processing.png",
+      "replacementSHA256": "fd5c4acff2f8e111d7fcb42365bbae307dfffdfcac3d6fa8c35b77e941e1cc2f"
+    },
+    {
+      "path": "docs/screenshots/amber/editor-real-detections.png",
+      "previousSHA256": "512a09863b256927cc87f7769b30e257b8a595eb09da366918bffa754cf44201",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/amber/editor-real-selected.png",
+      "previousSHA256": "750da29ebedbb1723c5911e486125d42c756b0563e5331f4c664595f6a405d9f",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/amber/export-real-completed.png",
+      "previousSHA256": "1fe780398dcaf4c25b973c4b59ed3feca5336a8409214c98b872c8d7a79ca7c0",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/screenshots/composition/cached-preview.png",
+      "previousSHA256": "ef1e4cf2e9662c71b9cec6d0f92360e01d828d5a140dc1404695fdcf9d64a2f7",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/composition/editor.png",
+      "previousSHA256": "68d07e2b389f43494b6eee89818f29ba434cae7b19683e3ffd2ef80fd6b1be3f",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/composition/export.png",
+      "previousSHA256": "5c3c1612f0e34866616ca723514c81a40a1c89d197bd3ebc330789caec085e34",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/screenshots/composition-anchor/export-completed.png",
+      "previousSHA256": "eb983c4a34ba2b52d223ada1e051a8c5d2abddaf2ba16e64023666b57d824fb6",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/screenshots/composition-anchor/processed-preview.png",
+      "previousSHA256": "99d887f767e0dbcb66935f3a49529aaa4cfd5483143a5df40a901fa7bdd23644",
+      "replacement": "docs/design-assets/phone/export-preview.png",
+      "replacementSHA256": "47ce70c866ebc14a9dc38c219dd26007c84c54198e3265e631066938f0b9a05d"
+    },
+    {
+      "path": "docs/screenshots/composition-anchor/selected-before-processing.png",
+      "previousSHA256": "55e2c3ec86141a83637d0244f9e20f327d42dc07b8530d54cc59fd704c2f53f9",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/frame-A/real-detections.png",
+      "previousSHA256": "fe49040c1d69f8c0aeb7d6cdb8eb70cc1e6b47fd568e89e45d6e2df7ae44f370",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/frame-A/real-selected.png",
+      "previousSHA256": "654c9e38aedf1092af3fde7bf025fb45a0164620d78e9fdb68549d35eed2cd63",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/frame-C/real-detections.png",
+      "previousSHA256": "3623240c4918ee562ffeca81054dec7db0fe6757f5c46a91e4977baf365ef4bb",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/frame-C/real-selected.png",
+      "previousSHA256": "4eef8298d555151a57fce933ec828fbbb37d83fdfb607d325384abc6502cfa7c",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/frame-reference/real-detections.png",
+      "previousSHA256": "54ec454d207b1dde876a99304cc4e601745666b41db32bb28409bfe4448e7a99",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/frame-reference/real-selected.png",
+      "previousSHA256": "ec1afbcbc894b34a58883f44ca3d775e98aa638d4d0816b4b26f3b50e7eba9cb",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/occlusion/completed.png",
+      "previousSHA256": "1fe780398dcaf4c25b973c4b59ed3feca5336a8409214c98b872c8d7a79ca7c0",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/screenshots/occlusion/direct-selection.png",
+      "previousSHA256": "2590765db437660c1ffc9fe84eff2acc06215dbf3a1ec491f92b720024ce2267",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/occlusion/selected.png",
+      "previousSHA256": "86e14146d818d31868b41abaee349185749d010edd647c418929148b7651b37f",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/screenshots/occlusion/tracking.png",
+      "previousSHA256": "f2615b1298012b8dfe904b1775d2d88bffff1ada7a3f687db59affbd07fc3e94",
+      "replacement": "docs/design-assets/phone/processing.png",
+      "replacementSHA256": "fd5c4acff2f8e111d7fcb42365bbae307dfffdfcac3d6fa8c35b77e941e1cc2f"
+    },
+    {
+      "path": "docs/screenshots/optimization-rounds/composition.png",
+      "previousSHA256": "57617f6c6fabf7da673ab0e49145b093a4d1c4098b288389a965b36047b7db6e",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/screenshots/optimization-rounds/export-progress.png",
+      "previousSHA256": "9fe554d9561945ed0873f2c2421d9ac60678b4a963729292cfb3abcec7826442",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/screenshots/optimization-rounds/restored-output.png",
+      "previousSHA256": "b848dfff3f30cc4789ba9adc89271cc3935e2b1df15ec77cadaa6550cd72d2fe",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/B/contact-sheet.jpg",
+      "previousSHA256": "1778cff50991726c6dec7f4d22f8b190f33c642f67528d0e0b2fb0e4d040185d",
+      "replacement": "docs/design-assets/baseline.jpg",
+      "replacementSHA256": "3b70e854cf98c79d61992c6667e8968327798f8daa94eb84eae83e091fe28727"
+    },
+    {
+      "path": "docs/validation/CR/contact-sheet.jpg",
+      "previousSHA256": "0509bcfc2ae89c9caadbe20a6edae25ddcfa0a6bf4642911f2dacf12ecdac5da",
+      "replacement": "docs/design-assets/baseline.jpg",
+      "replacementSHA256": "3b70e854cf98c79d61992c6667e8968327798f8daa94eb84eae83e091fe28727"
+    },
+    {
+      "path": "docs/validation/adaptive-workspace/mac-export-frame.png",
+      "previousSHA256": "1633163d6600fececfa5f397d6a5580e362a79b6e16fad95e4ef185b6f8cd466",
+      "replacement": "docs/design-assets/baseline.png",
+      "replacementSHA256": "221760aeec24a43709f89d14787c38624c9c28ad030d7efbd3777584da379a8d"
+    },
+    {
+      "path": "docs/validation/composition/export-contact-sheet.jpg",
+      "previousSHA256": "4fba2ad0bea363ddea07463ccea821dcb15429da8c72622edf635fffa7b3727c",
+      "replacement": "docs/design-assets/baseline.jpg",
+      "replacementSHA256": "3b70e854cf98c79d61992c6667e8968327798f8daa94eb84eae83e091fe28727"
+    },
+    {
+      "path": "docs/validation/composition-anchor/clear-before-after.jpg",
+      "previousSHA256": "a76aafac3184f3205df798de023d30f735c77f3761915626ed6a29218a2156fb",
+      "replacement": "docs/design-assets/baseline.jpg",
+      "replacementSHA256": "3b70e854cf98c79d61992c6667e8968327798f8daa94eb84eae83e091fe28727"
+    },
+    {
+      "path": "docs/validation/composition-anchor/export-first-frame.png",
+      "previousSHA256": "2c0e694fc5bc2b97fc0179d667d3169432391dd0d8e9877a0771963996e365fd",
+      "replacement": "docs/design-assets/baseline.png",
+      "replacementSHA256": "221760aeec24a43709f89d14787c38624c9c28ad030d7efbd3777584da379a8d"
+    },
+    {
+      "path": "docs/validation/composition-anchor/selection-export-comparison.jpg",
+      "previousSHA256": "06ab984dbf40ec561efbe0175a7082ad2f4aa4a04d99ed154c14a6d4de8afedf",
+      "replacement": "docs/design-assets/baseline.jpg",
+      "replacementSHA256": "3b70e854cf98c79d61992c6667e8968327798f8daa94eb84eae83e091fe28727"
+    },
+    {
+      "path": "docs/validation/composition-aspects/real-ratio-portrait-composition.png",
+      "previousSHA256": "cbe22da9d1083c8982a49a9f3f7b49a4a7fbb9ea27e59745376a945a8dc8ad11",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/composition-aspects/real-ratio-portrait-export.png",
+      "previousSHA256": "bfb8874d2bc7c4c00ee7ede9c968cc0c9204f68918902702535ad039c0cce0f3",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/composition-aspects/real-ratio-portrait-source.png",
+      "previousSHA256": "5ffd188e78c8b5c98add5e33a7bcfea94bdc34d6a7880ba681194b143345e6fa",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/composition-aspects/real-ratio-square-composition.png",
+      "previousSHA256": "21a465443c12a697947e29111b7c6c32561e258324c70b653e3eaeb23ad7f827",
+      "replacement": "docs/design-assets/phone/composition-square.png",
+      "replacementSHA256": "477496750fed6ec339ea50a386dcf12426c4ec8b3490f70bf352371686566966"
+    },
+    {
+      "path": "docs/validation/composition-aspects/real-ratio-square-export.png",
+      "previousSHA256": "ab4ff76d38e73b397501c86f803fc8ddb7d5bbfb97462e08df3ed7e1dd63adb2",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/composition-aspects/real-ratio-square-source.png",
+      "previousSHA256": "8a1836d7333cca391e30e2e74ded1efdd914323bb5618d2a856b0eae01f25789",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/controls-layout/real-ratio-portrait-composition.png",
+      "previousSHA256": "927fffc69a8279679050402a1997ce775fd1dccb40d31bec60516e25d87e5565",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/controls-layout/real-ratio-portrait-export.png",
+      "previousSHA256": "3aa1cf8a7c69c157ede8ca2e5ede5b40e107214f962ee1e12a4ab1f7642b03f2",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/controls-layout/real-ratio-portrait-source.png",
+      "previousSHA256": "049f5ce4a22d99dce9d9d0621f1003ece14923e24b2b5c5266072870b559f00b",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/controls-layout/real-ratio-square-composition.png",
+      "previousSHA256": "94ea8e3a5161be4e03a7fcbc3c725ce63797127135ef9a86b19375ba24b08957",
+      "replacement": "docs/design-assets/phone/composition-square.png",
+      "replacementSHA256": "477496750fed6ec339ea50a386dcf12426c4ec8b3490f70bf352371686566966"
+    },
+    {
+      "path": "docs/validation/controls-layout/real-ratio-square-export.png",
+      "previousSHA256": "080f57c818f9faa3b827db556f08200a7a3f2e379cac9b0d821c94a0c0f86704",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/controls-layout/real-ratio-square-source.png",
+      "previousSHA256": "97d23bed144a816385140cc342dc378608511ec73fbf4cbedea3248ca221e51d",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/desktop/contact-sheet.jpg",
+      "previousSHA256": "084f7e8ff4db916447fc84785e4b0412555c4aff1f76b0a781fd90da940de57b",
+      "replacement": "docs/design-assets/baseline.jpg",
+      "replacementSHA256": "3b70e854cf98c79d61992c6667e8968327798f8daa94eb84eae83e091fe28727"
+    },
+    {
+      "path": "docs/validation/desktop/desktop-01-photo-picker.png",
+      "previousSHA256": "c450eac0775befb8c87e6a19401bab607c9cf9aa1ca9c5320df19ac65154c74e",
+      "replacement": "docs/design-assets/phone/home.png",
+      "replacementSHA256": "b78cea54caeb72b90b93e401ff3bddf98c1116e5edd37b81f2c8b7eda56909dd"
+    },
+    {
+      "path": "docs/validation/desktop/desktop-02-real-detections.png",
+      "previousSHA256": "253586d89dfc07ca9998a093fa1b13fa7072115c7969e619be1c42a00b5657bb",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/desktop/desktop-03-selected-target-fixed.png",
+      "previousSHA256": "456648ec67c4f7aadec7a4996777b84b4a1a39ad483068c8786c155d9677665e",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/desktop/desktop-03-selected-target.png",
+      "previousSHA256": "1295c7a2fa72c1c633d8cfb6b9cc40093a4c2b347b1273a91902254ae65fe217",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/desktop/desktop-04-live-tracking.png",
+      "previousSHA256": "2ce5179c5c42997df4ca6015d30538053ff69ee3ef619c3a841c671600781b5a",
+      "replacement": "docs/design-assets/phone/processing.png",
+      "replacementSHA256": "fd5c4acff2f8e111d7fcb42365bbae307dfffdfcac3d6fa8c35b77e941e1cc2f"
+    },
+    {
+      "path": "docs/validation/desktop/desktop-05-cropped-preview.png",
+      "previousSHA256": "12ceff5836fda2e9def7a45b06f22dc649339097d4ff9f23ba4ad4001f88adcd",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/desktop/desktop-06-export-completed.png",
+      "previousSHA256": "1ce06b0ebe7fd601c5fcfe76522922f7bf636c6600c97480f0c310c4178fd0fe",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/desktop/desktop-blocked-target.png",
+      "previousSHA256": "896e6bb1d26227cad5aa672e35d06b9d1726883321606636a9e6bde338857b39",
+      "replacement": "docs/design-assets/phone/recovery.png",
+      "replacementSHA256": "3a15aa80b2208ca767aa3fe5ecf5f7440eb7313b633c909744f9aa87716d34d7"
+    },
+    {
+      "path": "docs/validation/desktop/desktop-correction-13.png",
+      "previousSHA256": "5a762e399ca6c787b14c9d84fa462b271da142181bdd45a11eb13ec643b32903",
+      "replacement": "docs/design-assets/phone/recovery.png",
+      "replacementSHA256": "3a15aa80b2208ca767aa3fe5ecf5f7440eb7313b633c909744f9aa87716d34d7"
+    },
+    {
+      "path": "docs/validation/desktop-redesign/composition.png",
+      "previousSHA256": "f308ecebf430958eb3abcc63715cf2ab0edcf854e0c324741473a8fd8b1d9b34",
+      "replacement": "docs/design-assets/mac/composition.png",
+      "replacementSHA256": "e6a15c253d305cddd7e8456956a49413fb499372ee7764716c68b63a01f99e7c"
+    },
+    {
+      "path": "docs/validation/desktop-redesign/editor.png",
+      "previousSHA256": "10d89e7a6f144273f17bbbb70070789edca4a6bcf06a155ab79a7a45fb569913",
+      "replacement": "docs/design-assets/mac/editor.png",
+      "replacementSHA256": "d466f7ba6b42d4858715f094b5507c2c952922e697573a054f974fbf2d127cbe"
+    },
+    {
+      "path": "docs/validation/desktop-redesign/export.png",
+      "previousSHA256": "29b4e8f28e9afee68d3bffbdde2cb3cb776e9539c6b170cf53700715c2cb3601",
+      "replacement": "docs/design-assets/mac/export.png",
+      "replacementSHA256": "7d44768d58501a3364fbfbf222722984d9a8b25b78899fc61833701d529869fb"
+    },
+    {
+      "path": "docs/validation/desktop-redesign/library.png",
+      "previousSHA256": "2cf007e4e1afad53db91408ec9252fe96b3943403c257533fca2ead5986eb677",
+      "replacement": "docs/design-assets/mac/library.png",
+      "replacementSHA256": "60d2481c618a473728a6601056d49147aff49ee4881ca4a84ab3ea83add6c8d5"
+    },
+    {
+      "path": "docs/validation/desktop-redesign/redaction.png",
+      "previousSHA256": "5916c3a8c0a890176d62d2a5b13145a425e80bd978cd2b3334046686f4b258ed",
+      "replacement": "docs/design-assets/mac/redaction.png",
+      "replacementSHA256": "501f897f34919df7e38302ac06a59e61d1a8bb24d562dc8f38a559639ac5cea0"
+    },
+    {
+      "path": "docs/validation/duo-redesign/closed.png",
+      "previousSHA256": "6add9bab576a58f1ffa297dfccbfb4a36c006140ffd8c5d555df9f9a43a1f686",
+      "replacement": "docs/design-assets/duo/closed.png",
+      "replacementSHA256": "b536d1db7e39e2a2c77d5e3a005c92b8e44dd9d417a2b3cdfe1529a6944dc024"
+    },
+    {
+      "path": "docs/validation/duo-redesign/composition.png",
+      "previousSHA256": "2e991c406e681ddad453ebd3e04fd9eafb0fee4d03e2fab0e24415efa292094a",
+      "replacement": "docs/design-assets/duo/composition.png",
+      "replacementSHA256": "8a4a71517ba859362bf5baaf5fd1e604ffc9c1209503a2e6f917989675cb022d"
+    },
+    {
+      "path": "docs/validation/duo-redesign/library.png",
+      "previousSHA256": "0f3cabb8deada724131406e76d5ee996e48aaabf5641ded4b60eb38044dfac8e",
+      "replacement": "docs/design-assets/duo/library.png",
+      "replacementSHA256": "a513b94ad94302ed9133cfeb17303c24e5487e1227b9b88d246166acccdb2322"
+    },
+    {
+      "path": "docs/validation/duo-redesign/open.png",
+      "previousSHA256": "c8eace07840267e3ee3b730f9c18983cf959dddde460fcf4dfd5b5c87bd57afe",
+      "replacement": "docs/design-assets/duo/selection.png",
+      "replacementSHA256": "a84acf1e899e217ac0066c666cc6344d61da6f47ed6d66e5a89d4f322bdb9c26"
+    },
+    {
+      "path": "docs/validation/duo-redesign/partial.png",
+      "previousSHA256": "94cd2f16f8201074f70668fe97055711af69155dde6a5eaa67125698a048ee9a",
+      "replacement": "docs/design-assets/duo/partial.png",
+      "replacementSHA256": "79a27e8a23e310be8967969fd0089a12a0ab03ec885bf9351c6cdea14cc7a402"
+    },
+    {
+      "path": "docs/validation/duo-redesign/redaction.png",
+      "previousSHA256": "6ec445af813742466a0c65326658d6e6c2171f28106563913f58ad76f6677761",
+      "replacement": "docs/design-assets/duo/redaction.png",
+      "replacementSHA256": "bd3f6c88ef097852c0be2e7964319b2be31ffa80cbb4d64ddec7afb83c6ce0be"
+    },
+    {
+      "path": "docs/validation/glass-switch/composition.png",
+      "previousSHA256": "f2aaaf3234f9052bfc46e822fe0a8c6226e507cd431d5a5752778dd9dd5c019a",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/glass-switch/contact-sheet.png",
+      "previousSHA256": "5594ba9cd7a17134fdb004208477e49adf4a97dc91e819fbc427c8dcaddb3fa5",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/hang-recovery/completed.png",
+      "previousSHA256": "05805b514204dbe5e4ed7c7af827d34e2ff116733f2108f41180d1c136998f19",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/immersive-ui/immersive-02-real-selection.png",
+      "previousSHA256": "c78de1fb7e80a46c0ede4fbad122290928205d8ad1d3d55760b827ab36b9555b",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/immersive-ui/immersive-03-real-settings.png",
+      "previousSHA256": "7b40075fa3cbfbd434d39630ac6b18505eebf0ef9184dc5ed993209c056127d0",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/immersive-ui/immersive-04-real-composition.png",
+      "previousSHA256": "affe12d56d4f901cbfe7367b9e5a88d89e12bde23b973804c0a5306223f6e0ea",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/immersive-ui/immersive-05-real-tracking.png",
+      "previousSHA256": "7840a997a261fa5818aafadb64a71af3cd42610c409c8f575b2fcc275d8d53d6",
+      "replacement": "docs/design-assets/phone/processing.png",
+      "replacementSHA256": "fd5c4acff2f8e111d7fcb42365bbae307dfffdfcac3d6fa8c35b77e941e1cc2f"
+    },
+    {
+      "path": "docs/validation/immersive-ui/immersive-05a-paused.png",
+      "previousSHA256": "b2b97dc23bfb4785181b40db5bd1adb192290c19c760958bca572c7e376d313d",
+      "replacement": "docs/design-assets/phone/paused.png",
+      "replacementSHA256": "2369e7634f3fef7bc2efa01791ddfd1b6abef6ea4a9869b07aec29265acdd649"
+    },
+    {
+      "path": "docs/validation/immersive-ui/immersive-06-real-export-preview.png",
+      "previousSHA256": "0f59bd3b63ceda7df47ab67db65cc9c09af280d7653d8fd65b48a1661d19866a",
+      "replacement": "docs/design-assets/phone/export-preview.png",
+      "replacementSHA256": "47ce70c866ebc14a9dc38c219dd26007c84c54198e3265e631066938f0b9a05d"
+    },
+    {
+      "path": "docs/validation/immersive-ui/immersive-07-real-export-complete.png",
+      "previousSHA256": "847249d73da7913138803bb6cfb482ee9c907d55f047a1cf8f38803c6a7f51c2",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/immersive-ui/immersive-09-returned-composition.png",
+      "previousSHA256": "68060eab30d16978fab7105080c54707741784c1dcb133e5dab7d4d05e4315e2",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/immersive-ui/real-ratio-portrait-composition.png",
+      "previousSHA256": "991eceb8e0c2fdd5f00bb192eea449c5463c1b866c8b0a924e303b72bb9f2cbd",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/immersive-ui/real-ratio-portrait-export.png",
+      "previousSHA256": "d2a2ba3716cd92eb6d791a716714483cb689b3f7ca196f3f0249f697cfebed41",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/immersive-ui/real-ratio-portrait-source.png",
+      "previousSHA256": "d189b7420a0c6cfc01f873566b06c4e035e4ebf14461c1a1a36140a0afe91cc1",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/immersive-ui/real-ratio-square-composition.png",
+      "previousSHA256": "d928add705f50866893f01248860d5f0ece13c98546714929d276df0d5ae21a0",
+      "replacement": "docs/design-assets/phone/composition-square.png",
+      "replacementSHA256": "477496750fed6ec339ea50a386dcf12426c4ec8b3490f70bf352371686566966"
+    },
+    {
+      "path": "docs/validation/immersive-ui/real-ratio-square-export.png",
+      "previousSHA256": "7b7fa42627c184f85d30d5abeecdf7c6b1652643c189442e5dea4dd1aa3fb879",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/immersive-ui/real-ratio-square-source.png",
+      "previousSHA256": "332cf349777c44bd87edb1ad9b30462254c67d59078c1fc255f8ff6b8505e535",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/inline-editor/02-real-selection.png",
+      "previousSHA256": "152ec04d256d53f7925600cb7590de78ae043033f2917dfbdcd29cfe4e407c23",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/inline-editor/03-real-settings.png",
+      "previousSHA256": "f37fba45e74e91a7a6a988d32543fa9da0f39771e5eb4b00b9d92bb1e1fd7784",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/inline-editor/04-real-composition.png",
+      "previousSHA256": "defcdee8df6817ff07fc726ead99d224ff0f077707320daddb6553d1feb8942f",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/inline-editor/05-real-tracking.png",
+      "previousSHA256": "4dafdc508682d18f63f55760c7c0630443b269f8d7cab029d6915d88a95468ff",
+      "replacement": "docs/design-assets/phone/processing.png",
+      "replacementSHA256": "fd5c4acff2f8e111d7fcb42365bbae307dfffdfcac3d6fa8c35b77e941e1cc2f"
+    },
+    {
+      "path": "docs/validation/inline-editor/06-real-export-preview.png",
+      "previousSHA256": "94529815e61859dd5ecf2bbbf618541a64e0dbb1fa6dae24af4d1518b9c08555",
+      "replacement": "docs/design-assets/phone/export-preview.png",
+      "replacementSHA256": "47ce70c866ebc14a9dc38c219dd26007c84c54198e3265e631066938f0b9a05d"
+    },
+    {
+      "path": "docs/validation/inline-editor/07-real-export-complete.png",
+      "previousSHA256": "067f33d7074c34a52bfd9b6ca3d27e7119c63386f4e6a0e509976e42ac61ef7b",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/inline-editor/real-ratio-portrait-composition.png",
+      "previousSHA256": "1ab4cb590b29ed6cf9921a83db1a72072009457e830095eb82b7a692fa688b46",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/inline-editor/real-ratio-portrait-export.png",
+      "previousSHA256": "ac18d25ae4cc46536e2029975c9ffac9d11aa85777033ad9b0f70ce243e81583",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/inline-editor/real-ratio-portrait-source.png",
+      "previousSHA256": "670de10562a72bf30b913691556088e991fddf08998d77bfa2422c17ebff72e8",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/inline-editor/real-ratio-square-composition.png",
+      "previousSHA256": "182275998446178bac31bdc55f79fbbf5098babddb39eb96eb4c31a19a27d86d",
+      "replacement": "docs/design-assets/phone/composition-square.png",
+      "replacementSHA256": "477496750fed6ec339ea50a386dcf12426c4ec8b3490f70bf352371686566966"
+    },
+    {
+      "path": "docs/validation/inline-editor/real-ratio-square-export.png",
+      "previousSHA256": "0e9785f254673a31cbcc29a2aece5b5e6a67e4ec48ee413a283d87a5751bb482",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/inline-editor/real-ratio-square-source.png",
+      "previousSHA256": "5091d8bdb74e26100a695a78a24615a08596603e576770a946c2aa3ec3510abc",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/inline-progress/immersive-05-real-tracking-fill.png",
+      "previousSHA256": "d15a0800cbef144d022010a4a921d2b9cbacf05ba356e9ff9a69f91f40256374",
+      "replacement": "docs/design-assets/phone/processing.png",
+      "replacementSHA256": "fd5c4acff2f8e111d7fcb42365bbae307dfffdfcac3d6fa8c35b77e941e1cc2f"
+    },
+    {
+      "path": "docs/validation/inline-progress/immersive-05-real-tracking.png",
+      "previousSHA256": "487281d0f53e94b672fbcaa884e355c5990b4cf6fabe341ffc6ae1310827613a",
+      "replacement": "docs/design-assets/phone/processing.png",
+      "replacementSHA256": "fd5c4acff2f8e111d7fcb42365bbae307dfffdfcac3d6fa8c35b77e941e1cc2f"
+    },
+    {
+      "path": "docs/validation/inline-progress/immersive-05b-real-inline-paused-fill.png",
+      "previousSHA256": "b8952b7d74c60919527c029084955122db161c047e346067a9dbcd5deca64d3f",
+      "replacement": "docs/design-assets/phone/paused.png",
+      "replacementSHA256": "2369e7634f3fef7bc2efa01791ddfd1b6abef6ea4a9869b07aec29265acdd649"
+    },
+    {
+      "path": "docs/validation/inline-progress/immersive-05b-real-inline-paused.png",
+      "previousSHA256": "2e67463d77bd69da77b67e18544b0c76fa6e89c875b19d1b32e463d0d2348d9d",
+      "replacement": "docs/design-assets/phone/paused.png",
+      "replacementSHA256": "2369e7634f3fef7bc2efa01791ddfd1b6abef6ea4a9869b07aec29265acdd649"
+    },
+    {
+      "path": "docs/validation/liquid-glass/composition.png",
+      "previousSHA256": "f2aaaf3234f9052bfc46e822fe0a8c6226e507cd431d5a5752778dd9dd5c019a",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/liquid-glass/export-complete.png",
+      "previousSHA256": "846bf71dcda156bbb691ebae74f7da0d496c95fbe8520bf449d2a5bed6b3f740",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/liquid-glass/home.png",
+      "previousSHA256": "61da3be3b95aa8d2a733dab434bc523f45014c501b11c270257e25ca15135401",
+      "replacement": "docs/design-assets/phone/home.png",
+      "replacementSHA256": "b78cea54caeb72b90b93e401ff3bddf98c1116e5edd37b81f2c8b7eda56909dd"
+    },
+    {
+      "path": "docs/validation/liquid-glass/selection.png",
+      "previousSHA256": "462c2b9f85c70c6e0d95f14abb1e428eb1f07040ae27d85d2a4e71e79f712f3b",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/occlusion/controlled-mask.jpg",
+      "previousSHA256": "efc9272bfd516a323f8579fa257f8847fbc64983969dc5c8a0ebeabb92e840b5",
+      "replacement": "docs/design-assets/baseline.jpg",
+      "replacementSHA256": "3b70e854cf98c79d61992c6667e8968327798f8daa94eb84eae83e091fe28727"
+    },
+    {
+      "path": "docs/validation/real-people-follow.jpg",
+      "previousSHA256": "c8ac4c2596ae114a033493dd7a347b20e48b79adfc21c00cb143081a268e0e77",
+      "replacement": "docs/design-assets/baseline.jpg",
+      "replacementSHA256": "3b70e854cf98c79d61992c6667e8968327798f8daa94eb84eae83e091fe28727"
+    },
+    {
+      "path": "docs/validation/redaction/face-frosted-0.0.png",
+      "previousSHA256": "d0718318f2e4771090fa607fc4ae19ec6e6bd68e2eea9d83a3de515a328ae3a7",
+      "replacement": "docs/design-assets/face-frosted.png",
+      "replacementSHA256": "4d8d34678a700532f3368af71bda4577d163a8ea7e5bba63357a3df8b14cafa9"
+    },
+    {
+      "path": "docs/validation/redaction/face-frosted-0.5.png",
+      "previousSHA256": "ae7b2a346596d74fab6a47a39a6bbb111d8bfa1cbf25eb4cd270450a7b5e50ae",
+      "replacement": "docs/design-assets/face-frosted.png",
+      "replacementSHA256": "4d8d34678a700532f3368af71bda4577d163a8ea7e5bba63357a3df8b14cafa9"
+    },
+    {
+      "path": "docs/validation/redaction/face-frosted-1.0.png",
+      "previousSHA256": "6e478f8119ab7254696f02a91ac12ee1ce217fed0042b949a01702fae03a028a",
+      "replacement": "docs/design-assets/face-frosted.png",
+      "replacementSHA256": "4d8d34678a700532f3368af71bda4577d163a8ea7e5bba63357a3df8b14cafa9"
+    },
+    {
+      "path": "docs/validation/redaction/face-frosted-1.5.png",
+      "previousSHA256": "e902c8a516baf83acefef4a7e9f3130a23fa93b6c6f3d6c2c702c3c79576bc84",
+      "replacement": "docs/design-assets/face-frosted.png",
+      "replacementSHA256": "4d8d34678a700532f3368af71bda4577d163a8ea7e5bba63357a3df8b14cafa9"
+    },
+    {
+      "path": "docs/validation/redaction/face-image-0.0.png",
+      "previousSHA256": "91dfd4e4ce778e4d184db1f7fb7fb07b9aa1f2e99cdea533efbff6477d99db7e",
+      "replacement": "docs/design-assets/face-image.png",
+      "replacementSHA256": "c78ad5dab317002b522b8b07342e11e1ff7fcf25a058ca532a259623d26bd766"
+    },
+    {
+      "path": "docs/validation/redaction/face-image-0.5.png",
+      "previousSHA256": "392d1978820fab4800a15624529aa89d2c93efd5d38bc2af9ea0cf25500b7d3e",
+      "replacement": "docs/design-assets/face-image.png",
+      "replacementSHA256": "c78ad5dab317002b522b8b07342e11e1ff7fcf25a058ca532a259623d26bd766"
+    },
+    {
+      "path": "docs/validation/redaction/face-image-1.0.png",
+      "previousSHA256": "03342ea716141991e95f6810f417bb7822807daf14f2f2b51e5d6374695994a7",
+      "replacement": "docs/design-assets/face-image.png",
+      "replacementSHA256": "c78ad5dab317002b522b8b07342e11e1ff7fcf25a058ca532a259623d26bd766"
+    },
+    {
+      "path": "docs/validation/redaction/face-image-1.5.png",
+      "previousSHA256": "0cb35ee0e25f648885390041bbd11cfd2d8fddaf4bc8ae42d08dd114b42f5589",
+      "replacement": "docs/design-assets/face-image.png",
+      "replacementSHA256": "c78ad5dab317002b522b8b07342e11e1ff7fcf25a058ca532a259623d26bd766"
+    },
+    {
+      "path": "docs/validation/redaction/face-mosaic-0.0.png",
+      "previousSHA256": "11d5a64372f450f7463b88608816466e298c23338f9f4d491b2ba9be7ac9c973",
+      "replacement": "docs/design-assets/face-mosaic.png",
+      "replacementSHA256": "a8c48f4383127c8b2c48f1950c6272432ce1709802f6a131f4e33bc576e761d3"
+    },
+    {
+      "path": "docs/validation/redaction/face-mosaic-0.5.png",
+      "previousSHA256": "2e72dd9dde33e6581cc1691b9e1980fe4c6d05d63e0f8641d3e82afc88e45dd4",
+      "replacement": "docs/design-assets/face-mosaic.png",
+      "replacementSHA256": "a8c48f4383127c8b2c48f1950c6272432ce1709802f6a131f4e33bc576e761d3"
+    },
+    {
+      "path": "docs/validation/redaction/face-mosaic-1.0.png",
+      "previousSHA256": "369e5a2f0d4fcaa8d5104a986eb452026eca2441d4bedea6ccdc4c0e645c7fef",
+      "replacement": "docs/design-assets/face-mosaic.png",
+      "replacementSHA256": "a8c48f4383127c8b2c48f1950c6272432ce1709802f6a131f4e33bc576e761d3"
+    },
+    {
+      "path": "docs/validation/redaction/face-mosaic-1.5.png",
+      "previousSHA256": "1d2c51b5eb3a6ba6e32af948be1881bbcf4fbbd2fcf20735de1ec3dda18ccb1a",
+      "replacement": "docs/design-assets/face-mosaic.png",
+      "replacementSHA256": "a8c48f4383127c8b2c48f1950c6272432ce1709802f6a131f4e33bc576e761d3"
+    },
+    {
+      "path": "docs/validation/redaction/person-frosted-0.0.png",
+      "previousSHA256": "c6b823f310ee061756015d221936fd8561b7dc0e04c63a508b2a1e9539c365ff",
+      "replacement": "docs/design-assets/person-frosted.png",
+      "replacementSHA256": "10a8c95eb28b1cee4a67fc94525f79ecdbd778ab480e3a047714d57c0ff92629"
+    },
+    {
+      "path": "docs/validation/redaction/person-frosted-0.5.png",
+      "previousSHA256": "246ee82ac7bbb719bf34864956005fa1486f0652f536b642ec713add8be6d0fb",
+      "replacement": "docs/design-assets/person-frosted.png",
+      "replacementSHA256": "10a8c95eb28b1cee4a67fc94525f79ecdbd778ab480e3a047714d57c0ff92629"
+    },
+    {
+      "path": "docs/validation/redaction/person-frosted-1.0.png",
+      "previousSHA256": "9ea990c6f44c7f78cef469a4ff7e589d3d5a9032c13db69f26080103f16ab398",
+      "replacement": "docs/design-assets/person-frosted.png",
+      "replacementSHA256": "10a8c95eb28b1cee4a67fc94525f79ecdbd778ab480e3a047714d57c0ff92629"
+    },
+    {
+      "path": "docs/validation/redaction/person-frosted-1.5.png",
+      "previousSHA256": "936bd0a5240f7c485bb5e2261e1c871994fbea5d32659cf11d6947c3e007f7a7",
+      "replacement": "docs/design-assets/person-frosted.png",
+      "replacementSHA256": "10a8c95eb28b1cee4a67fc94525f79ecdbd778ab480e3a047714d57c0ff92629"
+    },
+    {
+      "path": "docs/validation/redaction/person-image-0.0.png",
+      "previousSHA256": "935f59d278102212ef4f05ed062af9d16c49c4de05dbf6fd689082ced21188a7",
+      "replacement": "docs/design-assets/person-image.png",
+      "replacementSHA256": "0e48b065b5f449fbd58ccac8636992b60726fa225bf12f4fc171e2bb095782ac"
+    },
+    {
+      "path": "docs/validation/redaction/person-image-0.5.png",
+      "previousSHA256": "568456dfe2b7ec0a1c9310763f695f7271d4cbce1c3c43927b4067b18a143369",
+      "replacement": "docs/design-assets/person-image.png",
+      "replacementSHA256": "0e48b065b5f449fbd58ccac8636992b60726fa225bf12f4fc171e2bb095782ac"
+    },
+    {
+      "path": "docs/validation/redaction/person-image-1.0.png",
+      "previousSHA256": "b48f676ab74f622582186957c8812d3987bf366da284486e37c12ed059f71d27",
+      "replacement": "docs/design-assets/person-image.png",
+      "replacementSHA256": "0e48b065b5f449fbd58ccac8636992b60726fa225bf12f4fc171e2bb095782ac"
+    },
+    {
+      "path": "docs/validation/redaction/person-image-1.5.png",
+      "previousSHA256": "73aa1f974723a8bca14938a8595da77cf9e81056a5a9d9b548d702b65ecc48e3",
+      "replacement": "docs/design-assets/person-image.png",
+      "replacementSHA256": "0e48b065b5f449fbd58ccac8636992b60726fa225bf12f4fc171e2bb095782ac"
+    },
+    {
+      "path": "docs/validation/redaction/person-mosaic-0.0.png",
+      "previousSHA256": "fc9f6a02ae250a1a6faa27989dcd81dfb89694ba4c54cf27b2569a1f5499bb58",
+      "replacement": "docs/design-assets/person-mosaic.png",
+      "replacementSHA256": "c8363d25802f2a6f1015b42c46c5034500528983196d88a247f1390cc9440cf9"
+    },
+    {
+      "path": "docs/validation/redaction/person-mosaic-0.5.png",
+      "previousSHA256": "a7b9404e3035b0965037e3a6ef38341b359a3eb7673114a5aa9bcd66b22b4243",
+      "replacement": "docs/design-assets/person-mosaic.png",
+      "replacementSHA256": "c8363d25802f2a6f1015b42c46c5034500528983196d88a247f1390cc9440cf9"
+    },
+    {
+      "path": "docs/validation/redaction/person-mosaic-1.0.png",
+      "previousSHA256": "690a7659fcd94afc54c7ab4cbccb5750f52b7f294ce29e2269c3de9cdf63be3c",
+      "replacement": "docs/design-assets/person-mosaic.png",
+      "replacementSHA256": "c8363d25802f2a6f1015b42c46c5034500528983196d88a247f1390cc9440cf9"
+    },
+    {
+      "path": "docs/validation/redaction/person-mosaic-1.5.png",
+      "previousSHA256": "af1ce376e365f254913070e67a8b07cf7b3ac58b0f2e10ce530d0eddad3f0f69",
+      "replacement": "docs/design-assets/person-mosaic.png",
+      "replacementSHA256": "c8363d25802f2a6f1015b42c46c5034500528983196d88a247f1390cc9440cf9"
+    },
+    {
+      "path": "docs/validation/redaction/ui-face-settings.png",
+      "previousSHA256": "6a6a61d6bdc1026d09c45a4a47e237d5e33a544865b345d462b0006cf52bd2cc",
+      "replacement": "docs/design-assets/phone/redaction-face.png",
+      "replacementSHA256": "e7fdb0111352ff7d3554f5980b844875ee44c7c72dd17024fee99a48739b915c"
+    },
+    {
+      "path": "docs/validation/redaction/ui-image-settings.png",
+      "previousSHA256": "777bc3a06378823c9266645296d4e41d934090845ec27e0724082c209132b701",
+      "replacement": "docs/design-assets/phone/redaction-image.png",
+      "replacementSHA256": "aaab89f6141fe10f4a5f8f582f70f67a5b822c48fedf9daaab1f67e589565886"
+    },
+    {
+      "path": "docs/validation/redaction/ui-mosaic-settings.png",
+      "previousSHA256": "07f5d3508ab1ab4dd7dbc08a803413efac665e4da4b6cdc2c1ae931c1d23f89e",
+      "replacement": "docs/design-assets/phone/redaction-mosaic.png",
+      "replacementSHA256": "ba2b6bbeb8d0b6ead0540d75a60bc4216e49e91fcef6123a05c46a9c51831c80"
+    },
+    {
+      "path": "docs/validation/redaction/ui-output-complete.png",
+      "previousSHA256": "6d7ec4282640c90228455f79f2f2802b0b1840d2c132586b46a14d5997b37be2",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/redaction/ui-output-preview.png",
+      "previousSHA256": "141f6cffd2c80237b2631c104daa9f90b02d7d62e5d47351baf05b25d597f3fb",
+      "replacement": "docs/design-assets/phone/export-preview.png",
+      "replacementSHA256": "47ce70c866ebc14a9dc38c219dd26007c84c54198e3265e631066938f0b9a05d"
+    },
+    {
+      "path": "docs/validation/redaction/ui-person-settings.png",
+      "previousSHA256": "e915cffb1691c9a687852227fd4cba9c9a466bdcc64b06809278bca70ea4b5a7",
+      "replacement": "docs/design-assets/phone/redaction-person.png",
+      "replacementSHA256": "b3f10f0cf194ad728cce843787297bcd3da926fb03da09c596db708fedffb730"
+    },
+    {
+      "path": "docs/validation/regeneration/edited.png",
+      "previousSHA256": "0028d5c482eaa562700a762dfeab1b5c7e1531040cdb514e5caf8c3e0e3002ed",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/regeneration/output-complete.png",
+      "previousSHA256": "9de17a8050ef749c22d9f77e6b9afb72525459da31ebe8c5770e439e7939a6b7",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/speed-smooth/contact-sheet.jpg",
+      "previousSHA256": "14c1fcdc9eb566c8fb80be48a7375263985346359393eac53a5f10629383a308",
+      "replacement": "docs/design-assets/baseline.jpg",
+      "replacementSHA256": "3b70e854cf98c79d61992c6667e8968327798f8daa94eb84eae83e091fe28727"
+    },
+    {
+      "path": "docs/validation/steady/contact-sheet.jpg",
+      "previousSHA256": "f4c8e339b9d240da227c77d9fc54c0e2eca23da694c98e2518b395366ae6dc9e",
+      "replacement": "docs/design-assets/baseline.jpg",
+      "replacementSHA256": "3b70e854cf98c79d61992c6667e8968327798f8daa94eb84eae83e091fe28727"
+    },
+    {
+      "path": "docs/validation/three-aspects/real-ratio-portrait-composition.png",
+      "previousSHA256": "7969c4e35c827a8ca868a6fcd0f8f9d776249f8cee9bf903d414fc2b6553a290",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/three-aspects/real-ratio-portrait-export.png",
+      "previousSHA256": "846bf71dcda156bbb691ebae74f7da0d496c95fbe8520bf449d2a5bed6b3f740",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/three-aspects/real-ratio-portrait-source.png",
+      "previousSHA256": "3ccc967981360d6e2d43426cdf62d0f6ab294dd4e7e2fd475174ea926d688f02",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/three-aspects/real-ratio-square-composition.png",
+      "previousSHA256": "cb292d85a6120b72e5d3ad0920ca6b03661042ad829e2e1950d9f95b6f3556e5",
+      "replacement": "docs/design-assets/phone/composition-square.png",
+      "replacementSHA256": "477496750fed6ec339ea50a386dcf12426c4ec8b3490f70bf352371686566966"
+    },
+    {
+      "path": "docs/validation/three-aspects/real-ratio-square-export.png",
+      "previousSHA256": "3920eb13498faefdbadddfbeb64f891575690871255baa5230c33a062a3819df",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/three-aspects/real-ratio-square-source.png",
+      "previousSHA256": "b40e013821cd347be12f8bf8ce5caed1b94a6673f8a7db2fbfe56959d7d97a7c",
+      "replacement": "docs/design-assets/phone/selection.png",
+      "replacementSHA256": "f92b046d1d9f4e6b87a8bd0e5bf6231e6e6a73fa24d96fbd7d352b3b579f3dc4"
+    },
+    {
+      "path": "docs/validation/timeline-editor/real-composition.png",
+      "previousSHA256": "fbc9bf9bb29813b457eaad665984b6c7dbc6b8d291554d726be1bffe3cffd1b7",
+      "replacement": "docs/design-assets/phone/composition.png",
+      "replacementSHA256": "835e19c54b13734ff880dfb692da9411ac8dc0c1b24f2cfbafc1e71b4a5f6e45"
+    },
+    {
+      "path": "docs/validation/timeline-editor/real-export.png",
+      "previousSHA256": "5a10f7eee0f5f6c863eafe601cfa39c6c0ce9d1e998f7bef5f437337cd6ba501",
+      "replacement": "docs/design-assets/phone/export-complete.png",
+      "replacementSHA256": "6cd5a0ba2be82bea63300105deda09a593c871950755bd708160b42bb5f2b79a"
+    },
+    {
+      "path": "docs/validation/liquid-glass/guide.png",
+      "previousSHA256": "91c75abc22765206fa2add225031f2a953fb3f3253a02fbd1b112723967aac65",
+      "replacement": "docs/design-assets/phone/guide.png",
+      "replacementSHA256": "616190640ebdfa3d9a38a8c65c329c7c118e0c277ece444a31fcd93ca3d4e4d0"
+    }
+  ],
+  "preservedSyntheticImages": [
+    "docs/design/target-frames/A.png",
+    "docs/design/target-frames/B.png",
+    "docs/design/target-frames/C.png",
+    "docs/design/target-frames/three-frames.png",
+    "docs/screenshots/B/history-swipe-delete.png",
+    "docs/screenshots/B/left-hand-16e.png",
+    "docs/screenshots/B/manual-box-16e.png",
+    "docs/screenshots/amber/home-16e.png",
+    "docs/screenshots/amber/manual-box-16e.png",
+    "docs/screenshots/amber/parameters-16e.png",
+    "docs/screenshots/composition/editor-16e.png",
+    "docs/screenshots/editor-green.png",
+    "docs/screenshots/frame-A/recovery.png",
+    "docs/screenshots/frame-C/recovery.png",
+    "docs/validation/adaptive-workspace/duo-closed.png",
+    "docs/validation/adaptive-workspace/duo-open.png",
+    "docs/validation/back-confirmation/confirmation.png",
+    "docs/validation/composition-aspects/accessibility-inline-composition.png",
+    "docs/validation/composition-aspects/composition-aspect-1-1.png",
+    "docs/validation/composition-aspects/composition-aspect-16-9.png",
+    "docs/validation/composition-aspects/composition-aspect-4-3.png",
+    "docs/validation/composition-aspects/composition-aspect-9-16.png",
+    "docs/validation/controls-layout/05-export-preview.png",
+    "docs/validation/controls-layout/accessibility-inline-composition.png",
+    "docs/validation/controls-layout/composition-aspect-4-3.png",
+    "docs/validation/controls-layout/composition-aspect-9-16.png",
+    "docs/validation/desktop-redesign/paused-demo.png",
+    "docs/validation/immersive-ui/02-floating-adjustments.png",
+    "docs/validation/immersive-ui/04-blocking-recovery.png",
+    "docs/validation/immersive-ui/manual-selection.png",
+    "docs/validation/inline-editor/03-inline-trim.png",
+    "docs/validation/inline-editor/04-blocking-recovery.png",
+    "docs/validation/inline-editor/accessibility-composition.png",
+    "docs/validation/inline-editor/manual-selection.png",
+    "docs/validation/inline-editor/ratio-narrow.png",
+    "docs/validation/inline-editor/ratio-portrait.png",
+    "docs/validation/inline-editor/ratio-square.png",
+    "docs/validation/inline-editor/ratio-ultrawide.png",
+    "docs/validation/inline-progress/editor-processing-inline-fill.png",
+    "docs/validation/inline-progress/editor-processing-inline.png",
+    "docs/validation/inline-progress/editor-processing-paused-fill.png",
+    "docs/validation/inline-progress/editor-processing-paused.png",
+    "docs/validation/liquid-glass/accessibility.png",
+    "docs/validation/liquid-glass/export-preview.png",
+    "docs/validation/liquid-glass/manual.png",
+    "docs/validation/liquid-glass/motion.png",
+    "docs/validation/liquid-glass/processing-paused.png",
+    "docs/validation/liquid-glass/processing.png",
+    "docs/validation/liquid-glass/recovery.png",
+    "docs/validation/liquid-glass/returned-from-pause.png",
+    "docs/validation/liquid-glass/trim.png",
+    "docs/validation/regeneration/processing-paused.png",
+    "docs/validation/regeneration/processing.png",
+    "docs/validation/timeline-editor/composition.png",
+    "docs/validation/timeline-editor/editor.png",
+    "docs/validation/timeline-editor/selection.png",
+    "docs/validation/timeline-editor/timeline.png"
+  ],
+  "videoExamplesReplaced": [
+    "docs/validation/real-people-follow.mp4",
+    "docs/validation/hang-recovery/output.mp4",
+    "docs/validation/CR/desktop-1080p.mp4",
+    "docs/validation/desktop/desktop-dancer-follow-1080p.mp4",
+    "docs/validation/inline-editor/output.mp4",
+    "docs/validation/occlusion/automatic-recovery.mp4",
+    "docs/validation/composition/desktop-composition-1080p.mp4",
+    "docs/validation/redaction/face-mosaic.mp4",
+    "docs/validation/redaction/face-image.mp4",
+    "docs/validation/redaction/baseline.mp4",
+    "docs/validation/redaction/person-frosted.mp4",
+    "docs/validation/redaction/face-frosted.mp4",
+    "docs/validation/redaction/person-mosaic.mp4",
+    "docs/validation/redaction/person-image.mp4",
+    "docs/validation/composition-anchor/output.mp4",
+    "docs/validation/composition-anchor/before-after-reproduced.mp4",
+    "docs/validation/steady/desktop-dancer-steady.mp4",
+    "docs/validation/speed-smooth/comparison.mp4",
+    "docs/validation/speed-smooth/before/output.mp4",
+    "docs/validation/speed-smooth/after/output.mp4",
+    "docs/validation/immersive-ui/output.mp4",
+    "docs/validation/optimization-rounds/round-one/output.mp4",
+    "docs/validation/optimization-rounds/round-three/output.mp4",
+    "docs/validation/optimization-rounds/round-two/before/output.mp4",
+    "docs/validation/optimization-rounds/round-two/after/output.mp4",
+    "docs/validation/B/desktop-original-1080p.mp4",
+    "docs/validation/glass-switch/transitions.mp4"
+  ],
+  "updatedDocuments": [
+    "docs/validation/three-aspects/README.md",
+    "docs/validation/liquid-glass/README.md",
+    "docs/validation/timeline-editor/README.md",
+    "docs/validation/controls-layout/README.md",
+    "docs/validation/inline-editor/README.md",
+    "docs/validation/composition-aspects/README.md",
+    "docs/validation/inline-progress/README.md",
+    "docs/validation/glass-switch/README.md",
+    "docs/validation/adaptive-workspace/review.html",
+    "docs/validation/liquid-glass/review.html",
+    "docs/validation/desktop-redesign/review.html",
+    "docs/validation/redaction/review.html",
+    "docs/validation/duo-redesign/review.html",
+    "docs/validation/immersive-ui/review.html"
+  ],
+  "note": "Replacements illustrate the corresponding current feature. Historical image paths no longer contain original validation frames. Historical metrics are retained; this is not a new tracking or rendering benchmark.",
+  "embeddedPhotosReplaced": [
+    {
+      "path": "docs/design/button-layouts/comparison.html",
+      "count": 2,
+      "replacement": "docs/design-assets/baseline.jpg"
+    }
+  ],
+  "captureValidation": {
+    "phoneFlow": "1 test passed; 15 synthetic screenshots",
+    "phoneStylesAndGuide": "1 test passed; 4 synthetic screenshots; image style selected and simulated image imported",
+    "Duo": "Native simulator captures; automation session unavailable, manual capture used",
+    "Mac": "Native demo UI captures",
+    "scope": "Documentation capture only, no real-video inference benchmark rerun"
+  },
+  "finalChecks": {
+    "localReferences": 160,
+    "missingReferences": 0,
+    "remainingDocumentVideos": 0,
+    "embeddedPhotographs": 0,
+    "replacementHashesVerified": 153,
+    "businessCodeChanged": false
+  },
+  "deduplication": {
+    "date": "2026-10-19",
+    "description": "Duplicate images removed; document references point to retained assets. replacedImages.path records historical provenance and may no longer exist.",
+    "removedImages": [
+      {
+        "path": "docs/design-assets/phone/composition-wide.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/design-assets/phone/home-wide.png",
+        "replacement": "docs/design-assets/phone/home.png"
+      },
+      {
+        "path": "docs/design-assets/phone/redaction-wide.png",
+        "replacement": "docs/design-assets/phone/redaction-person.png"
+      },
+      {
+        "path": "docs/design/button-layouts/A.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/design/button-layouts/B.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/design/button-layouts/C.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/design/button-layouts/comparison.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/screenshots/B/real-completed.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/screenshots/B/real-direct-selection.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/B/real-selected.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/B/real-settings.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/screenshots/B/real-tracking.png",
+        "replacement": "docs/design-assets/phone/processing.png"
+      },
+      {
+        "path": "docs/screenshots/amber/editor-real-detections.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/amber/editor-real-selected.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/amber/export-real-completed.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/screenshots/composition-anchor/export-completed.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/screenshots/composition-anchor/processed-preview.png",
+        "replacement": "docs/design-assets/phone/export-preview.png"
+      },
+      {
+        "path": "docs/screenshots/composition-anchor/selected-before-processing.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/composition/cached-preview.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/composition/editor.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/composition/export.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/screenshots/frame-A/real-detections.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/frame-A/real-selected.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/frame-C/real-detections.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/frame-C/real-selected.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/frame-reference/real-detections.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/frame-reference/real-selected.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/occlusion/completed.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/screenshots/occlusion/direct-selection.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/occlusion/selected.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/screenshots/occlusion/tracking.png",
+        "replacement": "docs/design-assets/phone/processing.png"
+      },
+      {
+        "path": "docs/screenshots/optimization-rounds/composition.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/screenshots/optimization-rounds/export-progress.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/screenshots/optimization-rounds/restored-output.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/B/contact-sheet.jpg",
+        "replacement": "docs/design-assets/baseline.jpg"
+      },
+      {
+        "path": "docs/validation/CR/contact-sheet.jpg",
+        "replacement": "docs/design-assets/baseline.jpg"
+      },
+      {
+        "path": "docs/validation/adaptive-workspace/mac-export-frame.png",
+        "replacement": "docs/design-assets/baseline.png"
+      },
+      {
+        "path": "docs/validation/composition-anchor/clear-before-after.jpg",
+        "replacement": "docs/design-assets/baseline.jpg"
+      },
+      {
+        "path": "docs/validation/composition-anchor/export-first-frame.png",
+        "replacement": "docs/design-assets/baseline.png"
+      },
+      {
+        "path": "docs/validation/composition-anchor/selection-export-comparison.jpg",
+        "replacement": "docs/design-assets/baseline.jpg"
+      },
+      {
+        "path": "docs/validation/composition-aspects/real-ratio-portrait-composition.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/composition-aspects/real-ratio-portrait-export.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/composition-aspects/real-ratio-portrait-source.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/composition-aspects/real-ratio-square-composition.png",
+        "replacement": "docs/design-assets/phone/composition-square.png"
+      },
+      {
+        "path": "docs/validation/composition-aspects/real-ratio-square-export.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/composition-aspects/real-ratio-square-source.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/composition/export-contact-sheet.jpg",
+        "replacement": "docs/design-assets/baseline.jpg"
+      },
+      {
+        "path": "docs/validation/controls-layout/05-export-preview.png",
+        "replacement": "docs/validation/liquid-glass/export-preview.png"
+      },
+      {
+        "path": "docs/validation/controls-layout/real-ratio-portrait-composition.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/controls-layout/real-ratio-portrait-export.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/controls-layout/real-ratio-portrait-source.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/controls-layout/real-ratio-square-composition.png",
+        "replacement": "docs/design-assets/phone/composition-square.png"
+      },
+      {
+        "path": "docs/validation/controls-layout/real-ratio-square-export.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/controls-layout/real-ratio-square-source.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/desktop-redesign/composition.png",
+        "replacement": "docs/design-assets/mac/composition.png"
+      },
+      {
+        "path": "docs/validation/desktop-redesign/editor.png",
+        "replacement": "docs/design-assets/mac/editor.png"
+      },
+      {
+        "path": "docs/validation/desktop-redesign/export.png",
+        "replacement": "docs/design-assets/mac/export.png"
+      },
+      {
+        "path": "docs/validation/desktop-redesign/library.png",
+        "replacement": "docs/design-assets/mac/library.png"
+      },
+      {
+        "path": "docs/validation/desktop-redesign/redaction.png",
+        "replacement": "docs/design-assets/mac/redaction.png"
+      },
+      {
+        "path": "docs/validation/desktop/contact-sheet.jpg",
+        "replacement": "docs/design-assets/baseline.jpg"
+      },
+      {
+        "path": "docs/validation/desktop/desktop-01-photo-picker.png",
+        "replacement": "docs/design-assets/phone/home.png"
+      },
+      {
+        "path": "docs/validation/desktop/desktop-02-real-detections.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/desktop/desktop-03-selected-target-fixed.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/desktop/desktop-03-selected-target.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/desktop/desktop-04-live-tracking.png",
+        "replacement": "docs/design-assets/phone/processing.png"
+      },
+      {
+        "path": "docs/validation/desktop/desktop-05-cropped-preview.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/desktop/desktop-06-export-completed.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/desktop/desktop-blocked-target.png",
+        "replacement": "docs/design-assets/phone/recovery.png"
+      },
+      {
+        "path": "docs/validation/desktop/desktop-correction-13.png",
+        "replacement": "docs/design-assets/phone/recovery.png"
+      },
+      {
+        "path": "docs/validation/duo-redesign/closed.png",
+        "replacement": "docs/design-assets/duo/closed.png"
+      },
+      {
+        "path": "docs/validation/duo-redesign/composition.png",
+        "replacement": "docs/design-assets/duo/composition.png"
+      },
+      {
+        "path": "docs/validation/duo-redesign/library.png",
+        "replacement": "docs/design-assets/duo/library.png"
+      },
+      {
+        "path": "docs/validation/duo-redesign/open.png",
+        "replacement": "docs/design-assets/duo/selection.png"
+      },
+      {
+        "path": "docs/validation/duo-redesign/partial.png",
+        "replacement": "docs/design-assets/duo/partial.png"
+      },
+      {
+        "path": "docs/validation/duo-redesign/redaction.png",
+        "replacement": "docs/design-assets/duo/redaction.png"
+      },
+      {
+        "path": "docs/validation/glass-switch/composition.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/glass-switch/contact-sheet.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/hang-recovery/completed.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/immersive-ui/immersive-02-real-selection.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/immersive-ui/immersive-03-real-settings.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/immersive-ui/immersive-04-real-composition.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/immersive-ui/immersive-05-real-tracking.png",
+        "replacement": "docs/design-assets/phone/processing.png"
+      },
+      {
+        "path": "docs/validation/immersive-ui/immersive-05a-paused.png",
+        "replacement": "docs/design-assets/phone/paused.png"
+      },
+      {
+        "path": "docs/validation/immersive-ui/immersive-06-real-export-preview.png",
+        "replacement": "docs/design-assets/phone/export-preview.png"
+      },
+      {
+        "path": "docs/validation/immersive-ui/immersive-07-real-export-complete.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/immersive-ui/immersive-09-returned-composition.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/immersive-ui/real-ratio-portrait-composition.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/immersive-ui/real-ratio-portrait-export.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/immersive-ui/real-ratio-portrait-source.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/immersive-ui/real-ratio-square-composition.png",
+        "replacement": "docs/design-assets/phone/composition-square.png"
+      },
+      {
+        "path": "docs/validation/immersive-ui/real-ratio-square-export.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/immersive-ui/real-ratio-square-source.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/inline-editor/02-real-selection.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/inline-editor/03-real-settings.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/inline-editor/04-real-composition.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/inline-editor/05-real-tracking.png",
+        "replacement": "docs/design-assets/phone/processing.png"
+      },
+      {
+        "path": "docs/validation/inline-editor/06-real-export-preview.png",
+        "replacement": "docs/design-assets/phone/export-preview.png"
+      },
+      {
+        "path": "docs/validation/inline-editor/07-real-export-complete.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/inline-editor/real-ratio-portrait-composition.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/inline-editor/real-ratio-portrait-export.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/inline-editor/real-ratio-portrait-source.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/inline-editor/real-ratio-square-composition.png",
+        "replacement": "docs/design-assets/phone/composition-square.png"
+      },
+      {
+        "path": "docs/validation/inline-editor/real-ratio-square-export.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/inline-editor/real-ratio-square-source.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/inline-progress/immersive-05-real-tracking-fill.png",
+        "replacement": "docs/design-assets/phone/processing.png"
+      },
+      {
+        "path": "docs/validation/inline-progress/immersive-05-real-tracking.png",
+        "replacement": "docs/design-assets/phone/processing.png"
+      },
+      {
+        "path": "docs/validation/inline-progress/immersive-05b-real-inline-paused-fill.png",
+        "replacement": "docs/design-assets/phone/paused.png"
+      },
+      {
+        "path": "docs/validation/inline-progress/immersive-05b-real-inline-paused.png",
+        "replacement": "docs/design-assets/phone/paused.png"
+      },
+      {
+        "path": "docs/validation/liquid-glass/composition.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/liquid-glass/export-complete.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/liquid-glass/guide.png",
+        "replacement": "docs/design-assets/phone/guide.png"
+      },
+      {
+        "path": "docs/validation/liquid-glass/home.png",
+        "replacement": "docs/design-assets/phone/home.png"
+      },
+      {
+        "path": "docs/validation/liquid-glass/selection.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/occlusion/controlled-mask.jpg",
+        "replacement": "docs/design-assets/baseline.jpg"
+      },
+      {
+        "path": "docs/validation/real-people-follow.jpg",
+        "replacement": "docs/design-assets/baseline.jpg"
+      },
+      {
+        "path": "docs/validation/redaction/face-frosted-0.0.png",
+        "replacement": "docs/design-assets/face-frosted.png"
+      },
+      {
+        "path": "docs/validation/redaction/face-frosted-0.5.png",
+        "replacement": "docs/design-assets/face-frosted.png"
+      },
+      {
+        "path": "docs/validation/redaction/face-frosted-1.0.png",
+        "replacement": "docs/design-assets/face-frosted.png"
+      },
+      {
+        "path": "docs/validation/redaction/face-frosted-1.5.png",
+        "replacement": "docs/design-assets/face-frosted.png"
+      },
+      {
+        "path": "docs/validation/redaction/face-image-0.0.png",
+        "replacement": "docs/design-assets/face-image.png"
+      },
+      {
+        "path": "docs/validation/redaction/face-image-0.5.png",
+        "replacement": "docs/design-assets/face-image.png"
+      },
+      {
+        "path": "docs/validation/redaction/face-image-1.0.png",
+        "replacement": "docs/design-assets/face-image.png"
+      },
+      {
+        "path": "docs/validation/redaction/face-image-1.5.png",
+        "replacement": "docs/design-assets/face-image.png"
+      },
+      {
+        "path": "docs/validation/redaction/face-mosaic-0.0.png",
+        "replacement": "docs/design-assets/face-mosaic.png"
+      },
+      {
+        "path": "docs/validation/redaction/face-mosaic-0.5.png",
+        "replacement": "docs/design-assets/face-mosaic.png"
+      },
+      {
+        "path": "docs/validation/redaction/face-mosaic-1.0.png",
+        "replacement": "docs/design-assets/face-mosaic.png"
+      },
+      {
+        "path": "docs/validation/redaction/face-mosaic-1.5.png",
+        "replacement": "docs/design-assets/face-mosaic.png"
+      },
+      {
+        "path": "docs/validation/redaction/person-frosted-0.0.png",
+        "replacement": "docs/design-assets/person-frosted.png"
+      },
+      {
+        "path": "docs/validation/redaction/person-frosted-0.5.png",
+        "replacement": "docs/design-assets/person-frosted.png"
+      },
+      {
+        "path": "docs/validation/redaction/person-frosted-1.0.png",
+        "replacement": "docs/design-assets/person-frosted.png"
+      },
+      {
+        "path": "docs/validation/redaction/person-frosted-1.5.png",
+        "replacement": "docs/design-assets/person-frosted.png"
+      },
+      {
+        "path": "docs/validation/redaction/person-image-0.0.png",
+        "replacement": "docs/design-assets/person-image.png"
+      },
+      {
+        "path": "docs/validation/redaction/person-image-0.5.png",
+        "replacement": "docs/design-assets/person-image.png"
+      },
+      {
+        "path": "docs/validation/redaction/person-image-1.0.png",
+        "replacement": "docs/design-assets/person-image.png"
+      },
+      {
+        "path": "docs/validation/redaction/person-image-1.5.png",
+        "replacement": "docs/design-assets/person-image.png"
+      },
+      {
+        "path": "docs/validation/redaction/person-mosaic-0.0.png",
+        "replacement": "docs/design-assets/person-mosaic.png"
+      },
+      {
+        "path": "docs/validation/redaction/person-mosaic-0.5.png",
+        "replacement": "docs/design-assets/person-mosaic.png"
+      },
+      {
+        "path": "docs/validation/redaction/person-mosaic-1.0.png",
+        "replacement": "docs/design-assets/person-mosaic.png"
+      },
+      {
+        "path": "docs/validation/redaction/person-mosaic-1.5.png",
+        "replacement": "docs/design-assets/person-mosaic.png"
+      },
+      {
+        "path": "docs/validation/redaction/ui-face-settings.png",
+        "replacement": "docs/design-assets/phone/redaction-face.png"
+      },
+      {
+        "path": "docs/validation/redaction/ui-image-settings.png",
+        "replacement": "docs/design-assets/phone/redaction-image.png"
+      },
+      {
+        "path": "docs/validation/redaction/ui-mosaic-settings.png",
+        "replacement": "docs/design-assets/phone/redaction-mosaic.png"
+      },
+      {
+        "path": "docs/validation/redaction/ui-output-complete.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/redaction/ui-output-preview.png",
+        "replacement": "docs/design-assets/phone/export-preview.png"
+      },
+      {
+        "path": "docs/validation/redaction/ui-person-settings.png",
+        "replacement": "docs/design-assets/phone/redaction-person.png"
+      },
+      {
+        "path": "docs/validation/regeneration/edited.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/regeneration/output-complete.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/regeneration/processing.png",
+        "replacement": "docs/validation/liquid-glass/processing.png"
+      },
+      {
+        "path": "docs/validation/speed-smooth/contact-sheet.jpg",
+        "replacement": "docs/design-assets/baseline.jpg"
+      },
+      {
+        "path": "docs/validation/steady/contact-sheet.jpg",
+        "replacement": "docs/design-assets/baseline.jpg"
+      },
+      {
+        "path": "docs/validation/three-aspects/real-ratio-portrait-composition.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/three-aspects/real-ratio-portrait-export.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/three-aspects/real-ratio-portrait-source.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/three-aspects/real-ratio-square-composition.png",
+        "replacement": "docs/design-assets/phone/composition-square.png"
+      },
+      {
+        "path": "docs/validation/three-aspects/real-ratio-square-export.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      },
+      {
+        "path": "docs/validation/three-aspects/real-ratio-square-source.png",
+        "replacement": "docs/design-assets/phone/selection.png"
+      },
+      {
+        "path": "docs/validation/timeline-editor/real-composition.png",
+        "replacement": "docs/design-assets/phone/composition.png"
+      },
+      {
+        "path": "docs/validation/timeline-editor/real-export.png",
+        "replacement": "docs/design-assets/phone/export-complete.png"
+      }
+    ]
+  }
+}

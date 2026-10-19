@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-19",
+  "baseCommit": "8c51f7a",
+  "rounds": [
+    {
+      "round": 1,
+      "scope": "编辑、暂停、异常确认、导出状态流转",
+      "issue": "异常确认时仍可调用播放与普通时间轴拖动；Mac 还显示时间轴",
+      "severity": "P2",
+      "fix": "只允许编辑状态播放与普通拖动；异常恢复保留显式前后帧查看；Mac 与手机/Duo 一致隐藏普通时间轴",
+      "reproduction": "testBlockedRecoveryDoesNotPlayOrScrubPastConfirmationFrame: before failed, after passed"
+    },
+    {
+      "round": 2,
+      "scope": "人物分析复用、构图与打码数据一致性",
+      "issue": "已完成分析后修改打码配置，再进入构图会尝试创建尚未具备有效遮挡轨迹的动态预览并报错",
+      "severity": "P2",
+      "fix": "保持静态构图可编辑，清理旧动态预览，确认处理后生成新打码轨迹并复用人物分析",
+      "reproduction": "testChangingMasksAfterAnalysisKeepsCompositionUsableAndRebuildsMasksOnConfirm: before failed, after passed"
+    },
+    {
+      "round": 3,
+      "scope": "异步取消、持久化、缓存、多端播放交互",
+      "issue": "成片播放控制状态未跟随后台暂停与播放结束同步",
+      "severity": "P2",
+      "fix": "监听场景生命周期及当前播放项结束通知，主线程更新播放按钮，过滤旧播放项通知",
+      "reproduction": "testOutputPlaybackResetsAfterBackgrounding: before failed, after passed",
+      "note": "后台场景有自动化复现；播放结束处理通过代码审查及构建校验，本轮未对真实播放结束事件单独执行 UI 断言"
+    }
+  ],
+  "validation": {
+    "fullUnitAndIntegration": {
+      "executed": 97,
+      "skipped": 6,
+      "failures": 0,
+      "result": "passed"
+    },
+    "compositionRedactionExportFocused": {
+      "executed": 18,
+      "failures": 0,
+      "result": "passed"
+    },
+    "finalAsyncStateRegression": {
+      "executed": 13,
+      "failures": 0,
+      "result": "passed"
+    },
+    "finalIPhoneUI": {
+      "executed": 2,
+      "failures": 0,
+      "result": "passed"
+    },
+    "finalDuoUI": {
+      "executed": 2,
+      "failures": 0,
+      "result": "passed"
+    },
+    "finalMacCatalystBuild": "passed",
+    "diffCheck": "passed"
+  },
+  "limits": [
+    "6 个私有完整视频或性能测试按需跳过；本轮未重跑桌面完整视频识别与编码性能基准。",
+    "整人打码仍使用矩形包络；复杂人物交叠时的精细避让仍需实例分割能力。"
+  ]
+}

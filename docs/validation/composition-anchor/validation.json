@@ -1,0 +1,47 @@
+{
+  "source": "Desktop video_1774105867371.mp4",
+  "referenceTime": 0,
+  "preAnalysisAnchorEqualsExportAnchor": true,
+  "selectedSourceRect": {
+    "x": 1537.297150865033,
+    "y": 898.0185317991397,
+    "width": 390.0127852769127,
+    "height": 693.3560627145115
+  },
+  "oldAlgorithmWithoutAnchor": {
+    "x": 1479.4830611616824,
+    "y": 848.5892824331689,
+    "width": 499.735052234612,
+    "height": 888.4178706393102,
+    "method": "Run current legacy CropPlan with identical saved samples/settings and compositionAnchor=nil; this branch retains the pre-fix calculation."
+  },
+  "selectedSourceCropVsExportMeanAbsoluteRGBError": 0.010509077705147356,
+  "nativeEditorScreenshotVsExport": {
+    "meanAbsoluteRGBError": 0.010537059363823435,
+    "correlation": 0.9976257101059453,
+    "screenshotCrop": [
+      239,
+      486,
+      799,
+      1483
+    ],
+    "excludedOutlinePixels": 2
+  },
+  "analysisSeconds": 70.49545800685883,
+  "exportSeconds": 27.42840600013733,
+  "manualIdentityCorrections": 0,
+  "previewExportParityFile": "preview-export-parity.json",
+  "limitations": "Simulator and one source clip; RGB differences include resampling, color conversion and lossy encoding.",
+  "regressions": {
+    "unitAndMediaPassed": 48,
+    "specializedSkipped": 5,
+    "editorUITestsPassed": 6,
+    "finalCompositionAndAsyncStateTestsPassed": 17
+  },
+  "comparisonArtifacts": {
+    "image": "../../design-assets/baseline.jpg",
+    "video": "before-after-reproduced.mp4",
+    "videoLeft": "Old camera logic replay on original source; crop position/size rounded to source pixels for FFmpeg. Not an archived app export.",
+    "videoRight": "Actual fixed iOS export resized to 540×960."
+  }
+}

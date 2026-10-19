@@ -1,0 +1,20 @@
+    t =    48.84s Added attachment named 'real-ratio-portrait-export'
+    t =    48.84s Tap "完成" Button
+    t =    48.84s     Wait for com.aicut.app to idle
+    t =    48.84s     Find the "完成" Button
+    t =    48.85s     Check for interrupting elements affecting "完成" Button
+    t =    48.86s     Synthesize event
+    t =    49.15s     Wait for com.aicut.app to idle
+    t =    49.15s Terminate com.aicut.app:87276
+2026-10-18 22:11:50.856 xcodebuild[87150:1806253] [MT] IDESchemeActionSDKRecord: operatingSystemBuild = <DVTBuildVersion 24A94232>, error = invalidDigitCount(94232).
+2026-10-18 22:11:50.856 xcodebuild[87150:1806253] [MT] IDESchemeActionSDKRecord: operatingSystemBuild = <DVTBuildVersion 24A94232>, error = invalidDigitCount(94232).
+    t =    50.21s Tear Down
+Test Case '-[AICutUITests.VideoRatioValidationTests testRealSquareAndPortraitFlow]' passed (50.596 seconds).
+Test Suite 'VideoRatioValidationTests' passed at 2026-10-18 22:11:52.284.
+	 Executed 1 test, with 0 failures (0 unexpected) in 50.596 (50.597) seconds
+Test Suite 'AICutUITests.xctest' passed at 2026-10-18 22:11:52.284.
+	 Executed 1 test, with 0 failures (0 unexpected) in 50.596 (50.598) seconds
+Test Suite 'Selected tests' passed at 2026-10-18 22:11:52.285.
+	 Executed 1 test, with 0 failures (0 unexpected) in 50.596 (50.599) seconds
+2026-10-18 22:11:52.311 xcodebuild[87150:1806253] [MT] IDESchemeActionSDKRecord: operatingSystemBuild = <DVTBuildVersion 24A94232>, error = invalidDigitCount(94232).
+2026-10-18 22:11:52.312 xcodebuild[87150:1806253] [MT] IDESchemeActionSDKRecord: operatingSystemBuild = <DVTBuildVersion 24A94232>, error = invalidDigitCount(94232).

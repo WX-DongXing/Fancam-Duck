@@ -1,0 +1,33 @@
+{
+  "platform": "Mac Catalyst",
+  "source": "Desktop/video_1774105867371.mp4",
+  "sourceSize": [
+    3840,
+    2160
+  ],
+  "sourceDuration": 37.92,
+  "verified": [
+    "real-project-open",
+    "composition-square-switch",
+    "composition-zoom-updates-model",
+    "composition-cancel-restores-reusable-output",
+    "automatic-bystander-redaction-still-preview",
+    "redaction-cancel-restores-output",
+    "existing-output-preview",
+    "native-save-panel",
+    "saved-file-exists",
+    "demo-target-selection",
+    "demo-processing-progress",
+    "demo-blocking-recovery",
+    "demo-pause-return-to-editing",
+    "leave-alert-cancel-and-save-buttons"
+  ],
+  "savedOutput": "/private/tmp/FancamDuck-Desktop-Redesign.mp4",
+  "fullPipelineRerun": false,
+  "minimumWindowSizeManuallyVerified": false,
+  "iPhoneRegression": {
+    "test": "testOutputAspectsAndIndependentCentering",
+    "result": "passed",
+    "failures": 0
+  }
+}

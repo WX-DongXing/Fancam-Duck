@@ -1,0 +1,34 @@
+{
+  "device": "iPhone Duo",
+  "runtime": "iOS 27.1",
+  "source": "video_1774105867371.mp4",
+  "sourceSize": [
+    3840,
+    2160
+  ],
+  "duration": 37.92,
+  "posesVisuallyChecked": [
+    "open",
+    "partially-open",
+    "closed"
+  ],
+  "uiTestsPassed": [
+    "testDuoLayoutWithOriginalVideo",
+    "testAdaptiveWorkspaceKeepsSelectionAndCompositionAcrossRotation",
+    "testSingleScreenDemoAndBlockingRecovery"
+  ],
+  "iPhoneRegressionPassed": [
+    "testOutputAspectsAndIndependentCentering",
+    "testProcessingStaysInEditorWithInlineProgressAndPause"
+  ],
+  "macBuild": "passed",
+  "fullRealVideoPipelineRerun": false,
+  "screenshotMethod": "simctl io screenshot --display 3 (inner) / 1 (outer); XCTest screenshot captured inactive display, discarded",
+  "fixedIssues": [
+    "timeline separated from video",
+    "equal-width flat layout",
+    "small combined primary action",
+    "blank arrangement in partial fold from rigid size limits",
+    "grid uses larger single thumbnail without increasing timeline thumbnail sizes"
+  ]
+}

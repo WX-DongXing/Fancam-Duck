@@ -1,0 +1,32 @@
+{
+  "source": {
+    "duration": 37.92,
+    "height": 2160,
+    "width": 3840,
+    "frameRate": 25
+  },
+  "output": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_type": "audio",
+        "r_frame_rate": "0/0",
+        "start_time": "0.000000",
+        "duration": "37.919025",
+        "nb_frames": "1636"
+      },
+      {
+        "codec_type": "video",
+        "width": 1080,
+        "height": 1920,
+        "r_frame_rate": "25/1",
+        "start_time": "0.000000",
+        "duration": "37.920000",
+        "nb_frames": "948"
+      }
+    ]
+  },
+  "decoded": true,
+  "audioVideoDurationDifferenceSeconds": 0.0009750000000039449
+}

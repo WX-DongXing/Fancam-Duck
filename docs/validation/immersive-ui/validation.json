@@ -1,0 +1,144 @@
+{
+  "date": "2026-10-18",
+  "platforms": [
+    "iPhone 17 Pro / iOS 26.3 Simulator",
+    "iPhone 16e / iOS 26.3 Simulator"
+  ],
+  "ui": {
+    "style": "深色沉浸画布、白色胶囊按钮、黄色人物框",
+    "scrolling": false,
+    "sourceDisplay": "完整等比显示原片",
+    "compositionViewport": "9:16",
+    "controls": "固定底部区域，参数按需浮现；处理中隐藏编辑工具",
+    "gestures": [
+      "双指缩放",
+      "拖动位置",
+      "居中",
+      "撤销",
+      "重置"
+    ],
+    "blockingRecovery": "身份不确定时暂停，点选目标或手动框选后确认继续"
+  },
+  "regression": {
+    "passed": 68,
+    "skipped": 6,
+    "failed": 0,
+    "unitPassed": 61,
+    "unitSkipped": 6,
+    "uiPassed": 7
+  },
+  "sourceRatioLayouts": [
+    "16:9",
+    "1:1",
+    "9:16",
+    "2560:1080",
+    "1080:2560"
+  ],
+  "realVideoCases": [
+    {
+      "source": "桌面 video_1774105867371.mp4",
+      "dimensions": [
+        3840,
+        2160
+      ],
+      "duration": 37.92,
+      "flow": [
+        "Photos导入",
+        "检测与选人",
+        "画质选择",
+        "真实缩放与拖动",
+        "确认处理",
+        "暂停及继续",
+        "预览播放",
+        "导出",
+        "保存相册",
+        "返回保留构图"
+      ],
+      "result": "passed",
+      "analysisSeconds": 64.89994704723358,
+      "exportSeconds": 35.352084040641785
+    },
+    {
+      "source": "原片派生方形素材",
+      "duration": 5,
+      "result": "passed"
+    },
+    {
+      "source": "原片派生竖屏素材（包含非方形像素SAR）",
+      "duration": 6,
+      "result": "passed"
+    }
+  ],
+  "previewExportParity": [
+    {
+      "correlation": 0.9994938550322923,
+      "meanAbsoluteRGBError": 0.004619445579153591,
+      "time": 0
+    },
+    {
+      "correlation": 0.9995241758860263,
+      "meanAbsoluteRGBError": 0.004470185412123958,
+      "time": 5
+    },
+    {
+      "correlation": 0.9997619389172229,
+      "meanAbsoluteRGBError": 0.002346745642699558,
+      "time": 18
+    },
+    {
+      "correlation": 0.9995458990986614,
+      "meanAbsoluteRGBError": 0.003946129493460686,
+      "time": 32
+    },
+    {
+      "correlation": 0.9992355972211898,
+      "meanAbsoluteRGBError": 0.003561013525777613,
+      "time": 37.8
+    }
+  ],
+  "desktopOutput": {
+    "source": {
+      "duration": 37.92,
+      "height": 2160,
+      "width": 3840,
+      "frameRate": 25
+    },
+    "output": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_type": "audio",
+          "r_frame_rate": "0/0",
+          "start_time": "0.000000",
+          "duration": "37.919025",
+          "nb_frames": "1636"
+        },
+        {
+          "codec_type": "video",
+          "width": 1080,
+          "height": 1920,
+          "r_frame_rate": "25/1",
+          "start_time": "0.000000",
+          "duration": "37.920000",
+          "nb_frames": "948"
+        }
+      ]
+    },
+    "decoded": true,
+    "audioVideoDurationDifferenceSeconds": 0.0009750000000039449
+  },
+  "limitations": [
+    "以上耗时为模拟器验证耗时，不能用于推断真实 iPhone 性能。",
+    "超宽、超窄使用布局测试；实际人物识别与导出覆盖横屏、方形、竖屏。",
+    "额外白衣舞者长片尝试发生身份不确定，按预期阻塞；完整长片端到端选取中间黑衣舞者。",
+    "本轮未更换检测、身份识别、跟踪或运镜算法。"
+  ],
+  "resultBundles": {
+    "regression": "/private/tmp/fancamduck-immersive-regression.xcresult",
+    "desktop": "/private/tmp/fancamduck-immersive-desktop-final2.xcresult",
+    "parity": "/private/tmp/fancamduck-immersive-parity.xcresult",
+    "finalLayout": "/private/tmp/fancamduck-immersive-layout-final.xcresult",
+    "realRatios": "/private/tmp/fancamduck-immersive-ratios-final.xcresult"
+  }
+}

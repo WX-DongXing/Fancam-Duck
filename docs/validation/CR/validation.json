@@ -1,0 +1,57 @@
+{
+  "input_sha256": "aaf13bac532294a93ee1075e15fba0a7fd536560f38706a216895221fcdf3a0e",
+  "device": "iPhone 17 Pro iOS 26.3 simulator on M4",
+  "source": {
+    "width": 3840,
+    "height": 2160,
+    "duration": 37.92,
+    "frameRate": 25
+  },
+  "samples": 382,
+  "sample_start": 0,
+  "sample_end": 37.92,
+  "manual_corrections": 0,
+  "analysis_seconds": 85.2681519985199,
+  "export_seconds": 18.41242206096649,
+  "output": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_type": "audio",
+        "r_frame_rate": "0/0",
+        "duration": "37.919025"
+      },
+      {
+        "codec_type": "video",
+        "width": 1080,
+        "height": 1920,
+        "r_frame_rate": "25/1",
+        "duration": "37.920000"
+      }
+    ]
+  },
+  "camera_height_range_source_pixels": 0.0,
+  "regression": {
+    "unit_media_passed": 33,
+    "local_optional_skipped": 3,
+    "ui_passed": 6,
+    "desktop_full_flow_passed": 1,
+    "controlled_occlusion_passed": 1
+  },
+  "limitations": [
+    "Simulator timing is not iPhone hardware performance.",
+    "Six sampled frames do not establish per-frame identity accuracy.",
+    "HDR, VFR, long-video and thermal behavior require dedicated validation."
+  ],
+  "controlled_occlusion": {
+    "occluded_seconds": 0.5,
+    "clip_seconds": 4,
+    "estimated_samples": 7,
+    "manual_corrections": 0,
+    "same_track_id": true,
+    "post_recovery_center_x_error_bound": 0.04
+  },
+  "visual_check": "Six frames sampled every six seconds; the same black-clothed dancer remains in the crop with full body visible in these frames.",
+  "output_file": "desktop-1080p.mp4"
+}

@@ -1,0 +1,56 @@
+# 架构与状态流转
+
+## 模块职责
+
+| 模块 | 入口 | 责任 |
+| --- | --- | --- |
+| 状态协调 | `Fancam Duck/App/AppModel.swift` | `@MainActor @Observable`，项目、任务、播放和路由 |
+| 领域数据 | `Fancam Duck/Domain/Project.swift` | 设置、画幅、时间范围、坐标、处理阶段 |
+| 界面 | `Fancam Duck/Features/` | 首页、编辑、构图、时间轴、导出 |
+| 自适应布局 | `Fancam Duck/Design/WorkspaceLayout.swift` | ArrangementView 与 AnyLayout 回退、Mac 布局 |
+| 识别跟踪 | `Fancam Duck/Tracking/` | 模型推理、身份关联、遮挡恢复、裁剪 |
+| 打码 | `Fancam Duck/Redaction/` | 非主角轨迹、覆盖规则、合成 |
+| 基础服务 | `Fancam Duck/Services/` | 媒体、存储、跟踪协议与编码 |
+
+`TargetTracking`、`VideoExporting` 和 `PhotoSaving` 支持注入替身，流程回归不应全部依赖完整模型和私人视频。
+
+## 路由与处理阶段
+
+`Route` 为 `home`、`editor`、`export`。`ProcessingPhase` 独立表示业务阶段；不要用页面是否显示来替代流程判断。
+
+```text
+editing → processing → readyToExport → exporting → completed
+                ↕
+              paused → 返回 editing
+                ↓
+              blocked → 明确重新选择并确认 → processing
+```
+
+图示为主要业务路径，不是所有方法的调用表。`ProcessingGate.canContinue` 校验目标与明确选择；`AppModel.canConfirm` 还校验检测、恢复、构图手势等忙状态。`readyToExport` 只说明分析／预览准备完成，不代表 MP4 已写入。
+
+`togglePreview` 和普通 `scrub` 仅在 editing 允许。`seek` 仍用于阻塞纠正中的明确帧检查。不能为了禁用普通时间轴把全部纠正寻帧也禁掉。
+
+## 异步任务
+
+AppModel 保存多个 Task，并以 operationID、detectionID、compositionID、restorationID 等代次标识过滤旧结果。更新前还需核对 projectID。取消 Task 后不能假设底层服务立即停止，晚到进度、错误与完成回调仍可能发生。
+
+改动时检查：切到首页、快速暂停恢复、导入另一项目、删除项目、应用后台、取消导出。持久化和删除需要考虑正在进行的保存，避免删除后的项目被旧任务重新写回。
+
+## 持久化与复用
+
+`ProjectStore` 是 actor，默认目录为 Application Support 下的 `Fancam Duck`。新目录不存在时原位迁移旧 `AICut` 目录；如果两者已存在，保留两份数据并使用新目录。
+
+- `projects.json`：项目和编辑设置，原子写入。
+- `trajectory-<UUID>.json`：完整轨迹，带分析版本、源 SHA256、元数据及目标锚点。读取时验证轨迹覆盖当前范围。
+- `artifacts-<UUID>/output.json` 及 MP4：成片记录，匹配源摘要、设置与目标后才复用；保存相册状态记录在清单中。
+- 源视频为应用管理副本；删除项目清理其轨迹、输出及不再被其他项目引用的副本，不触及相册原片。
+
+完整轨迹和有效输出可跨重启复用，不能把它们描述为仅在内存中缓存。处理中的部分会话／检查点则不等于可跨重启完整恢复的任务。
+
+`GenerationRecipe`、`lastGeneratedRecipe` 和 `hasReusableOutput` 用于当前会话判断旧结果是否可复用。更改模型或分析语义时评估 `ProjectStore.analysisVersion` 是否需要变更。
+
+## 构图和打码事务
+
+构图与打码各自保存进入前快照，取消必须恢复。构图手势中间态与持久设置要区分，避免手势抖动导致重建播放器或过度保存。
+
+完成跟踪后修改打码，旧计划可能失效：`refreshComposition` 保持静态构图可编辑，清理旧动态播放器，确认处理后补齐新打码计划。禁止绕过 `RedactionPlan.covers` 强行播放未覆盖的成片。

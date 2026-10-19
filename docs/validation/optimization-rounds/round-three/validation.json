@@ -1,0 +1,42 @@
+{
+  "status": "passed",
+  "analysisSeconds": 62.451748967170715,
+  "reopenTrackingPreviewSeconds": 2.438269019126892,
+  "cancelExportRecoverySeconds": 1.3985100984573364,
+  "exportSeconds": 27.36713707447052,
+  "reopenCompletedOutputSeconds": 2.4666730165481567,
+  "beforeAfterDecodedFrames": 948,
+  "allDecodedFramesMatchRoundOne": true,
+  "occlusion": {
+    "durationSeconds": 4,
+    "predictedSamples": 7,
+    "manualCorrections": 0,
+    "issue": null
+  },
+  "selectedCropMeanAbsoluteRGBError": 0.010509077705147356,
+  "scope": [
+    "persistent settings/source-matched completed output",
+    "real export progress and cancellation",
+    "reuse completed output without re-encoding",
+    "reuse automatic composition reference plan and AVPlayer instance"
+  ],
+  "limits": [
+    "Simulator only; single desktop clip and one controlled occlusion fixture",
+    "No adaptive detection cadence, long occlusion extension or moving-camera compensation enabled",
+    "Persistent checkpoints for interrupted analysis and incremental extension remain future work"
+  ],
+  "finalUnitTests": {
+    "total": 65,
+    "passed": 60,
+    "specializedSkipped": 5
+  },
+  "editorAndHistoryUITestsPassed": 7,
+  "finalPoster": {
+    "visibleDuringCachedProjectExport": true,
+    "missingOutputRecoveredWithoutAnalysis": true,
+    "reopenToPreviewSeconds": 2.539107918739319,
+    "testResult": "/private/tmp/fancamduck-poster-ui.xcresult"
+  },
+  "finalCompositionParityPassed": true,
+  "timingNote": "Cancellation and completed-output restore timings are from the main third-round UI run; the final poster correction was subsequently verified separately."
+}

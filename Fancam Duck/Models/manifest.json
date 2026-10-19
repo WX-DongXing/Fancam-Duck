@@ -1,0 +1,35 @@
+{
+  "ultralytics": "8.4.178",
+  "torch": "2.7.0",
+  "coremltools": "9.0",
+  "pose": {
+    "model": "yolo26s-pose.pt",
+    "sha256": "a083adb42303728ae14c4bd6bd56d80da46f82fb2564dbd6f31dcc92ea321646",
+    "size": [
+      640,
+      640
+    ],
+    "end2end": false,
+    "nms": false,
+    "package": "YOLO26sPose.mlpackage"
+  },
+  "reid": {
+    "model": "osnet_x0_25_msmt17_combineall_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip_jitter.pth",
+    "sha256": "cf55163d78fc44c62c82f85ab62d39f10438679b5abe8c698ae08cfa84aa6e18",
+    "size": [
+      256,
+      128
+    ],
+    "normalization": "ImageNet inside graph; output L2",
+    "package": "OSNetX025.mlpackage"
+  },
+  "tracktrack_commit": "ee7f1c5fcbdcac48ed8bfab38d52c0006bf304da",
+  "YOLO26sPose": {
+    "inputs": "[name: \"image\"\ntype {\n  imageType {\n    width: 640\n    height: 640\n    colorSpace: RGB\n  }\n}\n]",
+    "outputs": "[name: \"var_1527\"\ntype {\n  multiArrayType {\n    shape: 1\n    shape: 56\n    shape: 8400\n    dataType: FLOAT32\n  }\n}\n]"
+  },
+  "OSNetX025": {
+    "inputs": "[name: \"image\"\ntype {\n  imageType {\n    width: 128\n    height: 256\n    colorSpace: RGB\n  }\n}\n]",
+    "outputs": "[name: \"embedding\"\ntype {\n  multiArrayType {\n    shape: 1\n    shape: 512\n    dataType: FLOAT16\n  }\n}\n]"
+  }
+}

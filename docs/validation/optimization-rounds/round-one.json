@@ -1,0 +1,46 @@
+{
+  "status": "passed",
+  "scope": [
+    "persistent SHA256/version/identity-validated full trajectory",
+    "contained range reuse and exact camera boundary clipping",
+    "restore composition reference time",
+    "scrub on release",
+    "single full-body control",
+    "duplicate photo save guard",
+    "history status"
+  ],
+  "unitTests": {
+    "total": 59,
+    "passed": 55,
+    "skipped": 4
+  },
+  "editorAndHistoryUITestsPassed": 7,
+  "desktopVideo": {
+    "analysisSeconds": 68.99390399456024,
+    "reopenToPreviewSeconds": 2.4459269046783447,
+    "exportSeconds": 27.403356075286865,
+    "manualCorrections": 0
+  },
+  "previewExportSampleTimes": [
+    0,
+    5,
+    18,
+    32,
+    37.8
+  ],
+  "selectedCropRGBError": 0.010509077705147356,
+  "limitations": [
+    "M4 CPU-only simulator; one private desktop clip",
+    "Only contained ranges reuse completed analysis; extension still requires fresh analysis",
+    "In-progress analysis is not yet restored across process termination"
+  ],
+  "testResults": [
+    "/private/tmp/fancamduck-r1-verified.xcresult",
+    "/private/tmp/fancamduck-r1-desktop-final.xcresult"
+  ],
+  "validationRepairs": [
+    "Async tests wait for disk restoration",
+    "Home row selector follows native accessible label",
+    "Per-project pre-analysis snapshots prevent demo evidence overwrites"
+  ]
+}

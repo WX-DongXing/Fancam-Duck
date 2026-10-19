@@ -1,0 +1,27 @@
+[
+  {
+    "meanAbsoluteRGBError": 0.004590958605660526,
+    "time": 0,
+    "correlation": 0.9995010403424337
+  },
+  {
+    "meanAbsoluteRGBError": 0.0045053955609982935,
+    "time": 5,
+    "correlation": 0.9995185132352626
+  },
+  {
+    "meanAbsoluteRGBError": 0.0023420536038469817,
+    "time": 18,
+    "correlation": 0.999760542794903
+  },
+  {
+    "meanAbsoluteRGBError": 0.003938124092226128,
+    "time": 32,
+    "correlation": 0.9995471136838492
+  },
+  {
+    "meanAbsoluteRGBError": 0.0035809674564239273,
+    "time": 37.8,
+    "correlation": 0.9992198752513598
+  }
+]

@@ -1,0 +1,43 @@
+{
+  "duo": {
+    "runtime": "iOS 27.1",
+    "poses": [
+      "closed",
+      "partially open",
+      "open"
+    ],
+    "compositionContinuity": true,
+    "rotationUITest": "passed",
+    "selectionCorrectionExportUITest": "passed"
+  },
+  "iphone": {
+    "unitTests": {
+      "total": 95,
+      "skipped": 6,
+      "failures": 0
+    },
+    "uiTests": {
+      "total": 2,
+      "failures": 0
+    }
+  },
+  "mac": {
+    "platform": "Mac Catalyst",
+    "builtArchitectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "runtimeVerified": "Apple Silicon",
+    "source": "video_1774105867371.mp4",
+    "fileImport": true,
+    "primarySelection": true,
+    "fullClipTracking": true,
+    "export": true,
+    "nativeSavePanel": true,
+    "savedOutput": "/private/tmp/FancamDuck-Mac-Validation.mp4",
+    "duration": 37.92,
+    "width": 1080,
+    "height": 1920,
+    "audio": "aac"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "device": "iPhone 17 Pro iOS 26.3 simulator on M4",
+  "tests": {
+    "desktop_full_ui_flow_passed": 1,
+    "editor_ui_passed": 5,
+    "history_deletion_ui_passed": 1,
+    "controlled_occlusion_passed": 1,
+    "reader_parity_passed": 1
+  },
+  "desktop_ui_analysis_seconds": 67.84422194957733,
+  "desktop_ui_export_seconds": 45.38428807258606,
+  "manual_corrections": 0,
+  "controlled_occlusion": {
+    "estimated_samples": 7,
+    "manual_corrections": 0
+  },
+  "reader_parity": {
+    "times": [
+      0,
+      11.4,
+      13.7
+    ],
+    "body_iou": [
+      1,
+      1,
+      1
+    ]
+  },
+  "timing_note": "UI export includes active UI/preview resources; it is separately recorded and not substituted for the controlled benchmark.",
+  "xcodebuild_result": "TEST SUCCEEDED",
+  "isolated_ui_runs": [
+    {
+      "configuration": "before_releasing_preview",
+      "analysis_seconds": 68.99128496646881,
+      "export_seconds": 43.407959938049316,
+      "manual_corrections": 0,
+      "passed": true
+    },
+    {
+      "configuration": "after_releasing_preview",
+      "analysis_seconds": 68.08344495296478,
+      "export_seconds": 29.36017894744873,
+      "manual_corrections": 0,
+      "passed": true
+    }
+  ],
+  "unit_media_passed": 40,
+  "ordinary_regression_optional_skips": 4,
+  "export_resource_note": "UI export was slower than headless benchmark. Releasing the preview composition and showing a still poster reduced measured UI export from 43.41s to 29.36s; timing remains simulator-specific."
+}

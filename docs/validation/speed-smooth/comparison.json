@@ -1,0 +1,96 @@
+{
+  "method": "Same source, target anchor, 10Hz analysis, 75% person size, standard follow, full-body protection, 1080x1920 25fps; sequential Debug CPU-only simulator runs. Rendered motion compared on uniform 25fps grid.",
+  "before": {
+    "exportSeconds": 17.757408022880554,
+    "metrics": {
+      "detectionSeconds": 67.85760414600372,
+      "reidSeconds": 44.50571119785309,
+      "poseSeconds": 20.114064812660217,
+      "reidCalls": 5652,
+      "poseCalls": 383
+    },
+    "analysisSeconds": 85.90879094600677,
+    "planSeconds": 0.061962008476257324,
+    "source": {
+      "duration": 37.92,
+      "width": 3840,
+      "height": 2160,
+      "frameRate": 25
+    },
+    "label": "before",
+    "samples": 382,
+    "output": {
+      "height": 1920,
+      "duration": 37.92,
+      "width": 1080,
+      "frameRate": 25
+    }
+  },
+  "after": {
+    "planSeconds": 0.07200801372528076,
+    "output": {
+      "width": 1080,
+      "height": 1920,
+      "frameRate": 25,
+      "duration": 37.92
+    },
+    "source": {
+      "width": 3840,
+      "height": 2160,
+      "frameRate": 25,
+      "duration": 37.92
+    },
+    "samples": 382,
+    "exportSeconds": 17.618916988372803,
+    "analysisSeconds": 66.85373198986053,
+    "label": "after",
+    "metrics": {
+      "poseSeconds": 17.621100068092346,
+      "reidCalls": 4010,
+      "reidInferenceSeconds": 8.636817336082458,
+      "reidReadSeconds": 0.42672717571258545,
+      "reidSeconds": 32.12551987171173,
+      "detectionSeconds": 52.82203185558319,
+      "poseCalls": 383
+    }
+  },
+  "analysis_reduction_percent": 22.18056935305055,
+  "reid_call_reduction_percent": 29.05166312809625,
+  "trajectory_comparison": {
+    "unique_samples": 381,
+    "minimum_body_iou": 1.0,
+    "mean_body_iou": 1.0,
+    "max_center_x_change_source_pixels": 2.1316282072803006e-13
+  },
+  "motion_before": {
+    "rms_velocity_source_pixels_per_second": 102.51122813445963,
+    "rms_acceleration_source_pixels_per_second_squared": 193.3915301302167,
+    "max_acceleration": 1956.8147965595983,
+    "rms_jerk_source_pixels_per_second_cubed": 6241.5327797574655,
+    "zoom_height_range": 0.0,
+    "vertical_center_range": 0.0,
+    "horizontal_travel_range": 1031.5411839345074
+  },
+  "motion_after": {
+    "rms_velocity_source_pixels_per_second": 88.30565808786274,
+    "rms_acceleration_source_pixels_per_second_squared": 117.93875269406678,
+    "max_acceleration": 1092.6064430532278,
+    "rms_jerk_source_pixels_per_second_cubed": 1486.8217930614219,
+    "zoom_height_range": 0.0,
+    "vertical_center_range": 0.0,
+    "horizontal_travel_range": 922.0445809270207
+  },
+  "limitations": [
+    "Single video is regression evidence, not aggregate accuracy.",
+    "M4 simulator CPU timing is not physical iPhone throughput.",
+    "Motion derivatives are camera-path metrics, not a subjective dizziness score."
+  ],
+  "rms_acceleration_source_pixels_per_second_squared_reduction_percent": 39.015554293068135,
+  "rms_jerk_source_pixels_per_second_cubed_reduction_percent": 76.17857911627924,
+  "sampled_full_body_clip_over_one_pixel": [],
+  "source_sha256": "aaf13bac532294a93ee1075e15fba0a7fd536560f38706a216895221fcdf3a0e",
+  "audio_stream_hash_equal": true,
+  "audio_stream_sha256": "052cfefab6741971366fd281cd2ea6e8ebbc1b130df3867752e674248960d8e7",
+  "output_audio_duration_seconds": 37.919025,
+  "output_video_duration_seconds": 37.92
+}
