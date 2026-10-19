@@ -20,6 +20,14 @@ xcodebuild -project 'Fancam Duck.xcodeproj' -scheme 'Fancam Duck' \
   -derivedDataPath /tmp/fancamduck-mac-build CODE_SIGNING_ALLOWED=NO build
 ```
 
+## 应用图标与多平台构建
+
+A1 图标覆盖 iPhone、iPad／Duo 和 Mac Catalyst；素材及重建步骤见 [Logo 资源说明](../design-assets/logo-a1/README.md)。运行 `tools/validation/build-platforms.sh` 顺序验证 iOS 设备、iOS 模拟器和 Mac Catalyst 的未签名 Release 构建。日志与 DerivedData 默认保存在 `/tmp/fancamduck-platform-builds`，可通过 `FANCAM_DUCK_BUILD_ROOT` 指定目录。
+
+2026-10-19 本轮验证：Xcode 27.1（27A9275），工作区包含本次未提交图标变更；iOS 设备、iOS 模拟器、Mac Catalyst 三个平台 Release 构建全部通过（`CODE_SIGNING_ALLOWED=NO`）。11 个图标槽位尺寸检查通过，iOS 1024 PNG 无 alpha；iOS 产物包含 iPhone／iPad 主图标元数据，Mac 产物包含有效 `AppIcon.icns` 及引用。`git diff --check` 通过。构建仍有既有 `RedactionCompositor` sendability 与 AppIntents 元数据提示，无图标编译错误。
+
+脚本验证资源编译和应用构建，不代表签名、商店上传、启动器显示或实际设备 UI 验收。页面 Logo 替换后再次通过上述三平台 Release 构建；已覆盖安装并启动 iPhone 17 Pro（iOS 26.3.1）与 Duo（iOS 27.1），实际检查手机和宽屏首页 Logo 显示正常。Mac 页面仅完成构建验证。未运行单元或真实视频性能测试。
+
 ## 按改动选择测试
 
 | 修改范围 | 优先套件 |

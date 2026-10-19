@@ -21,9 +21,7 @@ struct HomeView: View {
             List {
                 VStack(alignment:.leading,spacing:24) {
                     HStack(spacing: 10) {
-                        Image(systemName: "viewfinder").font(.system(size: 21, weight: .regular))
-                            .frame(width: 44, height: 44)
-                            .modifier(StudioGlassSurface(shape: Circle(), interactive: false))
+                        BrandLogo()
                         Text("直拍鸭").font(.title2.weight(.semibold))
                         Spacer()
                     }
@@ -146,7 +144,10 @@ struct HomeView: View {
             VStack(alignment:.leading,spacing:24) {
                 HStack {
                     VStack(alignment:.leading,spacing:8) {
-                        Label("直拍鸭",systemImage:"viewfinder").font(.headline).foregroundStyle(.secondary)
+                        HStack(spacing: 10) {
+                            BrandLogo(size: 32)
+                            Text("直拍鸭").font(.headline)
+                        }
                         Text("视频项目").font(.largeTitle.bold())
                         Text("选择主角，让镜头跟上动作。").font(.subheadline).foregroundStyle(.secondary)
                     }
@@ -191,7 +192,7 @@ struct HomeView: View {
         HStack(spacing:0) {
             VStack(alignment:.leading,spacing:28) {
                 HStack(spacing:10) {
-                    Image(systemName:"viewfinder").font(.system(size:24)).foregroundStyle(Color.acAccent)
+                    BrandLogo(size: 36)
                     Text("直拍鸭").font(.system(size:21,weight:.semibold)).lineLimit(1).minimumScaleFactor(0.75)
                 }.padding(.top,8)
                 VStack(alignment:.leading,spacing:8) {

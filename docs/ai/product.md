@@ -4,6 +4,8 @@
 
 中文名「直拍鸭」，英文名「Fancam Duck」，突出从群舞视频中剪出个人直拍。工程与 Scheme 使用 Fancam Duck，Swift 模块与标识符使用 FancamDuck，测试模块使用 FancamDuckTests／FancamDuckUITests。中文系统显示直拍鸭，英文系统显示 Fancam Duck。签名 Bundle ID 保留 com.aicut.app，保证已有安装仍可访问自己的数据。Application Support 默认使用 Fancam Duck；首次打开时仅在新目录不存在的情况下迁移旧 AICut 数据目录，不覆盖已有新目录。
 
+首页手机标题、宽屏标题和 Mac 侧栏使用同一 A1 鸭子 Logo（`BrandLogo`），与系统 AppIcon 共用母图。Logo 仅用于品牌位置，功能按钮保留语义图标。
+
 ## 核心流程
 
 导入视频 → 全览点选主角 → 可选时间截取、构图及打码 → 确认处理 → 原位跟踪 → 导出预览 → 导出文件 → 保存相册或分享。
