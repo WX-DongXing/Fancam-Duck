@@ -19,14 +19,15 @@
 `Route` 为 `home`、`editor`、`export`。`ProcessingPhase` 独立表示业务阶段；不要用页面是否显示来替代流程判断。
 
 ```text
-editing → processing → readyToExport → exporting → completed
-                ↕
-              paused → 返回 editing
-                ↓
-              blocked → 明确重新选择并确认 → processing
+editing（选人／选段）→ processing（分析）→ editing（已分析，构图／打码）
+                                ↕ paused
+                                ↓ blocked → 确认同一主角 → processing
+editing（已分析）→ processing（准备打码／生成）→ completed（预览／导出）
+                                               ↓ 返回修改
+                                        editing（复用分析）
 ```
 
-图示为主要业务路径，不是所有方法的调用表。`ProcessingGate.canContinue` 校验目标与明确选择；`AppModel.canConfirm` 还校验检测、恢复、构图手势等忙状态。`readyToExport` 只说明分析／预览准备完成，不代表 MP4 已写入。
+图示为主要业务路径，不是所有方法的调用表。`ProcessingGate.canContinue` 校验目标与明确选择；`AppModel.canConfirm` 还校验检测、恢复、构图手势等忙状态。新工作台通过 `advanceWorkflow` 区分首次分析与已有分析后的生成。首次分析完成留在 editor；生成实际 MP4 后使用 completed 状态，仍留在 editor，导出仅保存文件。`readyToExport` 与独立 export 路由保留给现有兼容调用，不作为新工作台的首次分析完成态。
 
 `togglePreview` 和普通 `scrub` 仅在 editing 允许。`seek` 仍用于阻塞纠正中的明确帧检查。不能为了禁用普通时间轴把全部纠正寻帧也禁掉。
 
@@ -43,7 +44,7 @@ AppModel 保存多个 Task，并以 operationID、detectionID、compositionID、
 `ProjectStore` 是 actor，默认目录为 Application Support 下的 `Fancam Duck`。新目录不存在时原位迁移旧 `AICut` 目录；如果两者已存在，保留两份数据并使用新目录。
 
 - `projects.json`：项目和编辑设置，原子写入。
-- `trajectory-<UUID>.json`：完整轨迹，带分析版本、源 SHA256、元数据及目标锚点。读取时验证轨迹覆盖当前范围。
+- `trajectory-<UUID>.json`：完整主角轨迹及人群观测批次（人物框、姿态、外观特征），带分析版本、源 SHA256、元数据及目标锚点。读取时验证轨迹覆盖当前范围；恢复后寻帧及打码构建复用观测，设置变化不重复推理。旧缓存缺少人群批次时可能需要补充检测，不伪称其已有完整人群结果。
 - `artifacts-<UUID>/output.json` 及 MP4：成片记录，匹配源摘要、设置与目标后才复用；保存相册状态记录在清单中。
 - 源视频为应用管理副本；删除项目清理其轨迹、输出及不再被其他项目引用的副本，不触及相册原片。
 
@@ -51,8 +52,10 @@ AppModel 保存多个 Task，并以 operationID、detectionID、compositionID、
 
 `GenerationRecipe`、`lastGeneratedRecipe` 和 `hasReusableOutput` 用于当前会话判断旧结果是否可复用。更改模型或分析语义时评估 `ProjectStore.analysisVersion` 是否需要变更。
 
-## 构图和打码事务
+## 构图和打码即时设置
 
-构图与打码各自保存进入前快照，取消必须恢复。构图手势中间态与持久设置要区分，避免手势抖动导致重建播放器或过度保存。
+新工作台仅在完整分析后显示构图／打码工具，不再常驻选人、面板取消或完成按钮。工具切换提交当前配置，构图手势结束和比例切换会持久化，打码范围、样式和强度独立更新。重新进入打码面板不能重新开启用户关闭的打码。图片样式直接使用内置 BrandLogo。
 
-完成跟踪后修改打码，旧计划可能失效：`refreshComposition` 保持静态构图可编辑，清理旧动态播放器，确认处理后补齐新打码计划。禁止绕过 `RedactionPlan.covers` 强行播放未覆盖的成片。
+构图与打码继续复用既有计算和 GPU 合成链路。若完整打码计划尚未覆盖新范围，允许静态编辑，不允许播放未覆盖的动态预览。身份不确定仍停在问题帧；手动区域必须经过检测成为有效人物候选。生成取消保留主角分析与设置，旧成片保留至新文件成功写入。任务 ID、项目 ID 和取消后回调校验不可移除。
+
+手机设置展开与收起使用短动画，紧凑状态不为设置预留大块空白；工作台保持同一 editor 路由。视频时间轴只在分析前开放范围编辑，分析后用于片段定位；修改画幅、打码不更改分析范围。

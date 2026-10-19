@@ -1,35 +1,45 @@
 import SwiftUI
-import PhotosUI
+import AVFoundation
 
 struct EditorView: View {
     @Bindable var model: AppModel
-    @State private var redactionImageItem: PhotosPickerItem?
-    @State private var showRedactionImagePicker=false
+    @State private var savingFile=false
+    @State private var generatedPlaying=false
     @State private var redactionStrengthEditing=false
     @Namespace private var redactionStyleSelection
     @State private var drawnBox: NormalizedRect?
     @State private var showLeaveConfirmation = false
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ScaledMetric(relativeTo: .body) private var settingsHeight = 184
-    @ScaledMetric(relativeTo: .body) private var shortSettingsHeight = 104
+    @ScaledMetric(relativeTo: .body) private var settingsHeight = 154
     @Namespace private var aspectSelection
     @Namespace private var redactionSelection
     @Namespace private var toolSelection
     @State private var activeTool: WorkspaceTool?
+    @State private var lastSettingsTool:WorkspaceTool = .composition
     @State private var timelineTrimming = false
 
     private enum WorkspaceTool: String, CaseIterable {
-        case selection = "选人", composition = "构图", redaction = "打码"
+        case composition = "构图", redaction = "打码"
         var symbol: String {
             switch self {
-            case .selection: "person.crop.circle"
             case .composition: "crop"
             case .redaction: "square.on.circle"
             }
         }
     }
 
+    private var workspaceState:String {
+        if isBlocked {return "blocked"}
+        if isCompleted {return "preview"}
+        if model.generatingVideo {return "generating"}
+        if isPaused {return "paused"}
+        if isProcessing {return "analyzing"}
+        return model.hasCompletedTracking ? "settings" : "selection"
+    }
+    private var isCompleted:Bool {if case .completed = model.phase {return true};return false}
+    private var availableTools:[WorkspaceTool] {model.hasCompletedTracking ? [.composition,.redaction] : []}
     private var isProcessing: Bool {
         switch model.phase { case .processing, .paused: true; default: false }
     }
@@ -58,9 +68,9 @@ struct EditorView: View {
                                 recoveryDock.frame(height:180,alignment:.bottom)
                             } else {
                                 editorTimeline
-                                if let tool=activeTool,!isProcessing {
+                                if let tool=displayedTool,!isProcessing {
                                     inlineSettings(tool)
-                                        .frame(height:tool == .selection ? min(shortSettingsHeight,geometry.size.height*0.25) : tool == .redaction ? min(164,geometry.size.height*0.30) : min(settingsHeight,208,geometry.size.height*0.38))
+                                        .frame(height:tool == .redaction ? min(164,geometry.size.height*0.30) : min(settingsHeight,208,geometry.size.height*0.38))
                                         .transition(.opacity.combined(with:.move(edge:.bottom)))
                                 }
                                 bottomToolbar.padding(.top,12).padding(.bottom,8)
@@ -69,31 +79,44 @@ struct EditorView: View {
                     }
                 }
             }.frame(width: geometry.size.width, height: geometry.size.height)
-                .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: isProcessing)
             #endif
         }
+        .animation(reduceMotion ? nil : .smooth(duration:0.28),value:workspaceState)
+        .animation(reduceMotion ? nil : .smooth(duration:0.28),value:activeTool)
         .background { StudioBackground() }.foregroundStyle(.white).preferredColorScheme(.dark)
         .alert("保存并返回首页？", isPresented: $showLeaveConfirmation) {
             Button("取消", role: .cancel) {}
             Button("保存并返回") { model.goHome() }
         } message: { Text("当前任务将暂停，可以在最近项目中重新打开。") }
-        .photosPicker(isPresented:$showRedactionImagePicker,selection:$redactionImageItem,matching:.images)
-        .task(id:redactionImageItem) {
-            guard let item=redactionImageItem else {return}
-            do {
-                if let data=try await item.loadTransferable(type:Data.self),!Task.isCancelled {await model.importRedactionImage(data)}
-                if !Task.isCancelled {redactionImageItem=nil}
-            } catch {if !Task.isCancelled {model.errorMessage="图片读取失败，请重新选择。"}}
+        .sheet(isPresented:$savingFile) {if let url=model.outputURL {SaveVideoPicker(url:url)}}
+        .onChange(of:model.hasCompletedTracking) {_,complete in
+            if complete && model.phase == .editing {selectTool(.composition)}
         }
         .onChange(of: model.phase) { _, phase in
+            generatedPlaying=false
             if phase != .editing {
                 withAnimation(reduceMotion ? nil : .smooth(duration:0.28)) { activeTool = nil }
-            }
+            } else if model.hasCompletedTracking,activeTool == nil {selectTool(lastSettingsTool)}
         }
         .onChange(of: model.compositionEditing) { _, editing in
             if !editing && activeTool == .composition { activeTool = nil }
         }
-        .onDisappear { model.player?.pause() }
+        .onAppear {if model.hasCompletedTracking && model.phase == .editing {selectTool(.composition)}}
+        .task(id:generatedPlaying) {
+            while generatedPlaying && isCompleted && !Task.isCancelled {
+                if let time=model.previewPlayer?.currentTime().seconds,time.isFinite,let project=model.project {
+                    model.currentTime=min(project.settings.end,project.settings.start+max(0,time))
+                }
+                do {try await Task.sleep(for:.milliseconds(100))} catch {return}
+            }
+        }
+        .onChange(of:scenePhase) {_,phase in
+            if phase != .active {generatedPlaying=false;model.previewPlayer?.pause()}
+        }
+        .onReceive(NotificationCenter.default.publisher(for:.AVPlayerItemDidPlayToEndTime)) {notification in
+            if let item=notification.object as? AVPlayerItem,item === model.previewPlayer?.currentItem {generatedPlaying=false}
+        }
+        .onDisappear { model.player?.pause();model.previewPlayer?.pause() }
     }
     #if targetEnvironment(macCatalyst)
     private var desktopWorkspace:some View {
@@ -107,17 +130,13 @@ struct EditorView: View {
                     Text("FANCAM DUCK  /  视频工作台").font(.system(size:9,weight:.medium,design:.monospaced)).foregroundStyle(.secondary)
                 }
                 Spacer(minLength:8)
-                if isPaused {
-                    Button("返回调整") {activeTool=nil;model.returnToEditingFromPause()}
-                        .buttonStyle(DesktopButtonStyle()).accessibilityIdentifier("returnToEditingFromPause")
-                }
-                if !isBlocked && !model.manualSelection {desktopPrimaryAction}
+
             }.padding(.horizontal,20).frame(height:64).background(DesktopPalette.panel)
             Divider()
             HStack(spacing:0) {
                 VStack(spacing:0) {
                     HStack {
-                        Label(showsComposition ? "构图预览" : "原片全览",systemImage:showsComposition ? "crop" : "viewfinder")
+                        Label(isCompleted ? "成片预览" : showsComposition ? "构图预览" : "原片全览",systemImage:isCompleted ? "play.rectangle" : showsComposition ? "crop" : "viewfinder")
                         Spacer()
                         Text("\(Int(model.project?.metadata.width ?? 0)) × \(Int(model.project?.metadata.height ?? 0))")
                             .monospacedDigit()
@@ -130,7 +149,7 @@ struct EditorView: View {
                     }
                 }.frame(maxWidth:.infinity,maxHeight:.infinity)
                 Divider()
-                desktopInspector.frame(width:300).background(DesktopPalette.panel)
+                desktopInspector.frame(width:360).background(DesktopPalette.panel)
             }
         }.background(DesktopPalette.background)
             .accessibilityElement(children:.contain).accessibilityIdentifier("desktopWorkspace")
@@ -138,134 +157,55 @@ struct EditorView: View {
     private var desktopPrimaryAction:some View {
         Button {
             if isProcessing {if isPaused {model.resume()} else {model.pause()}}
-            else {finishTool(commit:true);model.confirmProcessing()}
+            else {finishTool(commit:true);model.advanceWorkflow()}
         } label: {
             HStack(spacing:12) {
                 Image(systemName:isProcessing ? (isPaused ? "play.fill" : "pause.fill") : "sparkles")
                 Text(isProcessing ? (isPaused ? "继续处理" : "处理中") : startTitle)
                 if isProcessing {Text(processingPercent).monospacedDigit().accessibilityIdentifier("processingProgress")}
-            }
+            }.frame(maxWidth:.infinity).frame(height:58)
         }.buttonStyle(DesktopButtonStyle(prominent:true))
-            .disabled(!isProcessing && !canStart).opacity(!isProcessing && !canStart ? 0.45 : 1)
+            .disabled(isProcessing ? !isPaused : !canStart).opacity(!isProcessing && !canStart ? 0.45 : 1)
             .accessibilityIdentifier("primaryAction")
             .accessibilityValue(isProcessing ? processingPercent : "")
     }
     private var desktopInspector:some View {
-        VStack(alignment:.leading,spacing:20) {
+        VStack(alignment:.leading,spacing:18) {
             if isBlocked || model.manualSelection {
-                Text(isBlocked ? "确认主角" : "手动框选").font(.system(size:16,weight:.semibold))
-                Text(isBlocked ? "跟踪暂时中断。请在原片中重新指定主角，然后继续处理。" : "拖动边框调整区域，尽量包含完整人物。")
-                    .font(.system(size:12)).foregroundStyle(.secondary)
-                recoveryDock.frame(height:180)
-            } else if isProcessing {
-                Label(isPaused ? "处理已暂停" : "正在跟随主角",systemImage:isPaused ? "pause.circle" : "viewfinder")
-                    .font(.system(size:16,weight:.semibold))
-                    .accessibilityIdentifier("processingStatus").accessibilityLabel(model.statusText)
-                ProgressView(value:min(1,max(0,model.phase.progress))).tint(.acAccent)
-                DesktopFact(title:"完成进度",value:processingPercent)
-                Text(isPaused ? "可以继续处理，或返回调整参数。" : "保持实时跟踪，完成后进入成片预览。")
-                    .font(.system(size:12)).foregroundStyle(.secondary)
-            } else {
-                HStack(spacing:4) {
-                    ForEach(WorkspaceTool.allCases,id:\.self) {tool in
-                        let selected=(activeTool ?? .selection)==tool
-                        Button {selectTool(tool)} label: {
-                            Label(tool.rawValue,systemImage:tool.symbol).font(.system(size:12,weight:.medium))
-                                .frame(maxWidth:.infinity).frame(height:34)
-                                .background(selected ? DesktopPalette.raised : .clear,in:RoundedRectangle(cornerRadius:7))
-                        }.buttonStyle(.plain).foregroundStyle(selected ? .white : .secondary)
-                            .accessibilityIdentifier("tool-"+tool.rawValue).accessibilityAddTraits(selected ? .isSelected : [])
-                            .disabled(!model.settingsEnabled || timelineTrimming || model.compositionBusy || model.compositionAdjusting || (tool != .selection && model.project?.target == nil))
-                    }
-                }.padding(4).background(DesktopPalette.background,in:RoundedRectangle(cornerRadius:10))
-                    .accessibilityElement(children:.contain).accessibilityIdentifier("editorToolbar")
+                Text("确认主角").font(.headline)
+            } else if isCompleted {
+                Text("视频已生成").font(.headline)
+                DesktopFact(title:"视频时长",value:((model.project?.settings.end ?? 0)-(model.project?.settings.start ?? 0)).videoTime)
+                DesktopFact(title:"分辨率",value:model.project?.settings.resolution.label ?? "")
+            } else if !isProcessing {
+                if model.hasCompletedTracking {
+                    if displayedTool == .composition {desktopCompositionSettings}
+                    else if displayedTool == .redaction {desktopRedactionSettings}
+                } else {Text(model.project?.target == nil ? "请在画面中选择主角" : "主角已选择").font(.subheadline)}
                 if let activity=model.editorActivityText {
-                    HStack(spacing:8) {
-                        ProgressView().controlSize(.small)
-                        Text(activity).font(.system(size:11)).foregroundStyle(.secondary)
-                    }.accessibilityElement(children:.combine).accessibilityIdentifier("editorActivity")
-                }
-                if activeTool == .composition {desktopCompositionSettings}
-                else if activeTool == .redaction {desktopRedactionSettings}
-                else {
-                    DesktopSection(title:"主角选择") {
-                        Image(systemName:model.project?.target == nil ? "person.crop.rectangle.badge.plus" : "person.crop.rectangle.fill")
-                            .font(.system(size:28)).foregroundStyle(Color.acAccent).padding(.vertical,6)
-                        Text(model.project?.target == nil ? "点击画面中的主角" : "主角已选中")
-                            .font(.system(size:16,weight:.semibold))
-                        Text("在完整原片中点击人物即可切换。镜头会跟随主角，其他人物可在打码中自动遮挡。")
-                            .font(.system(size:12)).foregroundStyle(.secondary).lineSpacing(5)
-                        Button(action:beginManual) {Label("手动框选",systemImage:"viewfinder")}
-                            .buttonStyle(DesktopButtonStyle()).accessibilityLabel("手动框选人物")
-                    }
+                    HStack(spacing:8) {ProgressView().controlSize(.small);Text(activity).font(.caption).foregroundStyle(.secondary)}
                 }
             }
             Spacer(minLength:0)
-            Divider()
-            DesktopSection(title:"当前视频") {
-                DesktopFact(title:"输出比例",value:model.project?.settings.aspectRatio.rawValue ?? "16:9")
-                DesktopFact(title:"输出尺寸",value:model.project?.settings.resolution.label ?? "")
-                DesktopFact(title:"片段时长",value:((model.project?.settings.end ?? 0)-(model.project?.settings.start ?? 0)).videoTime)
+            if isBlocked || model.manualSelection {recoveryDock.frame(height:180)}
+            else if isCompleted {completedActions}
+            else if isProcessing {
+                HStack(spacing:10) {
+                    Button(model.generatingVideo ? "取消生成" : isPaused ? "返回选择" : "暂停分析") {
+                        if model.generatingVideo {model.cancelGeneration()} else if isPaused {model.returnToEditingFromPause()} else {model.pause()}
+                    }.buttonStyle(DesktopButtonStyle())
+                    processingAction
+                }
+            } else {
+                HStack(spacing:10) {
+                    if model.hasCompletedTracking {toolSelector.frame(width:156)}
+                    desktopPrimaryAction.frame(maxWidth:.infinity)
+                }
             }
         }.padding(20).frame(maxHeight:.infinity,alignment:.top)
     }
-    private var desktopCompositionSettings:some View {
-        VStack(alignment:.leading,spacing:18) {
-            DesktopSection(title:"画面比例") {
-                Picker("画面比例",selection:Binding(get:{model.project?.settings.aspectRatio ?? .portrait},set:{value in
-                    withAnimation(reduceMotion ? nil : .smooth(duration:0.32)) {model.setCompositionAspect(value)}
-                })) {ForEach(OutputAspectRatio.allCases) {Text($0.rawValue).tag($0)}}
-                    .pickerStyle(.segmented).labelsHidden().accessibilityIdentifier("compositionAspect")
-            }.disabled(compositionControlsDisabled)
-            DesktopSection(title:"位置与缩放") {
-                HStack(spacing:8) {
-                    Button {model.compositionZoom(1/1.1)} label:{Label("缩小",systemImage:"minus.magnifyingglass").frame(maxWidth:.infinity)}
-                    Button {model.compositionZoom(1.1)} label:{Label("放大",systemImage:"plus.magnifyingglass").frame(maxWidth:.infinity)}
-                }.buttonStyle(DesktopButtonStyle())
-                HStack(spacing:8) {
-                    Button {model.centerComposition(horizontal:true)} label:{Label("水平居中",systemImage:"align.horizontal.center").frame(maxWidth:.infinity)}
-                    Button {model.centerComposition(horizontal:false)} label:{Label("垂直居中",systemImage:"align.vertical.center").frame(maxWidth:.infinity)}
-                }.buttonStyle(DesktopButtonStyle())
-                Text(model.editorActivityText ?? model.compositionNotice ?? "直接拖动画面调整位置，双指缩放。")
-                    .font(.system(size:11)).foregroundStyle(.secondary)
-            }.disabled(compositionControlsDisabled)
-            HStack {toolCancel;Spacer();toolCommit}
-        }
-            .accessibilityElement(children:.contain).accessibilityIdentifier("adjustmentPanel")
-    }
-    private var desktopRedactionSettings:some View {
-        VStack(alignment:.leading,spacing:18) {
-            Toggle("遮挡其他人物",isOn:Binding(get:{model.project?.settings.redaction.enabled == true},set:{if $0 {model.enableAutomaticRedaction()} else {model.clearRedactions()}}))
-                .font(.system(size:13)).tint(.acAccent)
-            DesktopSection(title:"遮挡范围") {
-                Picker("遮挡范围",selection:Binding(get:{model.project?.settings.redaction.region ?? .face},set:{model.setRedactionRegion($0)})) {
-                    ForEach(RedactionSettings.Region.allCases,id:\.self) {Text($0.rawValue).tag($0)}
-                }.pickerStyle(.segmented).labelsHidden()
-            }
-            DesktopSection(title:"遮挡样式") {
-                HStack(spacing:6) {
-                    ForEach(RedactionSettings.Style.allCases,id:\.self) {style in
-                        Button {
-                            if style == .image && model.project?.settings.redaction.imageData == nil {showRedactionImagePicker=true}
-                            else {model.setRedactionStyle(style)}
-                        } label: {
-                            Text(style.rawValue).font(.system(size:12)).frame(maxWidth:.infinity).frame(height:34)
-                                .foregroundStyle(model.project?.settings.redaction.style == style ? Color.acOnAccent : .white)
-                                .background(model.project?.settings.redaction.style == style ? Color.acAccent : DesktopPalette.raised,in:RoundedRectangle(cornerRadius:7))
-                        }.buttonStyle(.plain).accessibilityIdentifier("redaction-style-"+style.rawValue)
-                    }
-                }
-                if model.project?.settings.redaction.style == .image {
-                    Button("更换图片") {showRedactionImagePicker=true}.buttonStyle(DesktopButtonStyle())
-                } else {
-                    Slider(value:Binding(get:{model.project?.settings.redaction.strength ?? 0.65},set:{model.setRedactionStrength($0)}),in:0.3...1)
-                        .tint(.acAccent).accessibilityLabel("打码强度")
-                }
-            }
-            Text("主角保持清晰，其余人物自动遮挡。") .font(.system(size:11)).foregroundStyle(.secondary)
-            HStack {toolCancel;Spacer();toolCommit}
-        }.accessibilityElement(children:.contain).accessibilityIdentifier("adjustmentPanel")
-    }
+    private var desktopCompositionSettings:some View {compositionPanel}
+    private var desktopRedactionSettings:some View {redactionPanel}
     #endif
     private var header: some View {
         HStack {
@@ -280,7 +220,7 @@ struct EditorView: View {
                     Text("视频编辑").font(.system(size:15,weight:.medium))
                         .accessibilityIdentifier("processingStatus").accessibilityLabel(model.statusText).accessibilityValue(model.currentTime.videoTime)
                 } else {
-                    Text(activeTool?.rawValue ?? "选择舞者").font(.system(size: 15, weight: .medium))
+                    Text("视频工作台").font(.system(size: 15, weight: .medium))
                 }
             }
             Spacer()
@@ -296,15 +236,18 @@ struct EditorView: View {
             let source = model.project?.metadata.size ?? CGSize(width: 1920, height: 1080)
             let inset:CGFloat=showsComposition ? 16 : 12
             let area=CGSize(width:max(1,geometry.size.width-inset*2),height:max(1,geometry.size.height-(showsComposition ? 12 : 48)))
-            let rect=CropGeometry.aspectFit(video:showsComposition ? (model.project?.settings.aspectRatio ?? .portrait).size : source,container:area).offsetBy(dx:inset,dy:0)
+            let rect=CropGeometry.aspectFit(video:(showsComposition || isCompleted) ? (model.project?.settings.aspectRatio ?? .portrait).size : source,container:area).offsetBy(dx:inset,dy:0)
             ZStack(alignment: .bottom) {
-                CompositionVideoViewport(model:model,source:source,viewport:rect.size,composition:showsComposition)
+                Group {
+                    if isCompleted,let player=model.previewPlayer {PlayerSurface(player:player)}
+                    else {CompositionVideoViewport(model:model,source:source,viewport:rect.size,composition:showsComposition)}
+                }
                     .frame(width:rect.width,height:rect.height)
                     .accessibilityElement(children:showsComposition ? .contain : .ignore)
-                    .accessibilityLabel(showsComposition ? "构图预览" : "原片画面")
+                    .accessibilityLabel(isCompleted ? "成片预览" : showsComposition ? "构图预览" : "原片画面")
                     .accessibilityIdentifier(showsComposition ? "compositionViewport" : "sourceVideoSurface")
                     .position(x:rect.midX,y:rect.midY)
-                if !model.redactionEditing && !model.compositionEditing && model.controlsEnabled && !model.manualSelection && !model.isPlaying && !timelineTrimming {
+                if !model.redactionEditing && !model.compositionEditing && model.controlsEnabled && (!model.hasCompletedTracking || isBlocked) && !isCompleted && !model.manualSelection && !model.isPlaying && !timelineTrimming {
                     ForEach(people, id: \.id) { person in
                         let number = person.number, box = person.box
                         Button { model.selectTarget(box) } label: {
@@ -321,7 +264,7 @@ struct EditorView: View {
                             .accessibilityIdentifier(model.isDemo ? "dancer\(number)" : "person\(number)")
                     }
                 }
-                if let box = activeBox, !showsComposition && !model.manualSelection && !model.isPlaying {
+                if let box = activeBox, !isCompleted, !showsComposition && !model.manualSelection && !model.isPlaying {
                     TargetBox(label: boxLabel, status: boxLabel, warning: isBlocked && model.redactionIssue == nil, dashed: isProcessing && model.trackedSample?.estimated == true, badgeInside: rect.minY + rect.height * box.y < 34)
                         .frame(width: rect.width * box.width, height: rect.height * box.height)
                         .position(x: rect.minX + rect.width * box.center.x, y: rect.minY + rect.height * box.center.y)
@@ -331,7 +274,7 @@ struct EditorView: View {
                     ManualBoxOverlay(box: $drawnBox).frame(width: rect.width, height: rect.height)
                         .position(x: rect.midX, y: rect.midY)
                 }
-                if !isProcessing && !model.compositionEditing {
+                if !isProcessing && !isCompleted && !model.compositionEditing {
                     HStack(spacing: 8) {
                         if model.detecting || model.restoringTracking { ProgressView().tint(.white) }
                         Text(sourceHint).font(.system(size: 11)).foregroundStyle(.white.opacity(0.65)).lineLimit(2)
@@ -372,7 +315,6 @@ struct EditorView: View {
             }.padding(.horizontal, 24)
         } else if isBlocked {
             VStack(spacing: 10) {
-                Spacer()
                 HStack(spacing: 24) {
                     StudioIcon(symbol: "backward.end.fill", label: "查看前一帧") { model.seek(to: model.currentTime - 0.2) }
                     Button("手动框选") { beginManual() }.font(.system(size: 13))
@@ -391,12 +333,21 @@ struct EditorView: View {
             Text(model.currentTime.videoTime).foregroundStyle(.white)
                 + Text(" / " + (model.project?.metadata.duration ?? 0).videoTime).foregroundStyle(.white.opacity(0.45))
             Spacer()
-            Button { model.togglePreview() } label: {
-                Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
+            Button {
+                if isCompleted {
+                    generatedPlaying.toggle()
+                    if generatedPlaying {
+                        if let player=model.previewPlayer,let end=player.currentItem?.duration.seconds,end.isFinite,player.currentTime().seconds>=end-0.1 {player.seek(to:.zero)}
+                        model.previewPlayer?.play()
+                    } else {model.previewPlayer?.pause()}
+                }
+                else {model.togglePreview()}
+            } label: {
+                Image(systemName: (isCompleted ? generatedPlaying : model.isPlaying) ? "pause.fill" : "play.fill")
                     .font(.system(size: 22)).frame(width: 44, height: 44)
-            }.buttonStyle(.plain).accessibilityLabel(model.isPlaying ? "暂停预览" : "播放预览")
+            }.buttonStyle(.plain).accessibilityLabel((isCompleted ? generatedPlaying : model.isPlaying) ? "暂停预览" : "播放预览")
                 .accessibilityIdentifier("editorPlayback").keyboardShortcut(.space,modifiers:[])
-                .disabled(isProcessing || timelineTrimming || (model.project?.settings.redaction.enabled == true && model.project?.redactionPlan?.covers(model.project!) != true) || model.compositionEditing && !model.hasCompletedTracking || model.compositionBusy)
+                .disabled(isProcessing || timelineTrimming || (!isCompleted && model.hasCompletedTracking && model.project?.settings.redaction.enabled == true && model.project?.redactionPlan?.covers(model.project!) != true) || model.compositionEditing && !model.hasCompletedTracking || model.compositionBusy)
             Spacer()
             Text(model.project?.settings.aspectRatio.rawValue ?? "16:9").foregroundStyle(.white.opacity(0.45)).frame(width: 60, alignment: .trailing)
         }.font(.system(.caption, design: .monospaced)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.65)
@@ -404,61 +355,59 @@ struct EditorView: View {
             .padding(.horizontal, 26).frame(height: 44)
     }
 
+    // Ending an editing session must not clear the selected settings tab.
+    private var displayedTool:WorkspaceTool? {
+        model.hasCompletedTracking && model.phase == .editing ? (activeTool ?? lastSettingsTool) : activeTool
+    }
+    private var toolSelector:some View {
+        StudioGlassGroup(spacing:4) {
+            HStack(spacing:0) {
+                ForEach(availableTools,id:\.self) {tool in
+                    let selected=displayedTool==tool
+                    Button {selectTool(tool)} label: {
+                        VStack(spacing:3) {
+                            Image(systemName:tool.symbol).font(.system(size:20))
+                            Text(tool.rawValue).font(toolLabelFont)
+                        }.frame(maxWidth:.infinity).frame(height:50)
+                            .foregroundStyle(.white.opacity(selected ? 1 : 0.6))
+                            .modifier(StudioGlassSelection(selected:selected,namespace:toolSelection,selectionID:"workspace-tool",optionID:tool.rawValue))
+                    }.buttonStyle(.plain).accessibilityIdentifier("tool-"+tool.rawValue)
+                        .accessibilityAddTraits(selected ? .isSelected : [])
+                        .disabled(!model.settingsEnabled || timelineTrimming || model.compositionBusy || model.compositionAdjusting)
+                }
+            }.padding(4).modifier(StudioGlassSurface(shape:Capsule()))
+        }.accessibilityElement(children:.contain).accessibilityIdentifier("editorToolbar")
+    }
     private var bottomToolbar: some View {
         StudioGlassGroup(spacing: 12) {
             HStack(spacing: 12) {
-                if !isProcessing {
-                    HStack(spacing: 0) {
-                        ForEach(WorkspaceTool.allCases, id: \.self) { tool in
-                            let selected = (activeTool ?? .selection) == tool
-                            Button { selectTool(tool) } label: {
-                                VStack(spacing: 3) {
-                                    Image(systemName: tool.symbol).symbolRenderingMode(.monochrome)
-                                        .font(.system(size: 20, weight: .regular))
-                                    Text(tool.rawValue).font(.caption2.weight(selected ? .semibold : .regular))
-                                        .lineLimit(1).minimumScaleFactor(0.6)
-                                }.frame(maxWidth: .infinity).frame(height: 50)
-                                    .foregroundStyle(.white.opacity(selected ? 1 : 0.65))
-                                    .modifier(StudioGlassSelection(selected:selected,namespace:toolSelection,selectionID:"selected-tool",optionID:tool.rawValue))
-                                    .contentShape(Capsule())
-                            }.buttonStyle(.plain).accessibilityIdentifier("tool-" + tool.rawValue)
-                                .accessibilityAddTraits(selected ? .isSelected : [])
-                                .disabled(!model.settingsEnabled || timelineTrimming || model.compositionBusy || model.compositionAdjusting || ((tool == .composition || tool == .redaction) && model.project?.target == nil))
-                        }
-                    }.padding(4).modifier(StudioGlassSurface(shape: Capsule()))
-                        .accessibilityElement(children: .contain).accessibilityIdentifier("editorToolbar")
-                            .transition(.opacity.combined(with:.move(edge:.leading)))
+                if model.hasCompletedTracking && !isProcessing && !isCompleted {
+                    toolSelector
                 }
-                if isPaused {
-                    Button {
-                        withAnimation(reduceMotion ? nil : .smooth(duration:0.28)) {
-                            activeTool=nil;model.returnToEditingFromPause()
-                        }
-                    } label: {
-                        Label("返回调整",systemImage:"slider.horizontal.3")
-                            .font(.subheadline.weight(.medium)).lineLimit(1).minimumScaleFactor(0.8)
-                            .frame(width:116,height:56).contentShape(Capsule())
-                    }.buttonStyle(.plain)
-                        .modifier(StudioGlassSurface(shape:Capsule()))
-                        .accessibilityIdentifier("returnToEditingFromPause")
-                        .transition(.opacity.combined(with:.move(edge:.leading)))
+                if isProcessing {
+                    Button(model.generatingVideo ? "取消生成" : isPaused ? "返回选择" : "暂停分析") {
+                        if model.generatingVideo {model.cancelGeneration()}
+                        else if isPaused {activeTool=nil;model.returnToEditingFromPause()}
+                        else {model.pause()}
+                    }.font(.subheadline).frame(maxWidth:.infinity,minHeight:56)
+                        .buttonStyle(.plain).modifier(StudioGlassSurface(shape:Capsule()))
                 }
-                processingAction
+                if isCompleted {completedActions} else {processingAction}
             }
         }.dynamicTypeSize(...DynamicTypeSize.xxxLarge).padding(.horizontal, 18).frame(height: 58)
     }
     private var processingAction:some View {
                 Button {
                     if isProcessing {
-                        if isPaused { model.resume() } else { model.pause() }
+                        if isPaused { model.resume() }
                     } else {
                         withAnimation(reduceMotion ? nil : .smooth(duration:0.28)) {
-                            finishTool(commit:true);model.confirmProcessing()
+                            finishTool(commit:true);model.advanceWorkflow()
                         }
                     }
                 } label: {
                     HStack(spacing:8) {
-                        Text(isProcessing ? (isPaused ? "已暂停" : "处理中") : startTitle)
+                        Text(isProcessing ? (model.generatingVideo ? "正在生成" : isPaused ? "继续分析" : "正在分析") : startTitle)
                             .font(.subheadline.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5)
                         if isProcessing {
                             Image(systemName:isPaused ? "play.fill" : "pause.fill").font(.system(size:12))
@@ -469,7 +418,7 @@ struct EditorView: View {
                             Image(systemName:"arrow.right").font(.system(size:16,weight:.medium))
                         }
                     }.padding(.horizontal,isProcessing ? 22 : 14)
-                        .frame(maxWidth:isProcessing || usesExpandedWorkspace ? .infinity : nil).frame(width:isProcessing || usesExpandedWorkspace ? nil : 132,height:56)
+                        .frame(maxWidth:isProcessing || usesExpandedWorkspace || !model.hasCompletedTracking ? .infinity : nil).frame(width:isProcessing || usesExpandedWorkspace || !model.hasCompletedTracking ? nil : 132,height:56)
                         .background {
                             if isProcessing {
                                 ProcessingButtonFill(progress:min(1,max(0,model.phase.progress)),paused:isPaused)
@@ -479,11 +428,23 @@ struct EditorView: View {
                         .foregroundStyle(.white.opacity(isProcessing || canStart ? 1 : 0.3))
                 }.buttonStyle(.plain).contentShape(Capsule())
                     .modifier(StudioGlassSurface(shape:Capsule(),selected:isProcessing || canStart))
-                    .disabled(!isProcessing && !canStart)
-                    .accessibilityLabel(isProcessing ? (isPaused ? "已暂停，继续处理" : "处理中，暂停处理") : startTitle)
+                    .disabled(isProcessing ? !isPaused : !canStart)
+                    .accessibilityLabel(isProcessing ? (model.generatingVideo ? "正在生成视频" : isPaused ? "继续分析" : "正在分析人物") : startTitle)
                     .accessibilityValue(isProcessing ? processingPercent : "")
-                    .accessibilityHint(isProcessing ? (isPaused ? "点按继续处理" : "点按暂停处理") : "按当前舞者、时间范围和构图生成视频")
+                    .accessibilityHint(isProcessing ? (isPaused ? "点按继续分析" : "请使用旁边的暂停或取消操作") : "按当前工作台状态继续")
                     .accessibilityIdentifier("primaryAction")
+    }
+    private var completedActions:some View {
+        HStack(spacing:12) {
+            Button("返回修改") {generatedPlaying=false;model.backToEditor();selectTool(.composition)}
+                .frame(maxWidth:.infinity,minHeight:50).modifier(StudioGlassSurface(shape:Capsule()))
+            #if targetEnvironment(macCatalyst)
+            Button("导出视频") {savingFile=true}.frame(maxWidth:.infinity,minHeight:50).modifier(StudioGlassSurface(shape:Capsule()))
+            #else
+            Button(model.savedToPhotos ? "已保存" : "导出视频") {Task {await model.saveVideo()}}
+                .disabled(model.savingToPhotos || model.savedToPhotos).frame(maxWidth:.infinity,minHeight:50).modifier(StudioGlassSurface(shape:Capsule()))
+            #endif
+        }.buttonStyle(.plain).accessibilityIdentifier("completedActions")
     }
     private var usesExpandedWorkspace:Bool {
         #if targetEnvironment(macCatalyst)
@@ -503,98 +464,67 @@ struct EditorView: View {
     private var expandedControls:some View {
         VStack(alignment:.leading,spacing:16) {
             HStack {
-                Image(systemName:isProcessing ? "viewfinder" : activeTool?.symbol ?? "person.crop.circle")
+                Image(systemName:isProcessing ? "viewfinder" : displayedTool?.symbol ?? "person.crop.circle")
                     .foregroundStyle(Color.acAccent)
-                Text(isBlocked ? "确认主角" : isProcessing ? (isPaused ? "处理已暂停" : "正在跟随主角") : activeTool?.rawValue ?? "主角选择")
+                Text(isBlocked ? "确认主角" : isProcessing ? (isPaused ? "处理已暂停" : "正在跟随主角") : displayedTool?.rawValue ?? "主角选择")
                     .font(.headline)
                 Spacer(minLength:0)
             }.padding(.horizontal,18).padding(.top,20)
             if isBlocked || model.manualSelection {
                 recoveryDock.frame(height:180)
             } else if isProcessing {
-                VStack(alignment:.leading,spacing:12) {
-                    ProgressView(value:min(1,max(0,model.phase.progress))).tint(.acAccent)
-                    Text(isPaused ? "继续处理，或返回调整构图与打码。" : "完成后将自动进入成片预览。")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                }.padding(.horizontal,18)
-            } else if let tool=activeTool {
-                inlineSettings(tool).frame(height:tool == .composition ? 184 : tool == .redaction ? 164 : 104)
+                Text(model.generatingVideo ? "正在生成视频" : isPaused ? "分析已暂停" : "正在分析人物").font(.subheadline).padding(.horizontal,18)
+            } else if isCompleted {completedActions}
+            else if let tool=displayedTool {
+                inlineSettings(tool).frame(height:tool == .composition ? 154 : tool == .redaction ? 164 : 104)
             } else {
                 VStack(alignment:.leading,spacing:12) {
                     Text(model.project?.target == nil ? "在原片中轻点主角" : "主角已选中")
                         .font(.title3.weight(.semibold))
-                    Text("直接点击人物切换主角。拖动时间轴两端截取，再调整构图和其他人物的遮挡。")
+                    Text("点击画面选择主角，拖动时间轴两端截取。")
                         .font(.subheadline).foregroundStyle(.secondary).lineSpacing(4)
-                    Button("手动框选",action:beginManual).font(.subheadline).frame(minHeight:44)
-                        .accessibilityLabel("手动框选人物")
+                    if model.observations.isEmpty && model.detectionNotice != nil {Button("手动框选",action:beginManual).font(.subheadline).frame(minHeight:44)}
                 }.padding(.horizontal,18)
             }
             Spacer(minLength:0)
-            if !isBlocked && !model.manualSelection {
-                VStack(spacing:12) {
-                    if !isProcessing {
-                        HStack(spacing:4) {
-                            ForEach(WorkspaceTool.allCases,id:\.self) {tool in
-                                let selected=(activeTool ?? .selection)==tool
-                                Button {selectTool(tool)} label: {
-                                    Label(tool.rawValue,systemImage:tool.symbol)
-                                        .font(.system(size:14,weight:.medium)).labelStyle(.titleAndIcon)
-                                        .frame(maxWidth:.infinity).frame(height:48)
-                                        .modifier(StudioGlassSelection(selected:selected,namespace:toolSelection,selectionID:"expanded-tool",optionID:tool.rawValue))
-                                }.buttonStyle(.plain).accessibilityIdentifier("tool-"+tool.rawValue)
-                                    .accessibilityAddTraits(selected ? .isSelected : [])
-                                    .disabled(!model.settingsEnabled || timelineTrimming || model.compositionBusy || model.compositionAdjusting || (tool != .selection && model.project?.target == nil))
-                            }
-                        }.padding(4).modifier(StudioGlassSurface(shape:Capsule()))
-                            .accessibilityElement(children:.contain).accessibilityIdentifier("editorToolbar")
-                    }
-                    if isPaused {
-                        Button {activeTool=nil;model.returnToEditingFromPause()} label: {
-                            Label("返回调整",systemImage:"slider.horizontal.3").font(.subheadline)
-                                .frame(maxWidth:.infinity,minHeight:44)
-                        }.buttonStyle(.plain).accessibilityIdentifier("returnToEditingFromPause")
-                    }
-                    processingAction
-                }.padding(.horizontal,14).padding(.bottom,14)
-            }
+            if !isBlocked && !model.manualSelection {bottomToolbar.padding(.bottom,12)}
         }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)
-            .background(.white.opacity(0.035),in:RoundedRectangle(cornerRadius:28))
-            .overlay {RoundedRectangle(cornerRadius:28).stroke(.white.opacity(0.08),lineWidth:0.5).allowsHitTesting(false)}
     }
+
     private var processingPercent:String {
         min(1,max(0,model.phase.progress)).formatted(.percent.precision(.fractionLength(0)))
     }
     private var canStart: Bool { !timelineTrimming && model.canConfirm }
     private var startTitle: String {
+        if !model.hasCompletedTracking {return model.detecting ? "正在识别人物…" : "分析所选片段"}
+
         if model.restoringTracking {return "正在恢复项目…"}
         if model.compositionBusy {return "正在准备预览…"}
         if model.importingRedactionImage {return "正在准备图片…"}
         if model.detecting {return "正在识别人物…"}
         if model.isPlaying {return "请先暂停预览"}
         if model.needsRegeneration {return "重新生成"}
-        if activeTool == .composition { return "确认并处理" }
-        return model.hasReusableOutput ? "预览成片" : "开始处理"
+
+        return model.hasReusableOutput ? "预览成片" : "生成视频"
     }
 
     private func selectTool(_ tool: WorkspaceTool) {
-        guard !model.compositionBusy, !model.compositionAdjusting else { return }
-        let wasSelected = activeTool == tool
+        guard model.hasCompletedTracking,!model.compositionBusy, !model.compositionAdjusting else { return }
+        guard activeTool != tool else {return}
         finishTool(commit: true)
-        guard !wasSelected else { return }
         model.pausePreview(refresh: false)
         withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
             if tool == .composition { model.beginComposition(); guard model.compositionEditing else { return } }
             if tool == .redaction {redactionStrengthEditing=false;model.beginRedaction()}
-            activeTool = tool
+            activeTool = tool;lastSettingsTool=tool
         }
     }
     private func finishTool(commit: Bool) {
         guard let tool = activeTool else { return }
         if commit && (model.compositionBusy || model.compositionAdjusting) { return }
         switch tool {
-        case .composition: model.finishComposition(commit: commit)
+        case .composition: model.finishComposition(commit: commit,refreshDetections:false)
         case .redaction: model.finishRedaction(commit:commit)
-        case .selection: break
         }
         withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { activeTool = nil }
     }
@@ -615,24 +545,55 @@ struct EditorView: View {
                 compositionPanel
             } else if tool == .redaction {
                 redactionPanel
-            } else {
-                VStack(spacing: 8) {
-                    HStack {
-                        toolCancel
-                        Spacer()
-                        Text("直接轻点画面中的舞者").font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        toolCommit
-                    }
-                    Button("手动框选", action: beginManual).font(.subheadline)
-                        .frame(minHeight: 44).accessibilityLabel("手动框选人物")
-                }
             }
+
         }.dynamicTypeSize(...DynamicTypeSize.xxxLarge).padding(.horizontal, 18)
             .accessibilityElement(children: .contain).accessibilityIdentifier("adjustmentPanel")
     }
+    private var panelSpacing:CGFloat {
+        #if targetEnvironment(macCatalyst)
+        12
+        #else
+        0
+        #endif
+    }
+    private var panelInset:CGFloat {
+        #if targetEnvironment(macCatalyst)
+        16
+        #else
+        12
+        #endif
+    }
+    private var panelActionWidth:CGFloat? {
+        #if targetEnvironment(macCatalyst)
+        .infinity
+        #else
+        nil
+        #endif
+    }
+    private var toolLabelFont:Font {
+        #if targetEnvironment(macCatalyst)
+        .system(size:13)
+        #else
+        .caption2
+        #endif
+    }
+    private var regionLabelFont:Font {
+        #if targetEnvironment(macCatalyst)
+        panelFont
+        #else
+        .subheadline
+        #endif
+    }
+    private var panelFont:Font {
+        #if targetEnvironment(macCatalyst)
+        .system(size:14)
+        #else
+        .caption
+        #endif
+    }
     private var redactionPanel: some View {
-        VStack(spacing:0) {
+        VStack(spacing:panelSpacing) {
             if redactionStrengthEditing && model.project?.settings.redaction.style != .image {
                 HStack(spacing:12) {
                     Text("强度").font(.caption)
@@ -645,7 +606,7 @@ struct EditorView: View {
                     ForEach(RedactionSettings.Region.allCases,id:\.self) { region in
                         let selected=model.project?.settings.redaction.region == region
                         Button {withAnimation(reduceMotion ? nil : .smooth(duration:0.25)) {model.setRedactionRegion(region)}} label: {
-                            Text(region.rawValue).font(.subheadline.weight(selected ? .semibold : .regular))
+                            Text(region.rawValue).font(regionLabelFont.weight(selected ? .semibold : .regular))
                                 .frame(maxWidth:.infinity).frame(height:44)
                                 .modifier(StudioGlassSelection(selected:selected,namespace:redactionSelection,selectionID:"redaction-region",optionID:region.rawValue))
                         }.buttonStyle(.plain).accessibilityIdentifier("redaction-"+region.rawValue)
@@ -659,10 +620,9 @@ struct EditorView: View {
                     ForEach(RedactionSettings.Style.allCases,id:\.self) { style in
                         let selected=model.project?.settings.redaction.style == style
                         Button {
-                            if style == .image && (selected || model.project?.settings.redaction.imageData == nil) {showRedactionImagePicker=true}
-                            else {withAnimation(reduceMotion ? nil : .smooth(duration:0.25)) {model.setRedactionStyle(style)}}
+                            withAnimation(reduceMotion ? nil : .smooth(duration:0.25)) {model.setRedactionStyle(style)}
                         } label: {
-                            Text(style.rawValue).font(.caption.weight(selected ? .semibold : .regular))
+                            Text(style.rawValue).font(panelFont.weight(selected ? .semibold : .regular))
                                 .frame(maxWidth:.infinity).frame(height:44)
                                 .modifier(StudioGlassSelection(selected:selected,namespace:redactionStyleSelection,selectionID:"redaction-style",optionID:style.rawValue))
                         }.buttonStyle(.plain).accessibilityIdentifier("redaction-style-"+style.rawValue)
@@ -671,28 +631,24 @@ struct EditorView: View {
                 }.padding(3).background(.black.opacity(0.14),in:Capsule())
             }
             HStack(spacing:8) {
-                toolCancel
-                Spacer(minLength:0)
                 if model.importingRedactionImage {ProgressView().frame(width:44,height:44)}
                 else if model.redactionPrimaryBody == nil {
-                    Button("预览遮挡") {model.seek(to:model.project?.targetTime ?? 0)}.font(.caption).frame(minWidth:64,minHeight:44)
+                    Button("预览遮挡") {model.seek(to:model.project?.targetTime ?? 0)}.font(panelFont).frame(maxWidth:panelActionWidth,minHeight:44)
                 } else if model.project?.settings.redaction.style == .image {
-                    Button("更换图片") {showRedactionImagePicker=true}.font(.caption).frame(minWidth:64,minHeight:44)
+                    Label {Text("直拍鸭 Logo").font(.caption)} icon: {Image("BrandLogo").resizable().scaledToFit().frame(width:24,height:24)}
                 } else {
                     Button(redactionStrengthEditing ? "范围" : "强度") {redactionStrengthEditing.toggle()}
-                        .font(.caption).frame(minWidth:44,minHeight:44).accessibilityLabel("打码强度设置")
+                        .font(panelFont).frame(maxWidth:panelActionWidth,minHeight:44).accessibilityLabel("打码强度设置")
                 }
                 Button(model.project?.settings.redaction.enabled == true ? "关闭打码" : "开启打码") {
                     if model.project?.settings.redaction.enabled == true {model.clearRedactions()} else {model.enableAutomaticRedaction()}
-                }.font(.caption).frame(minWidth:64,minHeight:44)
-                Spacer(minLength:0)
-                toolCommit
-            }
-        }.padding(.horizontal,12).padding(.vertical,8)
+                }.font(panelFont).frame(maxWidth:panelActionWidth,minHeight:44)
+            }.buttonStyle(.plain)
+        }.padding(panelInset)
             .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24)))
     }
     private var compositionPanel: some View {
-        VStack(spacing: 6) {
+        VStack(spacing:max(6,panelSpacing)) {
             StudioGlassGroup(spacing:4) {
                 HStack(spacing: 4) {
                     ForEach(OutputAspectRatio.allCases) { aspect in
@@ -722,31 +678,15 @@ struct EditorView: View {
                 compositionControl("垂直居中", symbol: "align.vertical.center") { model.centerComposition(horizontal: false) }
             }.disabled(compositionControlsDisabled)
             HStack(spacing: 8) {
-                toolCancel
                 Spacer(minLength: 0)
                 Text(model.editorActivityText ?? model.compositionNotice ?? "拖动位置 · 双指缩放")
                     .font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
-                toolCommit
             }
-        }.padding(.horizontal, 12).padding(.vertical, 8)
+        }.padding(panelInset)
             .modifier(StudioGlassSurface(shape: RoundedRectangle(cornerRadius: 24)))
     }
     private var compositionControlsDisabled: Bool { timelineTrimming || model.compositionBusy || model.compositionAdjusting }
-    private var toolCancel: some View {
-        Button { finishTool(commit: false) } label: {
-            Text("取消").font(.subheadline).foregroundStyle(.white.opacity(0.65))
-                .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
-        }
-            .buttonStyle(.plain).accessibilityLabel("取消调整").accessibilityIdentifier("cancelTool").disabled(timelineTrimming)
-    }
-    private var toolCommit: some View {
-        Button { finishTool(commit: true) } label: {
-            Text("完成").font(.subheadline.weight(.semibold))
-                .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
-        }
-            .buttonStyle(.plain).accessibilityLabel("确定调整").accessibilityIdentifier("commitTool").disabled(compositionControlsDisabled || model.importingRedactionImage)
-    }
     private func compositionControl(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 5) {

@@ -31,7 +31,7 @@ struct CompositionVideoViewport: View {
                         }
                     }.stroke(.white.opacity(0.5),lineWidth:0.5).allowsHitTesting(false)
                 }
-                CompositionGestureSurface(enabled:!model.compositionBusy && !model.isPlaying,
+                CompositionGestureSurface(enabled:!model.redactionEditing && !model.compositionBusy && !model.isPlaying,
                     crop:{model.compositionCrop ?? .zero},begin:{model.beginCompositionGesture()},
                     change:{model.applyCompositionCrop($0)},end:{model.endCompositionGesture(cancelled:$0)},
                     value:"\(model.project?.settings.compositionScale ?? 1),\(model.project?.settings.compositionX ?? 0),\(model.project?.settings.compositionY ?? 0)")

@@ -50,6 +50,7 @@ actor ProjectStore {
         let target:NormalizedRect?
         let targetTime:Double
         let samples:[TargetSample]
+        var people:[Int:DetectionBatch]? = nil
     }
     // Bump when inference preprocessing, identity matching or occlusion policy changes.
     static let analysisVersion="yolo26s640-osnet025-tracktrack10hz-bridge12-v1"
@@ -67,21 +68,27 @@ actor ProjectStore {
         let value=hash.finalize().map {String(format:"%02x",$0)}.joined()
         digests[source] = .init(size:size,date:date,digest:value);return value
     }
-    func saveTrajectory(project:VideoProject,samples:[TargetSample]) throws {
+    func saveTrajectory(project:VideoProject,samples:[TargetSample],people:[Int:DetectionBatch]? = nil) throws {
         guard !project.isDemo,let source=sourceURL(for:project),try projects().contains(where:{$0.id==project.id}) else {return}
         try VideoExporter.validateTrajectory(samples,project:project)
-        let record=TrajectoryRecord(version:Self.analysisVersion,sourceDigest:try digest(source),sourceFileName:project.sourceFileName,metadata:project.metadata,target:project.target,targetTime:project.targetTime,samples:samples)
+        let record=TrajectoryRecord(version:Self.analysisVersion,sourceDigest:try digest(source),sourceFileName:project.sourceFileName,metadata:project.metadata,target:project.target,targetTime:project.targetTime,samples:samples,people:people)
         try JSONEncoder().encode(record).write(to:trajectoryURL(project.id),options:.atomic)
     }
-    func trajectory(for project:VideoProject) throws -> [TargetSample]? {
+    struct SavedAnalysis:Sendable {
+        let samples:[TargetSample]
+        let people:[Int:DetectionBatch]?
+    }
+    func analysis(for project:VideoProject) throws -> SavedAnalysis? {
         guard let source=sourceURL(for:project),let data=try? Data(contentsOf:trajectoryURL(project.id)),
               let record=try? JSONDecoder().decode(TrajectoryRecord.self,from:data),record.version==Self.analysisVersion,
               record.sourceFileName==project.sourceFileName,record.metadata==project.metadata,
               record.target==project.target,record.targetTime==project.targetTime,
               record.sourceDigest == (try digest(source)),
               (try? VideoExporter.validateTrajectory(record.samples,project:project)) != nil else {return nil}
-        return record.samples
+        return .init(samples:record.samples,people:record.people)
     }
+    func trajectory(for project:VideoProject) throws -> [TargetSample]? {try analysis(for:project)?.samples}
+    func people(for project:VideoProject) throws -> [Int:DetectionBatch]? {try analysis(for:project)?.people}
     struct StoredOutput:Sendable {let url:URL;let savedToPhotos:Bool}
     private struct OutputRecord:Codable {
         let sourceDigest:String

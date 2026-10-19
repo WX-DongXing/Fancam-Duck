@@ -16,6 +16,7 @@ final class AppModel {
     var thumbnails: [UIImage] = []
     var player: AVPlayer?
     var observations: [PersonObservation] = []
+    private var analyzedPeople:[Int:DetectionBatch]=[:]
     private var selectionObservation:PersonObservation?
     var processingPreview: CGImage?
     var trackedSample: TargetSample?
@@ -68,6 +69,9 @@ final class AppModel {
     var compositionBusy=false
     var compositionCrop:CGRect?
     var compositionNotice:String?
+    private var analysisOnly=false
+    private var generateAfterAnalysis=false
+    var generatingVideo=false
     var hasCompletedTracking=false
     private var compositionSnapshot:EditSettings?
     private var compositionUndo:[EditSettings]=[]
@@ -229,16 +233,19 @@ final class AppModel {
                 guard !Task.isCancelled, self?.project?.id == project.id else { return }
                 self?.thumbnails = images
             }
-            seek(to: currentTime)
             restoringTracking=true
+            seek(to: currentTime)
             let restoreID=UUID();restorationID=restoreID
             let previousSave=persistenceTask
             restorationTask=Task { [weak self,store=self.store] in
                 await previousSave?.value
-                let cached=try? await store.trajectory(for:project)
+                let analysis=try? await store.analysis(for:project)
+                let cached=analysis?.samples,people=analysis?.people
                 let output=try? await store.output(for:project)
                 guard let self,!Task.isCancelled,self.restorationID==restoreID,self.project?.id==project.id else {return}
-                self.restoringTracking=false
+                if let people,let source=store.sourceURL(for:project) {await self.pipeline.restorePeople(people,source:source)}
+                guard !Task.isCancelled,self.restorationID==restoreID,self.project?.id==project.id else {return}
+                self.restoringTracking=false;self.analyzedPeople=people ?? [:]
                 if let output {self.outputURL=output.url;self.outputSettings=project.settings;self.savedToPhotos=output.savedToPhotos;self.lastGeneratedRecipe=GenerationRecipe(project)}
                 if let cached {
                     self.targetSamples=cached;self.hasCompletedTracking=true
@@ -257,7 +264,7 @@ final class AppModel {
                 else if output == nil && (project.targetTime<project.settings.start || project.targetTime>project.settings.end) {
                     self.project?.target=nil;self.project?.settings.compositionAnchor=nil;self.targetExplicitlySelected=false
                 }
-                self.refreshRedactionPreview()
+                self.detectPeople();self.refreshRedactionPreview()
             }
         } else { player = nil }
     }
@@ -278,7 +285,7 @@ final class AppModel {
             project?.settings.redaction.subjects.removeAll {$0.id==id};project?.redactionPlan=nil
         }
         restorationID=UUID();restorationTask?.cancel();restoringTracking=false
-        hasCompletedTracking=false;targetSamples=[];outputSettings=nil;outputURL=nil;savedToPhotos=false
+        hasCompletedTracking=false;targetSamples=[];analyzedPeople=[:];outputSettings=nil;outputURL=nil;savedToPhotos=false
         selectionObservation=observations.filter {$0.body.iou(rect)>0.7}.max {$0.body.iou(rect)<$1.body.iou(rect)}
         if phase.issue == nil {project?.settings.compositionAnchor=nil}
         project?.redactionPlan=nil
@@ -288,19 +295,26 @@ final class AppModel {
         manualSelection = false
         refreshRedactionPreview();persist()
     }
+    func advanceWorkflow() {
+        analysisOnly = !hasCompletedTracking
+        generateAfterAnalysis = hasCompletedTracking
+        confirmProcessing()
+    }
     func confirmProcessing() {
         if redactionEditing {finishRedaction(commit:true)}
         if compositionEditing { finishComposition(commit:true,refreshDetections:false) }
         guard canConfirm, let project else { return }
         pausePreview(refresh:false)
         if hasReusableOutput,let outputURL {
-            previewPlayer=AVPlayer(url:outputURL);phase = .completed(outputURL);route = .export;return
+            previewPlayer=AVPlayer(url:outputURL);phase = .completed(outputURL);route = generateAfterAnalysis ? .editor : .export;return
         }
-        outputURL=nil;outputSettings=nil;savedToPhotos=false
+        // Preserve the previous file until a replacement has successfully completed.
         manualSelection = false
         selectedTool = nil
         let previousPhase = phase
-        let regenerate=needsRegeneration
+        let regenerate=needsRegeneration || generateAfterAnalysis
+        let stopAfterAnalysis=analysisOnly
+        generatingVideo=regenerate
         let checkpoint: Double
         if case .blocked(let issue) = phase { checkpoint = issue.checkpoint }
         else if case .paused(let progress) = phase { checkpoint = progress }
@@ -339,11 +353,19 @@ final class AppModel {
                 if cached == nil {
                     await self.persistenceTask?.value
                     guard !Task.isCancelled,self.isCurrent(id,projectID:project.id) else {return}
-                    do {try await self.store.saveTrajectory(project:project,samples:result.samples)}
+                    do {let people=await pipeline.cachedPeople(source:url);try await self.store.saveTrajectory(project:project,samples:result.samples,people:people)}
                     catch {if !Task.isCancelled,self.isCurrent(id,projectID:project.id) {self.errorMessage="分析完成，但结果缓存未能保存：\(error.localizedDescription)"}}
                     guard !Task.isCancelled,self.isCurrent(id,projectID:project.id) else {return}
                 }
+                self.analyzedPeople=await pipeline.cachedPeople(source:url)
+                guard !Task.isCancelled,self.isCurrent(id,projectID:project.id) else {return}
                 self.hasCompletedTracking=true
+                if stopAfterAnalysis {
+                    self.analysisOnly=false;self.generatingVideo=false
+                    self.processingPreview=nil;self.phase = .editing;self.route = .editor
+                    self.currentTime=project.settings.start;self.seek(to:project.settings.start);self.persist()
+                    return
+                }
                 var renderProject=project
                 let conflicts=RedactionPolicy.conflicts(project:project,samples:result.samples)
                 if !conflicts.isEmpty {
@@ -351,7 +373,7 @@ final class AppModel {
                     renderProject.redactionPlan=nil
                     self.project?.settings.redaction=renderProject.settings.redaction;self.project?.redactionPlan=nil
                 }
-                if renderProject.settings.redaction.enabled {
+                if renderProject.settings.redaction.enabled && renderProject.redactionPlan?.covers(renderProject) != true {
                     let masks=try await pipeline.redactions(source:url,project:renderProject,samples:result.samples) { [weak self] progress in
                         await self?.receiveRedactionProgress(progress,id:id,projectID:project.id,regenerating:regenerate)
                     }
@@ -381,7 +403,7 @@ final class AppModel {
                     self.outputURL=output;self.outputSettings=renderProject.settings;self.savedToPhotos=false
                     self.lastGeneratedRecipe=GenerationRecipe(renderProject)
                     self.exportPoster=nil;self.previewPlayer=AVPlayer(url:output)
-                    self.phase = .completed(output);self.route = .export;self.persist();return
+                    self.generatingVideo=false;self.phase = .completed(output);self.route = self.generateAfterAnalysis ? .editor : .export;self.persist();return
                 }
                 let item=try await exporter.preview(source:url,project:renderProject,samples:result.samples)
                 let poster=await self.poster(for:item)
@@ -391,7 +413,11 @@ final class AppModel {
                 self.phase = .readyToExport;self.route = .export
             } catch {
                 guard !Task.isCancelled,self.isCurrent(id,projectID:project.id) else { return }
-                self.phase=previousPhase;self.errorMessage=error.localizedDescription
+                self.generatingVideo=false
+                if stopAfterAnalysis,case TrackingError.noTarget = error {
+                    self.phase = .blocked(.init(time:self.currentTime,message:"未识别到主角，请点击人物或手动框选",checkpoint:checkpoint))
+                    self.targetExplicitlySelected=false;self.seek(to:self.currentTime)
+                } else {self.phase=previousPhase;self.errorMessage=error.localizedDescription}
             }
         }
     }
@@ -410,7 +436,7 @@ final class AppModel {
                 guard let self,self.operationID==id,self.project?.id==projectID,case .processing = self.phase,let project=self.project else { return }
                 progress = min(1, progress + 0.018)
                 self.currentTime = project.settings.start + (project.settings.end - project.settings.start) * progress
-                if checkpoint < 0.56, progress >= 0.56 {
+                if !self.hasCompletedTracking,checkpoint < 0.56, progress >= 0.56 {
                     self.currentTime = min(22.4, project.settings.end)
                     self.phase = .blocked(TrackingIssue(time: self.currentTime, message: "交叉后人物匹配不确定", checkpoint: progress))
                     self.targetExplicitlySelected = false
@@ -418,12 +444,19 @@ final class AppModel {
                 }
                 self.phase = .processing(progress: progress)
                 if progress >= 1 {
-                    self.phase = .readyToExport
-                    self.route = .export
+                    if self.analysisOnly {
+                        self.targetSamples=[.init(time:project.settings.start,body:project.target!),.init(time:project.settings.end,body:project.target!)]
+                        self.hasCompletedTracking=true;self.analysisOnly=false;self.phase = .editing
+                    } else if self.generateAfterAnalysis {self.generatingVideo=false;self.phase = .completed(nil)}
+                    else {self.phase = .readyToExport;self.route = .export}
                     return
                 }
             }
         }
+    }
+    func cancelGeneration() {
+        guard generatingVideo else {return}
+        backToEditor();generatingVideo=false;persist()
     }
     func pause() {
         guard case .processing(let progress) = phase else { return }
@@ -444,7 +477,7 @@ final class AppModel {
     }
     func togglePreview() {
         guard phase == .editing else {return}
-        if let project,project.settings.redaction.enabled,project.redactionPlan?.covers(project) != true {
+        if let project,hasCompletedTracking,project.settings.redaction.enabled,project.redactionPlan?.covers(project) != true {
             detectionNotice="确认处理后可播放完整打码效果";return
         }
         if compositionEditing { toggleCompositionPlayback();return }
@@ -588,7 +621,7 @@ final class AppModel {
         await task.value
     }
     func goHome() {
-        if compositionEditing {finishComposition(commit:!compositionBusy && !compositionAdjusting,refreshDetections:false)}
+        if compositionEditing {finishComposition(commit:true,refreshDetections:false)}
         persist()
         cancelTasks()
         route = .home
@@ -691,10 +724,16 @@ final class AppModel {
         } else if processingPreview == nil {
             trackedSample=update.sample;currentTime=update.sample.time
         }
-        phase = .processing(progress: update.progress * (regenerating ? 0.6 : project?.settings.redaction.enabled == true ? 0.85 : 1))
+        phase = .processing(progress: update.progress * (regenerating ? 0.6 : analysisOnly ? 1 : project?.settings.redaction.enabled == true ? 0.85 : 1))
     }
     func detectPeople(region: NormalizedRect? = nil) {
-        guard controlsEnabled,let project,let source=store.sourceURL(for:project) else { return }
+        guard controlsEnabled,!restoringTracking,let project,let source=store.sourceURL(for:project) else { return }
+        if hasCompletedTracking,!analyzedPeople.isEmpty,region == nil {
+            detectionID=UUID();detectionTask?.cancel();detecting=false;detectionNotice=nil
+            let key=Int((currentTime*10000).rounded())
+            if let nearest=analyzedPeople.keys.min(by:{abs($0-key)<abs($1-key)}) {observations=analyzedPeople[nearest]?.primary ?? []}
+            refreshRedactionPreview();return
+        }
         let id=UUID();detectionID=id
         detectionTask?.cancel();observations=[];detecting=true;detectionNotice=nil
         let time = currentTime
@@ -731,14 +770,15 @@ final class AppModel {
     func suspend() { pause();pausePreview(refresh:false);previewPlayer?.pause();persist() }
     private func cancelTasks(preserveAnalysis:Bool=false) {
         if redactionEditing { finishRedaction(commit:true) }
+        generatingVideo=false;analysisOnly=false;generateAfterAnalysis=false
         redactionIssue=nil;redactionPreviewID=UUID();redactionPreviewTask?.cancel();redactionImageID=UUID();importingRedactionImage=false
-        if compositionEditing { finishComposition(commit:!compositionBusy && !compositionAdjusting,refreshDetections:false) }
+        if compositionEditing { finishComposition(commit:true,refreshDetections:false) }
         restorationID=UUID();restorationTask?.cancel();restoringTracking=false;savingToPhotos=false;detectionNotice=nil;cancellingExport=false;exportProgress=0
         compositionTask?.cancel();compositionID=UUID();compositionBusy=false;compositionFrames=[];compositionAutomaticFrames=[]
         pausePreview(refresh:false);operationID=UUID();detectionID=UUID();importID=UUID();importing=false
         detectionTask?.cancel();detecting=false;observations=[]
         processingPreview=nil;trackedSample=nil
-        if !preserveAnalysis {targetSamples=[];hasCompletedTracking=false;selectionObservation=nil}
+        if !preserveAnalysis {targetSamples=[];hasCompletedTracking=false;selectionObservation=nil;analyzedPeople=[:]}
         previewPlayer?.pause();previewPlayer=nil;exportPoster=nil
         thumbnailTask?.cancel();player?.pause()
         let previous=processingTask,projectID=project?.id,pipeline=self.pipeline
@@ -771,13 +811,13 @@ extension AppModel {
         detectionID=UUID();detectionTask?.cancel();detecting=false
         pausePreview(refresh:false);selectedTool=nil;manualSelection=false
         compositionSnapshot=project?.settings;compositionUndo=[];compositionEditing=true;compositionNotice=nil
-        compositionCrop=nil;compositionAutomatic=nil;compositionFrames=[];compositionAutomaticFrames=[];compositionAutomaticSettings=nil
+        compositionCrop=hasCompletedTracking ? CropPlan.rect(at:currentTime,in:compositionFrames) : nil;compositionAutomatic=nil;compositionFrames=[];compositionAutomaticFrames=[];compositionAutomaticSettings=nil
         if !hasCompletedTracking { currentTime=project?.settings.compositionAnchor?.time ?? project?.targetTime ?? currentTime }
         player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
         refreshComposition()
     }
     func finishComposition(commit:Bool,refreshDetections:Bool=true) {
-        guard compositionEditing,!commit || (!compositionBusy && !compositionAdjusting) else { return }
+        guard compositionEditing else { return }
         pausePreview(refresh:false)
         if commit,!hasCompletedTracking,project?.settings.compositionAnchor == nil,let crop=compositionCrop {saveCompositionAnchor(crop)}
         if !commit,let snapshot=compositionSnapshot {project?.settings=snapshot}
@@ -859,7 +899,7 @@ extension AppModel {
             if cancelled {project?.settings=before}
             else if before != project?.settings {compositionUndo.append(before);if compositionUndo.count>20 {compositionUndo.removeFirst()}}
         }
-        compositionGestureSettings=nil;compositionAdjusting=false;refreshComposition()
+        compositionGestureSettings=nil;compositionAdjusting=false;refreshComposition();persist()
     }
     func compositionZoom(_ factor:Double) {
         guard !compositionBusy,let crop=compositionCrop else {return}
@@ -885,7 +925,7 @@ extension AppModel {
             compositionCrop=reframed
             saveCompositionAnchor(reframed)
         }
-        refreshComposition()
+        refreshComposition();persist()
     }
     func centerComposition(horizontal:Bool) {
         guard compositionEditing,!compositionBusy,!compositionAdjusting,
@@ -957,17 +997,15 @@ extension AppModel {
         guard settingsEnabled,let project,project.target != nil else {return}
         pausePreview(refresh:false)
         if !hasCompletedTracking,abs(currentTime-project.targetTime)>0.05 {seek(to:project.targetTime)}
+        if hasCompletedTracking {beginComposition()}
         redactionEditing=true;redactionSnapshot=project.settings.redaction;redactionPlanSnapshot=project.redactionPlan
-        if !project.settings.redaction.allOthers {
-            self.project?.settings.redaction.allOthers=true
-            self.project?.settings.redaction.subjects=[];self.project?.redactionPlan=nil
-        }
         refreshRedactionPreview()
     }
     func finishRedaction(commit:Bool) {
         if !commit,let snapshot=redactionSnapshot {project?.settings.redaction=snapshot;project?.redactionPlan=redactionPlanSnapshot}
         redactionImageID=UUID();importingRedactionImage=false
         redactionEditing=false;redactionSnapshot=nil;redactionPlanSnapshot=nil
+        if compositionEditing {finishComposition(commit:true,refreshDetections:false)}
         refreshRedactionPreview();persist()
     }
     private func redactionSubject(at box:NormalizedRect) -> UUID? {
@@ -1032,7 +1070,7 @@ extension AppModel {
     func refreshRedactionPreview() {
         redactionPreviewTask?.cancel();let id=UUID();redactionPreviewID=id
         guard let project,!isDemo,!restoringTracking,let item=player?.currentItem else {return}
-        guard project.settings.redaction.enabled else {
+        guard project.settings.redaction.enabled,(hasCompletedTracking || redactionEditing) else {
             item.videoComposition=nil
             if !isPlaying {player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)}
             return
@@ -1083,7 +1121,11 @@ extension AppModel {
 
 extension AppModel {
     func setRedactionStyle(_ style:RedactionSettings.Style) {
-        guard settingsEnabled,style != .image || project?.settings.redaction.imageData != nil else {return}
+        guard settingsEnabled else {return}
+        if style == .image {
+            guard let data=UIImage(named:"BrandLogo")?.pngData() else {errorMessage="内置 Logo 无法读取";return}
+            project?.settings.redaction.imageData=data
+        }
         project?.settings.redaction.style=style
         refreshRedactionPreview();persist()
     }

@@ -5,7 +5,7 @@ import ImageIO
 import AVFoundation
 import Accelerate
 
-struct DetectionBatch {
+struct DetectionBatch:Codable,Sendable {
     var primary: [PersonObservation]
     var relaxed: [PersonObservation]
 }

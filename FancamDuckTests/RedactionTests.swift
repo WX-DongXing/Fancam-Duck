@@ -171,6 +171,36 @@ final class RedactionTests: XCTestCase {
             XCTAssertLessThan(Self.meanDifference(expected,actual),8)
         }
     }
+    @MainActor func testRealVideoMaskCompositorPreservesUnmaskedBrightness() async throws {
+        let source=try TestVideoFixture.people(),asset=AVURLAsset(url:source)
+        let metadata=try await MediaService.shared.metadata(url:source)
+        let tracks=try await asset.loadTracks(withMediaType:.video)
+        let track=try XCTUnwrap(tracks.first)
+        let transform=try await track.load(.preferredTransform)
+        let range=CMTimeRange(start:.zero,duration:try await asset.load(.duration))
+        let size=metadata.size
+        let plan=RedactionPlan(subjects:[],region:.face,start:0,end:metadata.duration,tracks:[])
+        let generator=AVAssetImageGenerator(asset:asset)
+        generator.appliesPreferredTrackTransform=true
+        generator.requestedTimeToleranceBefore = .zero;generator.requestedTimeToleranceAfter = .zero
+        let time=CMTime(seconds:1,preferredTimescale:600)
+        let original=try await generator.image(at:time).image
+        generator.videoComposition=RedactionRenderer.composition(trackID:track.trackID,range:range,transform:transform,source:size,output:size,start:0,crops:[],plan:plan,strength:0.65,rate:metadata.frameRate)
+        let shaded=try await generator.image(at:time).image
+        let difference=Self.meanDifference(original,shaded)
+        print("UNMASKED_BRIGHTNESS_DIFFERENCE=\(difference)")
+        XCTAssertLessThan(difference,3,"Enabling masking must not shade untouched pixels")
+        let mask=NormalizedRect(x:0.7,y:0.1,width:0.2,height:0.7)
+        let maskedPlan=RedactionPlan(subjects:[],region:.face,start:0,end:metadata.duration,tracks:[.init(subjectID:UUID(),frames:[.init(time:0,rect:mask),.init(time:metadata.duration,rect:mask)])])
+        let untouched=CGRect(x:0,y:0,width:floor(size.width*0.4),height:size.height)
+        for style in RedactionSettings.Style.allCases {
+            generator.videoComposition=RedactionRenderer.composition(trackID:track.trackID,range:range,transform:transform,source:size,output:size,start:0,crops:[],plan:maskedPlan,strength:0.65,rate:metadata.frameRate,style:style,imageData:UIImage(named:"BrandLogo")?.pngData())
+            let result=try await generator.image(at:time).image
+            let unmaskedDifference=Self.meanDifference(try XCTUnwrap(original.cropping(to:untouched)),try XCTUnwrap(result.cropping(to:untouched)))
+            print("UNMASKED_\(style)_DIFFERENCE=\(unmaskedDifference)")
+            XCTAssertLessThan(unmaskedDifference,3)
+        }
+    }
     func testCompositionViewportAndExportMatchWhenMaskCrossesCropEdge() throws {
         let bounds=CGRect(x:0,y:0,width:256,height:256),context=CIContext()
         let source=try XCTUnwrap(CIFilter(name:"CICheckerboardGenerator",parameters:["inputWidth":8])?.outputImage).cropped(to:bounds)

@@ -7,7 +7,7 @@ struct TrimTimeline:View {
     @State private var referenceTime = 0.0
     @GestureState private var draggingHandle = false
     private var canTrim: Bool {
-        model.settingsEnabled && !model.manualSelection && !model.compositionBusy && !model.compositionAdjusting
+        model.settingsEnabled && !model.hasCompletedTracking && !model.manualSelection && !model.compositionBusy && !model.compositionAdjusting
     }
     var body:some View {
         if let project=model.project {

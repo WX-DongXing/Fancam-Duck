@@ -7,7 +7,7 @@ struct PosePoint: Codable, Equatable, Sendable {
     let y: Double
     let confidence: Float
 }
-struct PersonObservation: Sendable, Equatable, Identifiable {
+struct PersonObservation: Codable, Sendable, Equatable, Identifiable {
     let id: Int
     let body: NormalizedRect
     let confidence: Float
@@ -50,6 +50,8 @@ protocol TargetTracking: Sendable {
     func detections(source: URL, time: Double, region: NormalizedRect?) async throws -> [PersonObservation]
     func analyze(source: URL, project: VideoProject, onUpdate: @escaping @Sendable (TrackingUpdate) async -> Void) async throws -> TrackingResult
     func discard(projectID: UUID) async
+    func cachedPeople(source:URL) async -> [Int:DetectionBatch]
+    func restorePeople(_ batches:[Int:DetectionBatch],source:URL) async
     func redactions(source:URL,project:VideoProject,samples:[TargetSample],onProgress:@escaping @Sendable (Double) async -> Void) async throws -> RedactionAnalysisResult
     func redactions(source: URL, project: VideoProject, onProgress: @escaping @Sendable (Double) async -> Void) async throws -> RedactionAnalysisResult
 }
@@ -59,6 +61,8 @@ extension TargetTracking {
         try await redactions(source:source,project:project,onProgress:onProgress)
     }
     func discard(projectID: UUID) async {}
+    func cachedPeople(source:URL) async -> [Int:DetectionBatch] {[:]}
+    func restorePeople(_ batches:[Int:DetectionBatch],source:URL) async {}
     func redactions(source: URL, project: VideoProject, onProgress: @escaping @Sendable (Double) async -> Void) async throws -> RedactionAnalysisResult {
         guard !project.settings.redaction.enabled else { throw RedactionError.incomplete }
         return .init(plan:nil,issue:nil)

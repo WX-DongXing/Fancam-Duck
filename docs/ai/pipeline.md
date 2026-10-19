@@ -20,7 +20,7 @@
 
 ## 打码与合成
 
-`AutomaticRedaction`、`RedactionTracker`、`RedactionPlan` 建立非主角遮挡轨迹，`RedactionCompositor` 渲染毛玻璃、马赛克或图片。沿用现有姿态／ReID 能力，不增加 Apple Vision 检测链。
+主角分析始终记录所选片段的人群检测批次，随轨迹保存；重开后恢复到管线，设置期寻帧也使用缓存观测。`AutomaticRedaction`、`RedactionTracker`、`RedactionPlan` 复用这些批次建立非主角遮挡轨迹，`RedactionCompositor` 渲染毛玻璃、马赛克或图片。沿用现有姿态／ReID 能力，不增加 Apple Vision 检测链。
 
 进入导出前校验主角冲突、计划覆盖和图片有效性。图片不生成额外阴影。整人区域仍是矩形包络，细致交叠避让需要进一步能力，不能通过放大所有矩形来掩盖缺陷。
 

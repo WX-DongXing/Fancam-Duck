@@ -74,9 +74,8 @@ struct DesktopButtonStyle:ButtonStyle {
     func makeBody(configuration:Configuration) -> some View {
         configuration.label.font(.system(size:13,weight:.medium))
             .padding(.horizontal,14).frame(minHeight:34)
-            .foregroundStyle(prominent ? Color.acOnAccent : .white)
-            .background(prominent ? Color.acAccent : DesktopPalette.raised,in:RoundedRectangle(cornerRadius:8))
-            .overlay {RoundedRectangle(cornerRadius:8).stroke(DesktopPalette.border,lineWidth:1)}
+            .foregroundStyle(.white)
+            .modifier(StudioGlassSurface(shape:Capsule(),selected:prominent))
             .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }

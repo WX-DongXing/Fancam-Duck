@@ -49,6 +49,10 @@ actor CoreMLTrackingPipeline: TargetTracking {
         let loaded = try CoreMLPeopleModels(reuseBuffers:reuseBuffers); models = loaded; return loaded
     }
     func discard(projectID: UUID) { sessions[projectID] = nil }
+    func cachedPeople(source:URL) -> [Int:DetectionBatch] {redactionSource == source ? redactionBatches : [:]}
+    func restorePeople(_ batches:[Int:DetectionBatch],source:URL) {
+        redactionSource=source;redactionBatches=batches
+    }
     func performanceMetrics() -> CoreMLPeopleModels.Metrics? { models?.metrics }
     func detections(source: URL, time: Double, region: NormalizedRect?) async throws -> [PersonObservation] {
         let engine = try engine()
@@ -99,7 +103,7 @@ actor CoreMLTrackingPipeline: TargetTracking {
                     batch.primary.removeAll { $0.body.iou(stable.body) > 0.7 }
                     batch.primary.append(stable)
                 }
-                remember(batch,time:leg.start,source:source,enabled:project.settings.redaction.enabled)
+                remember(batch,time:leg.start,source:source,enabled:true)
                 guard let chosen = batch.primary.max(by: { $0.body.iou(leg.box) < $1.body.iou(leg.box) }), chosen.body.iou(leg.box) > 0.15 else { throw TrackingError.noTarget }
                 state.tracker = TrackTrackTracker()
                 state.targetID = state.tracker.seed(batch.primary, selectedID: chosen.id, time: leg.start)!
@@ -125,7 +129,7 @@ actor CoreMLTrackingPipeline: TargetTracking {
                     try Task.checkCancellation()
                     let image=try await reader.imageCancellable(at:time)
                     let batch=try autoreleasepool {try engine.detect(image,features:true,relaxedFeatureThreshold:state.tracker.highConfidence)}
-                    remember(batch,time:time,source:source,enabled:project.settings.redaction.enabled)
+                    remember(batch,time:time,source:source,enabled:true)
                     let preview=try compressedPreview(image,engine:engine)
                     reverse[Int((time*10000).rounded())]=(batch,preview)
                     await onUpdate(.init(sample:reference,progress:min(0.999,state.completed/max(0.1,end-start)),message:"正在准备反向分析 · \(index+1)/\(times.count)"))
@@ -144,7 +148,7 @@ actor CoreMLTrackingPipeline: TargetTracking {
                     batch=cached.0;image=preview
                 }
                 try Task.checkCancellation()
-                remember(batch,time:time,source:source,enabled:project.settings.redaction.enabled)
+                remember(batch,time:time,source:source,enabled:true)
                 var proposed = state.tracker
                 let matches = proposed.update(batch, time: time)
                 let matchedCandidate = matches[state.targetID]
