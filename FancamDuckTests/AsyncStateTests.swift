@@ -15,13 +15,18 @@ private actor ReviewGate {
 private actor ReviewTracker:TargetTracking {
     let detectionGate:ReviewGate?
     let analysisGate:ReviewGate?
+    let deferredFailure:Bool
     private(set) var analyses=0
     private(set) var active=0
     private(set) var peak=0
     private(set) var discards=0
     private(set) var detectionsFinished=0
-    init(detectionGate:ReviewGate?=nil,analysisGate:ReviewGate?=nil) { self.detectionGate=detectionGate;self.analysisGate=analysisGate }
+    private(set) var detectionsStarted=0
+    init(detectionGate:ReviewGate?=nil,analysisGate:ReviewGate?=nil,deferredFailure:Bool=false) {
+        self.detectionGate=detectionGate;self.analysisGate=analysisGate;self.deferredFailure=deferredFailure
+    }
     func detections(source:URL,time:Double,region:NormalizedRect?) async throws -> [PersonObservation] {
+        detectionsStarted+=1
         if let detectionGate { await detectionGate.wait() }
         detectionsFinished+=1
         return [.init(id:1,body:.init(x:0.3,y:0.2,width:0.2,height:0.6),confidence:0.9,embedding:[1,0])]
@@ -37,6 +42,9 @@ private actor ReviewTracker:TargetTracking {
         // Intentionally ignore cancellation, as a delayed framework callback can do.
         await onUpdate(.init(sample:samples.last!,progress:1))
         active-=1
+        if deferredFailure,analyses == 1 {
+            return .init(samples:samples.filter {$0.time<0.2},issue:.init(time:0.2,message:"回补失败",checkpoint:0.999,requiresManualSelection:true))
+        }
         return .init(samples:samples,issue:nil)
     }
     func discard(projectID:UUID) { discards+=1 }
@@ -137,6 +145,54 @@ private actor ReviewExporter:VideoExporting {
         try await waitUntil {await delayed.detectionsFinished>0}
         XCTAssertTrue(model.observations.isEmpty,"Late detection must not reopen cancelled settings")
         model.goHome()
+    }
+    func testUnresolvedDeferredFrameOpensManualSelectionBeforeAnalysisCanComplete() async throws {
+        try await store.prepare()
+        let source=directory.appendingPathComponent("source.mp4");try Data([0,1,2]).write(to:source)
+        var p=VideoProject(title:"Deferred correction",sourceFileName:source.lastPathComponent,
+            metadata:.init(width:1280,height:720,duration:1,frameRate:30),settings:.init())
+        p.settings.end=0.7
+        let tracker=ReviewTracker(deferredFailure:true),model=AppModel(store:store,pipeline:tracker)
+        defer {model.goHome()}
+        model.open(p);try await waitUntil {!model.detecting && !model.restoringTracking}
+        model.selectTarget(.init(x:0.3,y:0.2,width:0.2,height:0.6));model.advanceWorkflow()
+        try await waitUntil {model.manualSelection}
+        XCTAssertEqual(model.currentTime,0.2,accuracy:0.001)
+        XCTAssertFalse(model.hasCompletedTracking);XCTAssertFalse(model.canConfirm)
+        XCTAssertNil(model.outputURL)
+        let corrected=NormalizedRect(x:0.25,y:0.15,width:0.25,height:0.7)
+        model.finishManualBox(corrected)
+        XCTAssertFalse(model.manualSelection);XCTAssertTrue(model.canConfirm)
+        model.confirmProcessing();try await waitUntil {model.hasCompletedTracking}
+        XCTAssertEqual(model.phase,.editing);XCTAssertEqual(model.project?.target,corrected)
+    }
+    func testManualBoxDirectlySetsTargetWithoutDetectionAndIgnoresLateCandidates() async throws {
+        try await store.prepare()
+        let source=directory.appendingPathComponent("source.mp4")
+        try Data([0,1,2]).write(to:source)
+        var p=VideoProject(title:"Manual anchor",sourceFileName:source.lastPathComponent,
+            metadata:.init(width:1280,height:720,duration:1,frameRate:30),settings:.init())
+        p.settings.end=0.7
+        let gate=ReviewGate(),tracker=ReviewTracker(detectionGate:gate)
+        let model=AppModel(store:store,pipeline:tracker)
+        defer {model.goHome()}
+        model.open(p);try await waitUntil {await gate.waiting>0}
+        model.beginManualSelection()
+        let manual=NormalizedRect(x:0.1,y:0.12,width:0.3,height:0.7)
+        model.finishManualBox(manual)
+        XCTAssertEqual(model.project?.target,manual)
+        XCTAssertFalse(model.manualSelection);XCTAssertFalse(model.detecting)
+        XCTAssertTrue(model.canConfirm)
+        await gate.release();try await waitUntil {await tracker.detectionsFinished == 1}
+        try await Task.sleep(for:.milliseconds(30))
+        let detectionCount=await tracker.detectionsStarted
+        XCTAssertEqual(detectionCount,1,"Manual confirmation must not request a second detection")
+        XCTAssertTrue(model.observations.isEmpty)
+        XCTAssertEqual(model.project?.target,manual,"Late candidates must not replace the manual box")
+        model.advanceWorkflow();try await waitUntil {model.hasCompletedTracking}
+        XCTAssertEqual(model.phase,.editing)
+        XCTAssertEqual(model.project?.target,manual)
+        let analyses=await tracker.analyses;XCTAssertEqual(analyses,1)
     }
     func testManualSelectionSurvivesLateDetection() async throws {
         let gate=ReviewGate()

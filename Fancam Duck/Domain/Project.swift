@@ -154,6 +154,7 @@ struct TrackingIssue: Equatable, Sendable {
     let time: Double
     let message: String
     let checkpoint: Double
+    var requiresManualSelection=false
 }
 
 enum ProcessingPhase: Equatable {

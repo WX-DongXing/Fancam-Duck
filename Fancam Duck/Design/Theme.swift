@@ -9,6 +9,22 @@ extension Color {
     static let acTool = Color(white: 0.16)
 }
 
+/// Size and hit shape belong to the label so blank space invokes the Button action too.
+struct StudioTextButton: View {
+    let title: String
+    var minWidth: CGFloat? = nil
+    var fillsWidth = true
+    var height: CGFloat = 44
+    let action: () -> Void
+    var body: some View {
+        Button(action:action) {
+            Text(title).lineLimit(1).minimumScaleFactor(0.75)
+                .frame(minWidth:minWidth,maxWidth:fillsWidth ? .infinity : nil,minHeight:height)
+                .contentShape(Rectangle())
+        }.buttonStyle(.plain)
+    }
+}
+
 struct PrimaryAction: View {
     let title: String
     var symbol = "arrow.right"
@@ -19,7 +35,7 @@ struct PrimaryAction: View {
             HStack(spacing: 10) {
                 Text(title).font(.system(.body, weight: .semibold))
                 Image(systemName: symbol).font(.system(size: 15, weight: .semibold))
-            }.frame(maxWidth: .infinity).frame(minHeight: 56)
+            }.frame(maxWidth: .infinity).frame(minHeight: 56).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .background(disabled ? Color.primary.opacity(0.08) : Color.acAccent, in: RoundedRectangle(cornerRadius: 18))
@@ -43,7 +59,7 @@ struct CameraButton: View {
                 if !title.isEmpty { Text(title).lineLimit(1) }
             }
             .font(.system(size: 13, weight: .semibold))
-            .padding(.horizontal, 14).frame(minWidth: 44, minHeight: 48)
+            .padding(.horizontal, 14).frame(minWidth: 44, minHeight: 48).contentShape(Rectangle())
             .background(selected ? Color.acAccent : Color.acTool, in: RoundedRectangle(cornerRadius: 14))
         }
         .foregroundStyle(selected ? Color.acOnAccent : .white)
@@ -123,9 +139,9 @@ struct StudioIcon: View {
             Image(systemName: symbol).symbolRenderingMode(.monochrome)
                 .font(.system(size: 17, weight: .regular)).frame(width: 44, height: 44)
                 // Include the empty space around the glyph in the button's hit area.
-                .contentShape(Circle())
+                .contentShape(Rectangle())
         }.buttonStyle(.plain).foregroundStyle(.white).frame(width: 44, height: 44)
-            .contentShape(Circle()).modifier(StudioGlassSurface(shape: Circle(), selected: selected))
+            .contentShape(Rectangle()).modifier(StudioGlassSurface(shape: Circle(), selected: selected))
             .accessibilityLabel(label)
     }
 }
@@ -140,7 +156,7 @@ struct StudioAction: View {
             HStack(spacing: 12) {
                 Text(title).font(.body.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.75)
                 if !symbol.isEmpty { Image(systemName: symbol).font(.system(size: 16, weight: .medium)) }
-            }.padding(.horizontal, 28).frame(minWidth: 190, minHeight: 50)
+            }.padding(.horizontal, 28).frame(minWidth: 190, minHeight: 50).contentShape(Capsule())
         }.buttonStyle(.plain).foregroundStyle(.white).frame(minWidth: 190, minHeight: 50)
             .contentShape(Capsule()).modifier(StudioGlassSurface(shape: Capsule(), selected: !disabled))
             .accessibilityLabel(title)

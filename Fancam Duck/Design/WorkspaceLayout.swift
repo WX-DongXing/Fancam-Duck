@@ -73,7 +73,7 @@ struct DesktopButtonStyle:ButtonStyle {
     var prominent=false
     func makeBody(configuration:Configuration) -> some View {
         configuration.label.font(.system(size:13,weight:.medium))
-            .padding(.horizontal,14).frame(minHeight:34)
+            .padding(.horizontal,14).frame(minHeight:34).contentShape(Capsule())
             .foregroundStyle(.white)
             .modifier(StudioGlassSurface(shape:Capsule(),selected:prominent))
             .opacity(configuration.isPressed ? 0.7 : 1)

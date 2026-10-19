@@ -135,6 +135,31 @@ private actor WorkflowExporter:VideoExporting {
         model.updateRange(end:1)
         XCTAssertTrue(model.hasCompletedTracking,"Returning inside cached analysis reuses it")
     }
+    func testReselectDuringAnalysisClearsTargetAndRejectsOldDemoUpdates() async throws {
+        let model=AppModel();model.startDemo();defer {model.goHome()}
+        model.selectTarget(DemoStage.body(index:1,time:0));model.advanceWorkflow()
+        XCTAssertNotEqual(model.phase,.editing)
+        model.reselectAnalysisTarget()
+        XCTAssertEqual(model.phase,.editing);XCTAssertEqual(model.route,.editor)
+        XCTAssertNil(model.project?.target);XCTAssertNil(model.trackedSample)
+        XCTAssertFalse(model.hasCompletedTracking);XCTAssertTrue(model.targetSamples.isEmpty)
+        XCTAssertFalse(model.canConfirm)
+        try await Task.sleep(for:.milliseconds(250))
+        XCTAssertEqual(model.phase,.editing);XCTAssertNil(model.project?.target)
+        XCTAssertEqual(model.currentTime,model.project!.settings.start)
+        model.selectTarget(DemoStage.body(index:2,time:0))
+        XCTAssertTrue(model.canConfirm)
+    }
+    func testRejectedSmallManualBoxKeepsDrawingStateAndRequiresValidConfirmation() {
+        let model=AppModel();model.startDemo();defer {model.goHome()}
+        model.beginManualSelection()
+        XCTAssertFalse(model.finishManualBox(.init(x:0.2,y:0.2,width:0.01,height:0.02)))
+        XCTAssertTrue(model.manualSelection);XCTAssertNil(model.project?.target)
+        XCTAssertFalse(model.canConfirm)
+        XCTAssertNotNil(model.detectionNotice)
+        XCTAssertTrue(model.finishManualBox(.init(x:0.2,y:0.2,width:0.2,height:0.6)))
+        XCTAssertFalse(model.manualSelection);XCTAssertTrue(model.canConfirm)
+    }
     private func wait(line:UInt = #line,_ condition:()->Bool) async throws {
         for _ in 0..<1000 {if condition(){return};try await Task.sleep(for:.milliseconds(10))}
         XCTFail("Workflow did not reach expected state",line:line);throw CancellationError()

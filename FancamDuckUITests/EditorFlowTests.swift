@@ -12,6 +12,43 @@ final class EditorFlowTests: XCTestCase {
     @MainActor private func ready(_ button: XCUIElement) {
         expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: button); waitForExpectations(timeout: 12)
     }
+    @MainActor func testReselectAnalysisRequiresNewPersonSelection() throws {
+        let app=launch();app.buttons["dancer1"].tap();app.buttons["primaryAction"].tap()
+        let reselect=app.buttons["重新选择"]
+        XCTAssertTrue(reselect.waitForExistence(timeout:3))
+        reselect.coordinate(withNormalizedOffset:CGVector(dx:0.08,dy:0.5)).tap()
+        XCTAssertTrue(app.buttons["dancer2"].waitForExistence(timeout:5))
+        XCTAssertFalse(app.buttons["primaryAction"].isEnabled)
+        XCTAssertFalse(app.descendants(matching:.any).matching(identifier:"selectedTargetFrame").firstMatch.exists)
+        app.buttons["dancer2"].tap();XCTAssertTrue(app.buttons["primaryAction"].isEnabled)
+        capture(app,"analysis-reselect-new-target")
+    }
+    @MainActor func testManualSelectionUsesFourRectangularEdgeHandles() throws {
+        let app=launch();app.buttons["dancer1"].tap();app.buttons["primaryAction"].tap()
+        XCTAssertTrue(app.buttons["dancer0"].waitForExistence(timeout:15))
+        app.buttons["手动框选人物"].tap()
+        for edge in ["top","bottom","left","right"] {
+            XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"manualEdge-"+edge).firstMatch.isHittable)
+        }
+        XCTAssertFalse(app.descendants(matching:.any).matching(identifier:"manualCorner0").firstMatch.exists)
+        let right=app.descendants(matching:.any).matching(identifier:"manualEdge-right").firstMatch
+        let before=right.frame.midX
+        let point=right.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5))
+        point.press(forDuration:0.1,thenDragTo:point.withOffset(CGVector(dx:20,dy:0)))
+        XCTAssertGreaterThan(right.frame.midX,before)
+        let box=app.descendants(matching:.any).matching(identifier:"manualBox").firstMatch
+        let beforeMove=box.frame
+        let center=box.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5))
+        center.press(forDuration:0.1,thenDragTo:center.withOffset(CGVector(dx:15,dy:10)))
+        XCTAssertGreaterThan(box.frame.midX,beforeMove.midX)
+        XCTAssertEqual(box.frame.width,beforeMove.width,accuracy:1)
+        XCTAssertEqual(box.frame.height,beforeMove.height,accuracy:1)
+        capture(app,"manual-selection-rectangular-edge-handles")
+        let confirm=app.buttons["primaryAction"]
+        confirm.coordinate(withNormalizedOffset:CGVector(dx:0.1,dy:0.5)).tap()
+        XCTAssertFalse(app.descendants(matching:.any).matching(identifier:"manualBox").firstMatch.exists)
+        XCTAssertTrue(app.buttons["确认并继续"].exists)
+    }
     @MainActor func testRedactionPanelMultiSelectionCancelAndSmallVideoLayouts() throws {
         for ratio in ["portrait","ultrawide"] {
             let app=launch(ratio:ratio);app.buttons["dancer1"].tap()

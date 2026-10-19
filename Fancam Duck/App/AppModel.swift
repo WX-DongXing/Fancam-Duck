@@ -353,7 +353,9 @@ final class AppModel {
                 if let data=try? JSONSerialization.data(withJSONObject:reuse) {try? data.write(to:FileManager.default.temporaryDirectory.appendingPathComponent("FancamDuck-last-cache.json"),options:.atomic)}
                 #endif
                 if let issue=result.issue {
-                    self.processingPreview=nil;self.phase = .blocked(issue);self.seek(to:issue.time);return
+                    self.processingPreview=nil;self.phase = .blocked(issue);self.seek(to:issue.time)
+                    if issue.requiresManualSelection {self.beginManualSelection()}
+                    return
                 }
                 if cached == nil {
                     await self.persistenceTask?.value
@@ -467,6 +469,20 @@ final class AppModel {
         guard case .processing(let progress) = phase else { return }
         operationID=UUID();processingTask?.cancel()
         phase = .paused(progress: progress)
+    }
+    func reselectAnalysisTarget() {
+        guard !generatingVideo else {return}
+        switch phase {case .processing,.paused:break;default:return}
+        cancelTasks()
+        project?.target=nil;project?.redactionPlan=nil
+        project?.settings.compositionAnchor=nil
+        compositionCrop=nil;compositionAutomatic=nil
+        targetExplicitlySelected=false;manualSelection=false;selectedTool=nil
+        outputURL=nil;outputSettings=nil;lastGeneratedRecipe=nil;savedToPhotos=false
+        processingMessage=nil;errorMessage=nil
+        phase = .editing;route = .editor
+        seek(to:project?.settings.start ?? 0)
+        persist()
     }
     func returnToEditingFromPause() {
         guard case .paused = phase else {return}
@@ -746,7 +762,7 @@ final class AppModel {
         } else if processingPreview == nil {
             trackedSample=update.sample;currentTime=update.sample.time
         }
-        phase = .processing(progress: update.progress * (regenerating ? generationAnalysisWeight : analysisOnly ? 1 : project?.settings.redaction.enabled == true ? 0.85 : 1))
+        phase = .processing(progress:max(phase.progress,update.progress * (regenerating ? generationAnalysisWeight : analysisOnly ? 1 : project?.settings.redaction.enabled == true ? 0.85 : 1)))
     }
     func detectPeople(region: NormalizedRect? = nil) {
         guard controlsEnabled,!restoringTracking,let project,let source=store.sourceURL(for:project) else { return }
@@ -772,7 +788,7 @@ final class AppModel {
                 if abs(project.targetTime-time)<0.001,let target=project.target {
                     selectionObservation=found.filter {$0.body.iou(target)>0.7}.max {$0.body.iou(target)<$1.body.iou(target)}
                 }
-                if found.isEmpty { detectionNotice = "未识别到人物 · 请换帧或框选辅助识别" }
+                if found.isEmpty { detectionNotice = "未识别到人物 · 请换帧或手动框选人物" }
             } catch {
                 guard !Task.isCancelled,detectionID==id,controlsEnabled,self.project?.id==project.id else { return }
                 detecting=false;errorMessage=error.localizedDescription
@@ -783,11 +799,27 @@ final class AppModel {
         guard controlsEnabled else {return}
         pausePreview(refresh:false)
         detectionID=UUID();detectionTask?.cancel();detecting=false
-        manualSelection=true
+        detectionNotice=nil;manualSelection=true
     }
-    func finishManualBox(_ box: NormalizedRect) {
-        guard controlsEnabled,box.isValid else { return }
-        if isDemo { selectTarget(box) } else { project?.target=nil;targetExplicitlySelected=false;manualSelection=false;detectPeople(region:box) }
+    @discardableResult func finishManualBox(_ box: NormalizedRect) -> Bool {
+        guard controlsEnabled else {return false}
+        guard box.isValid,box.width>0.015,box.height>0.03 else {
+            detectionNotice="选区太小，请扩大人物框";return false
+        }
+        if let issue=redactionIssue {
+            guard project?.settings.redaction.subjects.contains(where:{$0.id==issue.subjectID}) == true else {return false}
+            guard canRedactPerson(box) else {detectionNotice="主角不参与打码";return false}
+        }
+        // The user's rectangle is the explicit target anchor, not another detector request.
+        detectionID=UUID();detectionTask?.cancel();detecting=false
+        observations=[];detectionNotice=nil;selectionObservation=nil
+        selectTarget(box)
+        let accepted:Bool
+        if let issue=redactionIssue {
+            accepted=project?.settings.redaction.subjects.first(where:{$0.id==issue.subjectID})?.anchors.contains(where:{abs($0.time-currentTime)<0.001 && $0.body==box}) == true
+        } else {accepted=targetExplicitlySelected && project?.target==box}
+        if accepted {manualSelection=false}
+        return accepted
     }
     func suspend() { pause();pausePreview(refresh:false);previewPlayer?.pause();persist() }
     private func cancelTasks(preserveAnalysis:Bool=false) {

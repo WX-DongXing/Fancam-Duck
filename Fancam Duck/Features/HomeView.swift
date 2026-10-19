@@ -70,14 +70,14 @@ struct HomeView: View {
                 VStack(spacing:10) {
                     PhotosPicker(selection:$selection,matching:.videos,photoLibrary:.shared()) {
                         HStack(spacing:10) { Image(systemName:isImporting ? "hourglass" : "plus"); Text(isImporting ? "正在读取视频…" : "导入舞蹈视频") }
-                            .font(.system(size:16,weight:.semibold)).frame(maxWidth:.infinity).frame(height:56)
+                            .font(.system(size:16,weight:.semibold)).frame(maxWidth:.infinity).frame(height:56).contentShape(Capsule())
                             .foregroundStyle(.white)
                     }.buttonStyle(.plain).frame(maxWidth: .infinity, minHeight: 56).contentShape(Capsule())
                         .modifier(StudioGlassSurface(shape: Capsule(), selected: true)).accessibilityLabel(isImporting ? "正在读取视频…" : "导入舞蹈视频")
                         .disabled(isImporting).opacity(isImporting ? 0.45 : 1)
                     #if targetEnvironment(macCatalyst)
                     Button {importingFile=true} label: {
-                        Label("从文件导入",systemImage:"folder.badge.plus").frame(maxWidth:.infinity,minHeight:44)
+                        Label("从文件导入",systemImage:"folder.badge.plus").frame(maxWidth:.infinity,minHeight:44).contentShape(Rectangle())
                     }.keyboardShortcut("o",modifiers:.command).disabled(isImporting)
                         .accessibilityIdentifier("importVideoFile")
                     #endif
@@ -145,7 +145,7 @@ struct HomeView: View {
                         Text("选择主角，让镜头跟上动作。").font(.subheadline).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button {model.showGuide=true} label: {Image(systemName:"questionmark.circle").font(.title2).frame(width:48,height:48)}
+                    Button {model.showGuide=true} label: {Image(systemName:"questionmark.circle").font(.title2).frame(width:48,height:48).contentShape(Rectangle())}
                         .buttonStyle(.plain).accessibilityLabel("查看操作指引")
                 }
                 HStack {
@@ -166,7 +166,7 @@ struct HomeView: View {
                                 }
                                 Spacer(minLength:0)
                                 Menu {Button("删除项目",systemImage:"trash",role:.destructive) {pendingDelete=project}} label: {
-                                    Image(systemName:"ellipsis").frame(width:44,height:44)
+                                    Image(systemName:"ellipsis").frame(width:44,height:44).contentShape(Rectangle())
                                 }.accessibilityLabel("项目更多操作")
                             }
                         }.padding(14).background(.white.opacity(0.045),in:RoundedRectangle(cornerRadius:22))
@@ -176,7 +176,7 @@ struct HomeView: View {
                     ContentUnavailableView("还没有项目",systemImage:"film.stack",description:Text("从下方导入一段舞蹈视频开始吧。"))
                         .frame(maxWidth:.infinity)
                 }
-                Button("体验演示流程") {model.startDemo()}.font(.subheadline).frame(minHeight:44).accessibilityIdentifier("startDemo")
+                StudioTextButton(title:"体验演示流程",fillsWidth:false) {model.startDemo()}.font(.subheadline).accessibilityIdentifier("startDemo")
             }.frame(maxWidth:900).padding(28).frame(maxWidth:.infinity)
         }
     }
@@ -195,9 +195,9 @@ struct HomeView: View {
                         .background(.white.opacity(0.07),in:RoundedRectangle(cornerRadius:8))
                 }
                 Spacer()
-                Button {model.showGuide=true} label: {Label("使用指南",systemImage:"questionmark.circle")}
+                Button {model.showGuide=true} label: {Label("使用指南",systemImage:"questionmark.circle").frame(minHeight:44).contentShape(Rectangle())}
                     .buttonStyle(.plain).font(.system(size:12)).foregroundStyle(.secondary)
-                Button("体验演示") {model.startDemo()}.buttonStyle(.plain).font(.system(size:12)).foregroundStyle(.secondary)
+                StudioTextButton(title:"体验演示",fillsWidth:false) {model.startDemo()}.buttonStyle(.plain).font(.system(size:12)).foregroundStyle(.secondary)
                     .accessibilityIdentifier("startDemo")
                 Divider()
                 Label("本机处理 · 原片不上传",systemImage:"lock.shield").font(.system(size:10)).foregroundStyle(.secondary)
@@ -250,7 +250,7 @@ struct HomeView: View {
                                     }
                                     Spacer(minLength:0)
                                     Menu {Button("删除项目",systemImage:"trash",role:.destructive) {pendingDelete=project}} label: {
-                                        Image(systemName:"ellipsis").frame(width:28,height:28)
+                                        Image(systemName:"ellipsis").frame(width:28,height:28).contentShape(Rectangle())
                                     }.accessibilityLabel("项目更多操作")
                                 }.padding(14)
                             }.background(DesktopPalette.panel,in:RoundedRectangle(cornerRadius:12))

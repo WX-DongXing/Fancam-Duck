@@ -163,7 +163,7 @@ struct ExportView: View {
         #if targetEnvironment(macCatalyst)
         Label(title,systemImage:symbol)
             .font(.system(size:13,weight:primary ? .semibold : .regular))
-            .frame(maxWidth:.infinity).frame(height:primary ? 40 : 34)
+            .frame(maxWidth:.infinity).frame(height:primary ? 40 : 34).contentShape(Rectangle())
             .foregroundStyle(primary ? Color.acOnAccent : .white)
             .background(primary ? Color.acAccent : DesktopPalette.raised,in:RoundedRectangle(cornerRadius:8))
             .opacity(enabled ? 1 : 0.5)

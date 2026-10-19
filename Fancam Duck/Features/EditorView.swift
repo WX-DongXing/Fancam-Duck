@@ -168,8 +168,8 @@ struct EditorView: View {
             else if isCompleted {completedActions}
             else if isProcessing {
                 HStack(spacing:10) {
-                    Button(model.generatingVideo ? "取消生成" : isPaused ? "返回选择" : "暂停分析") {
-                        if model.generatingVideo {model.cancelGeneration()} else if isPaused {model.returnToEditingFromPause()} else {model.pause()}
+                    Button(model.generatingVideo ? "取消生成" : "重新选择") {
+                        if model.generatingVideo {model.cancelGeneration()} else {model.reselectAnalysisTarget()}
                     }.buttonStyle(DesktopButtonStyle())
                     processingAction
                 }
@@ -197,10 +197,10 @@ struct EditorView: View {
                         .padding(.horizontal, 14).padding(.vertical, 7).background(Color.acAccent, in: Capsule()).foregroundStyle(.black)
                         .accessibilityIdentifier("processingStatus").accessibilityLabel(model.statusText).accessibilityValue(model.currentTime.videoTime)
                 } else if isProcessing {
-                    Text("视频编辑").font(.system(size:15,weight:.medium))
+                    Text("人物分析").font(.system(size:15,weight:.medium))
                         .accessibilityIdentifier("processingStatus").accessibilityLabel(model.statusText).accessibilityValue(model.currentTime.videoTime)
                 } else {
-                    Text("视频工作台").font(.system(size: 15, weight: .medium))
+                    Text(model.hasCompletedTracking || isCompleted ? "视频工作台" : "人物分析").font(.system(size: 15, weight: .medium))
                 }
             }
             Spacer()
@@ -241,10 +241,9 @@ struct EditorView: View {
                             CandidateCorners()
                                 .stroke(model.redactionEditing && model.redactionSelected(box) ? Color.acAccent : .white.opacity(0.85), style: StrokeStyle(lineWidth:model.redactionEditing && model.redactionSelected(box) ? 2.5 : 1.5,lineCap:.round))
                                 .opacity(activeBox.map {$0.iou(box)>0.8} == true ? 0 : 1)
-                                .contentShape(Rectangle())
+                                .frame(width:rect.width*box.width,height:rect.height*box.height)
+                                .frame(minWidth:44,minHeight:44).contentShape(Rectangle())
                         }.buttonStyle(.plain)
-                            .frame(width: rect.width * box.width, height: rect.height * box.height)
-                            .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
                             .position(x: rect.minX + rect.width * box.center.x, y: rect.minY + rect.height * box.center.y)
                             .disabled((model.redactionEditing || model.redactionIssue != nil) && !model.canRedactPerson(box))
                             .accessibilityLabel(model.redactionEditing && !model.canRedactPerson(box) ? "主角，不参与打码" : model.redactionEditing ? (model.redactionSelected(box) ? "移除打码人物 \(number+1)" : "打码人物 \(number+1)") : (model.isDemo ? "选择舞者 \(number + 1)" : "选择人物 \(number + 1)"))
@@ -273,7 +272,7 @@ struct EditorView: View {
             .animation(reduceMotion ? nil : .smooth(duration:0.32),value:model.project?.settings.aspectRatio)
     }
     private var sourceHint: String {
-        if model.manualSelection { return "拖动框体移动 · 拖四角调整" }
+        if model.manualSelection { return model.detectionNotice ?? "拖动框体移动 · 拖四边中点调整" }
         if let activity=model.editorActivityText {return activity}
         if model.phase == .editing,model.hasCompletedTracking,let project=model.project,
            project.settings.redaction.enabled,project.redactionPlan?.covers(project) != true {
@@ -291,13 +290,13 @@ struct EditorView: View {
             VStack(spacing: 12) {
                 Spacer()
                 HStack {
-                    Button("取消") { model.manualSelection = false; drawnBox = nil }.frame(minWidth: 64, minHeight: 44)
+                    StudioTextButton(title:"取消",minWidth:64,fillsWidth:false) { model.manualSelection = false; drawnBox = nil }
                     Spacer()
-                    Button("重画") { drawnBox = nil }.frame(minWidth: 64, minHeight: 44)
+                    StudioTextButton(title:"重画",minWidth:64,fillsWidth:false) { drawnBox = nil }
                 }
-                StudioAction(title: "确认区域并识别", disabled: drawnBox == nil || model.detecting) {
+                StudioAction(title: "确认人物区域", disabled: drawnBox == nil) {
                     guard let box = drawnBox else { return }
-                    model.finishManualBox(box); model.manualSelection = false; drawnBox = nil
+                    if model.finishManualBox(box) {drawnBox=nil}
                 }
                 Spacer().frame(height: 10)
             }.padding(.horizontal, 24)
@@ -305,8 +304,7 @@ struct EditorView: View {
             VStack(spacing: 10) {
                 HStack(spacing: 24) {
                     StudioIcon(symbol: "backward.end.fill", label: "查看前一帧") { model.seek(to: model.currentTime - 0.2) }
-                    Button("手动框选") { beginManual() }.font(.system(size: 13))
-                        .padding(.horizontal, 24).frame(height: 44).modifier(StudioGlassSurface(shape: Capsule()))
+                    StudioTextButton(title:"手动框选",minWidth:100,fillsWidth:false) { beginManual() }.font(.system(size:13)).modifier(StudioGlassSurface(shape: Capsule()))
                         .accessibilityLabel("手动框选人物")
                     StudioIcon(symbol: "forward.end.fill", label: "查看后一帧") { model.seek(to: model.currentTime + 0.2) }
                 }
@@ -332,7 +330,7 @@ struct EditorView: View {
                 else {model.togglePreview()}
             } label: {
                 Image(systemName: (isCompleted ? generatedPlaying : model.isPlaying) ? "pause.fill" : "play.fill")
-                    .font(.system(size: 22)).frame(width: 44, height: 44)
+                    .font(.system(size: 22)).frame(width: 44, height: 44).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityLabel((isCompleted ? generatedPlaying : model.isPlaying) ? "暂停预览" : "播放预览")
                 .accessibilityIdentifier("editorPlayback").keyboardShortcut(.space,modifiers:[])
                 .disabled(isProcessing || timelineTrimming || (!isCompleted && model.hasCompletedTracking && model.project?.settings.redaction.enabled == true && model.project?.redactionPlan?.covers(model.project!) != true) || model.compositionEditing && !model.hasCompletedTracking || model.compositionBusy)
@@ -363,11 +361,10 @@ struct EditorView: View {
                     toolSelector
                 }
                 if isProcessing {
-                    Button(model.generatingVideo ? "取消生成" : isPaused ? "返回选择" : "暂停分析") {
+                    StudioTextButton(title:model.generatingVideo ? "取消生成" : "重新选择",height:56) {
                         if model.generatingVideo {model.cancelGeneration()}
-                        else if isPaused {activeTool=nil;model.returnToEditingFromPause()}
-                        else {model.pause()}
-                    }.font(.subheadline).frame(maxWidth:.infinity,minHeight:56)
+                        else {activeTool=nil;model.reselectAnalysisTarget()}
+                    }.font(.subheadline)
                         .buttonStyle(.plain).modifier(StudioGlassSurface(shape:Capsule()))
                 }
                 if isCompleted {completedActions} else {processingAction}
@@ -410,18 +407,18 @@ struct EditorView: View {
                     .disabled(isProcessing ? !isPaused : !canStart)
                     .accessibilityLabel(isProcessing ? (model.generatingVideo ? "正在生成视频" : isPaused ? "继续分析" : "正在分析人物") : startTitle)
                     .accessibilityValue(isProcessing ? processingPercent : "")
-                    .accessibilityHint(isProcessing ? (isPaused ? "点按继续分析" : "请使用旁边的暂停或取消操作") : "按当前工作台状态继续")
+                    .accessibilityHint(isProcessing ? (isPaused ? "点按继续分析" : "请使用旁边的重新选择或取消操作") : "按当前工作台状态继续")
                     .accessibilityIdentifier("primaryAction")
     }
     private var completedActions:some View {
         HStack(spacing:12) {
-            Button("返回修改") {generatedPlaying=false;model.backToEditor();selectTool(.composition)}
-                .frame(maxWidth:.infinity,minHeight:50).modifier(StudioGlassSurface(shape:Capsule()))
+            StudioTextButton(title:"返回修改",height:50) {generatedPlaying=false;model.backToEditor();selectTool(.composition)}
+                .modifier(StudioGlassSurface(shape:Capsule()))
             #if targetEnvironment(macCatalyst)
-            Button("导出视频") {savingFile=true}.frame(maxWidth:.infinity,minHeight:50).modifier(StudioGlassSurface(shape:Capsule()))
+            StudioTextButton(title:"导出视频",height:50) {savingFile=true}.modifier(StudioGlassSurface(shape:Capsule()))
             #else
-            Button(model.savedToPhotos ? "已保存" : "导出视频") {Task {await model.saveVideo()}}
-                .disabled(model.savingToPhotos || model.savedToPhotos).frame(maxWidth:.infinity,minHeight:50).modifier(StudioGlassSurface(shape:Capsule()))
+            StudioTextButton(title:model.savedToPhotos ? "已保存" : "导出视频",height:50) {Task {await model.saveVideo()}}
+                .disabled(model.savingToPhotos || model.savedToPhotos).modifier(StudioGlassSurface(shape:Capsule()))
             #endif
         }.buttonStyle(.plain).accessibilityIdentifier("completedActions")
     }
@@ -462,7 +459,7 @@ struct EditorView: View {
                         .font(.title3.weight(.semibold))
                     Text("点击画面选择主角，拖动时间轴两端截取。")
                         .font(.subheadline).foregroundStyle(.secondary).lineSpacing(4)
-                    if model.observations.isEmpty && model.detectionNotice != nil {Button("手动框选",action:beginManual).font(.subheadline).frame(minHeight:44)}
+                    if model.observations.isEmpty && model.detectionNotice != nil {StudioTextButton(title:"手动框选",fillsWidth:false,action:beginManual).font(.subheadline)}
                 }.padding(.horizontal,18)
             }
             Spacer(minLength:0)
@@ -604,7 +601,7 @@ struct EditorView: View {
                         Button {model.setRedactionSticker(sticker)} label: {
                             if let image=sticker.image {
                                 Image(uiImage:image).resizable().scaledToFit().frame(width:34,height:34)
-                                    .frame(maxWidth:.infinity,minHeight:44)
+                                    .frame(maxWidth:.infinity,minHeight:44).contentShape(Rectangle())
                                     .background(model.project?.settings.redaction.imageData == sticker.data ? .white.opacity(0.16) : .clear,in:RoundedRectangle(cornerRadius:12))
                             }
                         }.buttonStyle(.plain).accessibilityLabel(sticker.title+"贴片")
@@ -651,16 +648,16 @@ struct EditorView: View {
             HStack(spacing:12) {
                 if model.importingRedactionImage {ProgressView().frame(width:44,height:44)}
                 else if model.redactionPrimaryBody == nil {
-                    Button("预览遮挡") {model.seek(to:model.project?.targetTime ?? 0)}.font(panelFont).frame(maxWidth:.infinity,minHeight:44)
+                    StudioTextButton(title:"预览遮挡") {model.seek(to:model.project?.targetTime ?? 0)}.font(panelFont)
                 } else if model.project?.settings.redaction.style == .image {
                     Label {Text("直拍鸭 Logo").font(.caption)} icon: {Image("BrandLogo").resizable().scaledToFit().frame(width:24,height:24)}
                 } else {
-                    Button(redactionStrengthEditing ? "范围" : "强度") {redactionStrengthEditing.toggle()}
-                        .font(panelFont).frame(maxWidth:.infinity,minHeight:44).accessibilityLabel("打码强度设置")
+                    StudioTextButton(title:redactionStrengthEditing ? "范围" : "强度") {redactionStrengthEditing.toggle()}
+                        .font(panelFont).accessibilityLabel("打码强度设置")
                 }
-                Button(model.project?.settings.redaction.enabled == true ? "关闭打码" : "开启打码") {
+                StudioTextButton(title:model.project?.settings.redaction.enabled == true ? "关闭打码" : "开启打码") {
                     if model.project?.settings.redaction.enabled == true {model.clearRedactions()} else {model.enableAutomaticRedaction()}
-                }.font(panelFont).frame(maxWidth:.infinity,minHeight:44)
+                }.font(panelFont)
             }.buttonStyle(.plain)
         }.padding(panelInset)
             .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24)))

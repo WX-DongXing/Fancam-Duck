@@ -2,6 +2,22 @@ import XCTest
 @testable import FancamDuck
 
 final class CameraPlanTests:XCTestCase {
+    func testEdgeHandlesResizeOnlyTheirAxisAndPreserveOppositeEdge() {
+        let box=NormalizedRect(x:0.2,y:0.2,width:0.4,height:0.5)
+        let top=ManualBoxGeometry.resize(box,edge:.top,dx:0.3,dy:0.1)
+        XCTAssertEqual(top.x,box.x);XCTAssertEqual(top.width,box.width,accuracy:0.001)
+        XCTAssertEqual(top.y+top.height,0.7,accuracy:0.001)
+        let bottom=ManualBoxGeometry.resize(box,edge:.bottom,dx:0.3,dy:0.1)
+        XCTAssertEqual(bottom.y,box.y);XCTAssertEqual(bottom.height,0.6,accuracy:0.001)
+        let left=ManualBoxGeometry.resize(box,edge:.left,dx:0.1,dy:0.3)
+        XCTAssertEqual(left.y,box.y);XCTAssertEqual(left.height,box.height,accuracy:0.001)
+        XCTAssertEqual(left.x+left.width,0.6,accuracy:0.001)
+        let right=ManualBoxGeometry.resize(box,edge:.right,dx:0.1,dy:0.3)
+        XCTAssertEqual(right.x,box.x);XCTAssertEqual(right.width,0.5,accuracy:0.001)
+        let clamped=ManualBoxGeometry.resize(box,edge:.right,dx:-2,dy:0)
+        XCTAssertEqual(clamped.width,0.06,accuracy:0.001)
+    }
+
     func testFrameMultipleRoundoffDoesNotCreateZeroLengthTail() {
         let times=[0.0,0.3,0.6000000000000001]
         let path=times.map {CropPlan.Frame(time:$0,rect:.init(x:400+$0*10,y:30,width:300,height:533))}

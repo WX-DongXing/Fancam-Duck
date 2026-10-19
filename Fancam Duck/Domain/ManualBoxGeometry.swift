@@ -1,6 +1,19 @@
 import Foundation
 
 enum ManualBoxGeometry {
+    enum Edge: String, CaseIterable {
+        case top, bottom, left, right
+        var title:String {switch self {case .top:"上";case .bottom:"下";case .left:"左";case .right:"右"}}
+        var horizontal:Bool {self == .top || self == .bottom}
+    }
+    static func resize(_ box:NormalizedRect,edge:Edge,dx:Double,dy:Double) -> NormalizedRect {
+        switch edge {
+        case .top: resize(box,corner:.topLeft,dx:0,dy:dy)
+        case .bottom: resize(box,corner:.bottomLeft,dx:0,dy:dy)
+        case .left: resize(box,corner:.topLeft,dx:dx,dy:0)
+        case .right: resize(box,corner:.topRight,dx:dx,dy:0)
+        }
+    }
     enum Corner: CaseIterable { case topLeft, topRight, bottomLeft, bottomRight }
     static func move(_ box: NormalizedRect, dx: Double, dy: Double) -> NormalizedRect {
         .init(x: min(1-box.width,max(0,box.x+dx)),y:min(1-box.height,max(0,box.y+dy)),width:box.width,height:box.height)

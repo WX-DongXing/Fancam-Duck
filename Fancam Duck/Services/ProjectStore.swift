@@ -53,7 +53,7 @@ actor ProjectStore {
         var people:[Int:DetectionBatch]? = nil
     }
     // Bump when inference preprocessing, identity matching or occlusion policy changes.
-    static let analysisVersion="yolo26s640-osnet025-tracktrack10hz-bridge12-v1"
+    static let analysisVersion="yolo26s640-osnet025-tracktrack10hz-deferred-v2"
     private struct DigestEntry {let size:UInt64;let date:Date;let digest:String}
     private var digests:[URL:DigestEntry]=[:]
     private func trajectoryURL(_ id:UUID) -> URL {directory.appendingPathComponent("trajectory-\(id).json")}
