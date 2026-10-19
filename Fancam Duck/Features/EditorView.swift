@@ -212,7 +212,10 @@ struct EditorView: View {
                 .accessibilityValue("原片 \(Int(model.project?.metadata.width ?? 0)) × \(Int(model.project?.metadata.height ?? 0))")
         }.padding(.horizontal, 18).frame(height: 52)
     }
-    private var showsComposition: Bool { model.compositionEditing && !timelineTrimming && model.compositionCrop != nil }
+    private var showsComposition: Bool {
+        (model.compositionEditing || model.hasCompletedTracking && !isBlocked)
+            && !timelineTrimming && model.compositionCrop != nil
+    }
     private var sourceStage: some View {
         GeometryReader { geometry in
             let source = model.project?.metadata.size ?? CGSize(width: 1920, height: 1080)
@@ -536,7 +539,7 @@ struct EditorView: View {
     }
     private var phoneRedactionPanel: some View {
         VStack(spacing:8) {
-            HStack(spacing:12) {
+            HStack(spacing:0) {
                 Toggle(isOn:Binding(
                     get:{model.project?.settings.redaction.enabled == true},
                     set:{if $0 {model.enableAutomaticRedaction()} else {model.clearRedactions()}}
@@ -583,9 +586,10 @@ struct EditorView: View {
                     .accessibilityIdentifier("redactionRegionMenu")
                     .transition(reduceMotion ? .identity : .opacity.combined(with:.offset(y:4)))
                 }
-                }.frame(width:88,height:44)
-                    .animation(reduceMotion ? nil : .easeInOut(duration:0.22),value:model.project?.settings.redaction.enabled)
+                }.frame(width:model.project?.settings.redaction.enabled == true ? 88 : 0,height:44)
+                    .padding(.leading,model.project?.settings.redaction.enabled == true ? 12 : 0)
             }.frame(height:44)
+                .animation(reduceMotion ? nil : .easeInOut(duration:0.28),value:model.project?.settings.redaction.enabled)
             NativeSegmentedControl(title:"打码样式",options:RedactionSettings.Style.allCases.filter {model.project?.settings.redaction.region != .person || $0 != .image},selection:Binding(
                 get:{model.project?.settings.redaction.style ?? .frosted},set:{model.setRedactionStyle($0)}
             ),label:{$0 == .image ? "贴片" : $0.rawValue})

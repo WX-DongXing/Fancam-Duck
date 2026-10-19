@@ -278,7 +278,7 @@ final class EditorFlowTests: XCTestCase {
         let disabledSwitchFrame=enabled.frame
         enabled.coordinate(withNormalizedOffset:CGVector(dx:0.9,dy:0.5)).tap()
         XCTAssertEqual(enabled.value as? String,"1")
-        XCTAssertEqual(enabled.frame,disabledSwitchFrame)
+        XCTAssertEqual(disabledSwitchFrame.maxX-enabled.frame.maxX,100,accuracy:1)
         region.tap()
         app.buttons["全身"].tap()
         XCTAssertEqual(region.value as? String,"全身")
@@ -311,10 +311,17 @@ final class EditorFlowTests: XCTestCase {
         XCTAssertTrue(strength.exists)
         enabled.coordinate(withNormalizedOffset:CGVector(dx:0.9,dy:0.5)).tap()
         XCTAssertFalse(region.isHittable)
+        XCTAssertEqual(enabled.frame.maxX,disabledSwitchFrame.maxX,accuracy:1)
         tools.buttons["构图"].tap()
         XCTAssertTrue(picker.waitForExistence(timeout:5))
         XCTAssertTrue(first.isSelected)
         capture(app,"native-tool-and-redaction-segments")
+        app.buttons["primaryAction"].tap()
+        let generatingStage=app.descendants(matching:.any).matching(identifier:"editorStage").firstMatch
+        XCTAssertTrue(generatingStage.waitForExistence(timeout:3))
+        XCTAssertEqual(generatingStage.label,"构图预览")
+        capture(app,"generation-keeps-composition")
+        app.buttons["取消生成"].tap()
     }
     @MainActor func testOutputAspectsAndIndependentCentering() throws {
         let app=launch();app.buttons["dancer1"].tap();app.buttons["tool-构图"].tap()

@@ -71,6 +71,8 @@ final class AppModel {
     var compositionNotice:String?
     private var analysisOnly=false
     private var generateAfterAnalysis=false
+    private var generationAnalysisWeight=0.0
+    private var generationRedactionWeight=0.0
     var generatingVideo=false
     var hasCompletedTracking=false
     private var compositionSnapshot:EditSettings?
@@ -315,8 +317,11 @@ final class AppModel {
         let regenerate=needsRegeneration || generateAfterAnalysis
         let stopAfterAnalysis=analysisOnly
         generatingVideo=regenerate
+        generationAnalysisWeight=regenerate && !hasCompletedTracking ? 0.6 : 0
+        generationRedactionWeight=regenerate && project.settings.redaction.enabled && project.redactionPlan?.covers(project) != true ? 0.15 : 0
         let checkpoint: Double
-        if case .blocked(let issue) = phase { checkpoint = issue.checkpoint }
+        if regenerate {checkpoint=0}
+        else if case .blocked(let issue) = phase { checkpoint = issue.checkpoint }
         else if case .paused(let progress) = phase { checkpoint = progress }
         else { checkpoint = 0 }
         targetExplicitlySelected = false
@@ -724,7 +729,7 @@ final class AppModel {
         } else if processingPreview == nil {
             trackedSample=update.sample;currentTime=update.sample.time
         }
-        phase = .processing(progress: update.progress * (regenerating ? 0.6 : analysisOnly ? 1 : project?.settings.redaction.enabled == true ? 0.85 : 1))
+        phase = .processing(progress: update.progress * (regenerating ? generationAnalysisWeight : analysisOnly ? 1 : project?.settings.redaction.enabled == true ? 0.85 : 1))
     }
     func detectPeople(region: NormalizedRect? = nil) {
         guard controlsEnabled,!restoringTracking,let project,let source=store.sourceURL(for:project) else { return }
@@ -1065,7 +1070,7 @@ extension AppModel {
     private func receiveRedactionProgress(_ progress:Double,id:UUID,projectID:UUID,regenerating:Bool=false) {
         guard isCurrent(id,projectID:projectID),!Task.isCancelled,case .processing = phase else {return}
         processingMessage="正在生成平滑打码轨迹"
-        phase = .processing(progress:max(phase.progress,(regenerating ? 0.6 : 0.85)+min(1,max(0,progress))*(regenerating ? 0.15 : 0.14)))
+        phase = .processing(progress:max(phase.progress,(regenerating ? generationAnalysisWeight : 0.85)+min(1,max(0,progress))*(regenerating ? generationRedactionWeight : 0.14)))
     }
     /// Pause-frame settings preview uses the same GPU compositor. Playback is enabled only after
     /// a complete identity-checked plan exists; fixed seed rectangles are never played as tracking.
@@ -1155,6 +1160,7 @@ extension AppModel {
 extension AppModel {
     private func receiveRegenerationProgress(_ progress:Double,id:UUID,projectID:UUID) {
         guard progress.isFinite,isCurrent(id,projectID:projectID),case .processing = phase else {return}
-        phase = .processing(progress:max(phase.progress,0.75+min(1,max(0,progress))*0.24))
+        let base=generationAnalysisWeight+generationRedactionWeight
+        phase = .processing(progress:max(phase.progress,base+min(1,max(0,progress))*(0.99-base)))
     }
 }

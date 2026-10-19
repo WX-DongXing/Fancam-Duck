@@ -16,14 +16,20 @@ private actor WorkflowTracker:TargetTracking {
 }
 private actor WorkflowExporter:VideoExporting {
     private(set) var exports=0
+    private(set) var renderedSettings:EditSettings?
     private var hold=false
     private var continuation:CheckedContinuation<Void,Never>?
     var waiting:Bool {continuation != nil}
     func holdNext() {hold=true}
     func release() {continuation?.resume();continuation=nil}
     @MainActor func preview(source:URL,project:VideoProject,samples:[TargetSample]) -> AVPlayerItem {AVPlayerItem(url:source)}
+    func exportMovingCrop(source:URL,project:VideoProject,samples:[TargetSample],onProgress:@escaping @Sendable (Double) async -> Void) async throws -> URL {
+        await onProgress(0)
+        await onProgress(0.1)
+        return try await exportMovingCrop(source:source,project:project,samples:samples)
+    }
     func exportMovingCrop(source:URL,project:VideoProject,samples:[TargetSample]) async throws -> URL {
-        exports+=1
+        exports+=1;renderedSettings=project.settings
         if hold {hold=false;await withCheckedContinuation {continuation=$0}}
         let output=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString+".mp4")
         try FileManager.default.copyItem(at:source,to:output);return output
@@ -66,7 +72,13 @@ private actor WorkflowExporter:VideoExporting {
         restored.open(saved);try await wait {!restored.restoringTracking && !restored.detecting}
         XCTAssertTrue(restored.hasCompletedTracking)
         let restoredBatches=await fresh.restored;XCTAssertEqual(restoredBatches,1)
+        restored.beginComposition();try await wait {!restored.compositionBusy}
+        let generationCrop=restored.compositionCrop
+        let generationSettings=restored.project?.settings
         restored.advanceWorkflow();try await wait {restored.outputURL != nil}
+        XCTAssertEqual(restored.compositionCrop,generationCrop)
+        let rendered=await exporter.renderedSettings
+        XCTAssertEqual(rendered,generationSettings,"Generate must use the current composition settings")
         XCTAssertEqual(restored.route,.editor)
         let first=restored.outputURL
         restored.backToEditor();try await wait {!restored.detecting}
@@ -80,8 +92,10 @@ private actor WorkflowExporter:VideoExporting {
         restored.backToEditor();try await wait {!restored.detecting}
         restored.project?.settings.compositionScale=1.2
         await exporter.holdNext();restored.advanceWorkflow()
+        XCTAssertEqual(restored.phase.progress,0,"A fresh generation must start at zero")
         for _ in 0..<1000 {if await exporter.waiting {break};try await Task.sleep(for:.milliseconds(5))}
         let waiting=await exporter.waiting;XCTAssertTrue(waiting)
+        XCTAssertEqual(restored.phase.progress,0.099,accuracy:0.001,"Cached analysis must not create a 75% jump")
         restored.cancelGeneration();XCTAssertEqual(restored.phase,.editing)
         await exporter.release();try await Task.sleep(for:.milliseconds(100))
         XCTAssertEqual(restored.outputURL,retained)
