@@ -2,6 +2,31 @@
 
 将多人舞蹈视频转换为跟随主角的成片。使用 SwiftUI、Core ML 和 AVFoundation 在本地完成选人、身份跟踪、平滑运镜、自动裁剪及非主角遮挡，支持 iPhone、iPhone Duo、大屏工作台和 Mac Catalyst。
 
+[快速开始](#开发与运行) · [界面预览](#界面预览) · [测试与验证](#测试与验证) · [参与贡献](#参与贡献) · [开源协议](#开源协议)
+
+视频分析与导出在设备端完成，内置模型无需运行时下载。当前为开发中的原生应用，真机性能与复杂遮挡场景的验证边界见下方说明。
+
+## 界面预览
+
+以下为演示模式的模拟人物截图，用于展示交互，不代表真实视频的跟踪或打码效果。
+
+<table>
+  <tr>
+    <th>选择主角</th>
+    <th>调整构图</th>
+    <th>成片预览</th>
+  </tr>
+  <tr>
+    <td><img src="docs/design-assets/phone/selection.png" width="240" alt="在完整原片中选择模拟主角"></td>
+    <td><img src="docs/design-assets/phone/composition.png" width="240" alt="调整模拟视频的裁剪构图"></td>
+    <td><img src="docs/design-assets/phone/export-preview.png" width="240" alt="查看模拟成片预览"></td>
+  </tr>
+</table>
+
+Mac Catalyst 工作台：
+
+![Mac Catalyst 模拟人物编辑界面](docs/design-assets/mac/editor.png)
+
 ## 功能与流程
 
 1. **导入视频**：从相册导入；桌面端支持文件导入。创建本地项目并自动保存编辑配置。
@@ -27,6 +52,8 @@
 打开工程：
 
 ```sh
+git clone https://github.com/WX-DongXing/Fancam-Duck.git
+cd Fancam-Duck
 open 'Fancam Duck.xcodeproj'
 ```
 
@@ -98,6 +125,8 @@ xcodebuild -project 'Fancam Duck.xcodeproj' -scheme 'Fancam Duck' \
 
 最近一轮流程与功能 CR（2026-10-19）：
 
+以下为历史验证记录，不代表本次检出后已重新运行；请按本机工具链执行上述命令。
+
 - 完整单元／集成套件：97 项，6 项按需跳过，0 失败。
 - 最终异步状态回归：13 项通过；iPhone、Duo 各 2 项 UI 回归通过；Mac Catalyst 构建通过。
 - 修复异常确认期间播放／拖动越过问题帧、修改打码配置后构图报错，以及成片播放状态未跟随后台暂停同步的问题。
@@ -125,9 +154,28 @@ xcodebuild -project 'Fancam Duck.xcodeproj' -scheme 'Fancam Duck' \
 
 评审页包含不同阶段的截图，部分属于历史迭代；当前行为以代码和最新验证记录为准。
 
-## 第三方模型与许可
+## 参与贡献
 
-TrackTrack 和 OSNet 参考源码许可位于 `tools/reference`。Ultralytics 模型／软件、预训练权重及数据集的使用条件需分别核查，不能仅凭参考源码许可认定全部模型可商用；发布前需完成相应授权确认。模型来源说明中保留了相关链接。
+提交问题时请附上设备与系统版本、Xcode 版本、复现步骤、预期与实际表现。涉及识别或导出时，注明视频分辨率、帧率、时长及处理范围；提供素材前确认有权分享，避免上传私人视频。
+
+修改前先阅读 [开发知识库](docs/ai/README.md)，按 [验证指南](docs/ai/validation.md) 选择相关检查，并在 Pull Request 中写明实际验证结果及未验证项。界面文档使用 [模拟素材](docs/design-assets/README.md)，提交信息遵循 [提交规范](docs/ai/contributing.md)。不提交构建产物、模型转换环境、凭据或私人素材。
+
+## 开源协议
+
+本项目采用 **GNU Affero General Public License v3.0 only（SPDX：`AGPL-3.0-only`）**，完整条款见 [LICENSE](LICENSE)。除另有声明的第三方内容外，本项目原创代码和文档按此协议提供。
+
+选择依据是当前内置的 YOLO26s-pose：依据 [Ultralytics 官方许可说明](https://www.ultralytics.com/license)，其模型默认采用 AGPL-3.0，本项目选择相应的开源路径。分发应用或修改版本时，应遵守协议中对应源代码、许可声明等要求；修改版本通过网络提供交互服务时，还需遵守第 13 条的源码提供要求。商业使用仍须满足协议条件；需要闭源集成 YOLO 时，应另行取得适用的 Ultralytics Enterprise 授权，该授权本身不会改变本项目代码的 AGPL 许可。
+
+### 第三方模型与许可
+
+| 组件 | 来源与许可 | 仓库内记录 |
+| --- | --- | --- |
+| YOLO26s-pose / Core ML 转换模型 | [Ultralytics](https://www.ultralytics.com/license)，默认 AGPL-3.0；本项目按开源路径使用 | [来源说明](<Fancam Duck/Models/README.txt>)、[权重及转换清单](<Fancam Duck/Models/manifest.json>) |
+| OSNet 参考源码 | [deep-person-reid](https://github.com/KaiyangZhou/deep-person-reid)，MIT | [原始许可及版权声明](tools/reference/osnet/LICENSE) |
+| OSNet x0.25 MSMT17 权重 / Core ML 转换模型 | [作者模型库](https://huggingface.co/kaiyangzhou/osnet) 标注 MIT | [来源与使用边界](<Fancam Duck/Models/README.txt>) |
+| TrackTrack 参考实现与 Swift 移植所依据的算法代码 | [TrackTrack](https://github.com/kamkyu94/TrackTrack)，MIT；固定参考版本见模型清单 | [原始许可及版权声明](tools/reference/tracktrack/LICENSE) |
+
+第三方内容保留其原始许可与版权，不因根目录 LICENSE 被重新授权。训练数据集、预训练权重及其他素材的使用条件需分别遵守；本仓库的协议设置不代表已经完成数据集及所有发布渠道的授权审核。许可来源核对日期：2026-10-19。
 
 ## macOS 安装包
 
