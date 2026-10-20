@@ -73,9 +73,13 @@ enum RedactionRenderer {
         let transformed=upright.transformed(by:transform)
         let original=transformed.cropped(to:extent)
         var result=original
+        // The UI range 0...100 now spans the previous physical strength 0...30%.
+        let amount=RedactionSettings.renderStrength(strength)
+        if style != .image && amount == 0 {return original}
+        let lowStrengthRamp=min(1,amount/0.3)
         // A source-anchored grid and constant block size prevent texture crawling as boxes move.
-        let sourceBlock=max(6,max(source.width,source.height)*(0.003+min(1,max(0,strength))*0.007))
-        let block=sourceBlock*scale
+        let sourceBlock=max(6,max(source.width,source.height)*(0.003+amount*0.007))
+        let block=sourceBlock*scale*lowStrengthRamp
         let base:CIImage
         switch style {
         case .mosaic:
@@ -83,8 +87,8 @@ enum RedactionRenderer {
             pixel.center=CGPoint(x:-origin.x*scale,y:-origin.y*scale)
             base=pixel.outputImage?.cropped(to:extent) ?? CIImage(color:.black).cropped(to:extent)
         case .frosted:
-            base=transformed.clampedToExtent().applyingGaussianBlur(sigma:max(10,sourceBlock*1.6)*scale)
-                .applyingFilter("CIColorControls",parameters:[kCIInputSaturationKey:0.65,kCIInputBrightnessKey:0.025]).cropped(to:extent)
+            // Radius is evaluated per subject below, rather than from the full video size.
+            base=original
         case .image:
             // Image mode uses only the supplied pixels and alpha, without an external backing.
             base=original
@@ -93,27 +97,68 @@ enum RedactionRenderer {
             let rect=CGRect(x:box.x*source.width,y:(1-box.y-box.height)*source.height,width:box.width*source.width,height:box.height*source.height).applying(transform)
             guard rect.intersects(extent) else { continue }
             if style == .image,let sticker {
-                // Enlarge face sticker content by 18% over the previous 1.12 scale.
-                // Preserve the protected coverage boundary so it cannot reach neighboring people.
-                // Transparent image edges retain their own shape;
-                // no generated backing, blurred outline or shadow is composited behind the sticker.
+                // Keep the complete artwork inside the tracked coverage. Aspect-fill plus
+                // overscan used to enlarge the face graphic and then cut off its features.
                 let coverage=rect
-                let fit=max(coverage.width/sticker.extent.width,coverage.height/sticker.extent.height)*(region == .face ? 1.32 : 1.12)
+                let fit=min(coverage.width/sticker.extent.width,coverage.height/sticker.extent.height)
                 let fitted=sticker.transformed(by:.init(translationX:-sticker.extent.minX,y:-sticker.extent.minY))
                     .transformed(by:.init(scaleX:fit,y:fit))
                     .transformed(by:.init(translationX:coverage.midX-sticker.extent.width*fit/2,y:coverage.midY-sticker.extent.height*fit/2))
-                result=fitted.cropped(to:coverage).composited(over:result).cropped(to:extent)
+                result=fitted.composited(over:result).cropped(to:extent)
                 continue
             }
-            let shape=CIFilter.roundedRectangleGenerator();shape.extent=rect;shape.radius=Float(min(rect.width,rect.height)*(region == .face ? 0.45 : 0.10))
-            shape.color=CIColor.white
-            guard let generated=shape.outputImage else { continue }
-            // Light proportional feathering stays inside the conservative coverage margin.
-            let mask=generated.composited(over:CIImage(color:.black).cropped(to:extent)).applyingGaussianBlur(sigma:max(0.65,min(rect.width,rect.height)*0.025)).cropped(to:extent)
-            let blend=CIFilter.blendWithMask();blend.inputImage=base;blend.backgroundImage=result;blend.maskImage=mask
+            let shortSide=min(rect.width,rect.height)
+            let mask:CIImage
+            let obscured:CIImage
+            if style == .frosted {
+                // Preserve a broad core. Gradually reduce the blur radius at the boundary,
+                // rather than shrinking and fading a uniformly blurred cutout.
+                mask=frostedMask(in:rect,region:region).composited(over:CIImage(color:.black).cropped(to:extent)).cropped(to:extent)
+                let sigma=max(1.5*scale,shortSide*(0.055+amount*0.125))*lowStrengthRamp
+                let variable=CIFilter.maskedVariableBlur()
+                variable.inputImage=transformed.clampedToExtent().cropped(to:rect.insetBy(dx:-sigma*3,dy:-sigma*3))
+                variable.mask=mask
+                variable.radius=Float(sigma)
+                obscured=(variable.outputImage ?? original).cropped(to:rect)
+            } else {
+                let feather=max(0.35*scale,shortSide*0.025)
+                let inset=min(shortSide*0.15,feather*2)
+                let shape=CIFilter.roundedRectangleGenerator();shape.extent=rect.insetBy(dx:inset,dy:inset)
+                shape.radius=Float(max(0,shortSide*(region == .face ? 0.45 : 0.10)-inset));shape.color=CIColor.white
+                guard let generated=shape.outputImage else {continue}
+                mask=generated.applyingGaussianBlur(sigma:feather).cropped(to:rect)
+                    .composited(over:CIImage(color:.black).cropped(to:extent)).cropped(to:extent)
+                obscured=base
+            }
+            let blend=CIFilter.blendWithMask();blend.inputImage=obscured;blend.backgroundImage=result;blend.maskImage=mask
             if let image=blend.outputImage { result=image.cropped(to:extent) }
         }
         return result
+    }
+    /// Full-size head envelope, or a broad body core with smooth transitions on all four sides.
+    /// Both reach zero at the boundary, so no mask is cut off at a nonzero opacity.
+    static func frostedMask(in rect:CGRect,region:RedactionSettings.Region) -> CIImage {
+        if region == .face {
+            let radial=CIFilter.radialGradient()
+            radial.center = .zero;radial.radius0=0.8;radial.radius1=1
+            radial.color0 = .white;radial.color1 = .black
+            return (radial.outputImage ?? CIImage(color:.black))
+                .transformed(by:CGAffineTransform(scaleX:rect.width/2,y:rect.height/2)
+                    .concatenating(.init(translationX:rect.midX,y:rect.midY))).cropped(to:rect)
+        }
+        let transition=min(rect.width,rect.height)*0.14
+        let edges:[(CGPoint,CGPoint)]=[
+            (.init(x:rect.minX,y:rect.midY),.init(x:rect.minX+transition,y:rect.midY)),
+            (.init(x:rect.maxX,y:rect.midY),.init(x:rect.maxX-transition,y:rect.midY)),
+            (.init(x:rect.midX,y:rect.minY),.init(x:rect.midX,y:rect.minY+transition)),
+            (.init(x:rect.midX,y:rect.maxY),.init(x:rect.midX,y:rect.maxY-transition))
+        ]
+        return edges.reduce(CIImage(color:.white).cropped(to:rect)) { mask,edge in
+            let gradient=CIFilter.smoothLinearGradient()
+            gradient.point0=edge.0;gradient.point1=edge.1;gradient.color0 = .black;gradient.color1 = .white
+            return (gradient.outputImage ?? CIImage(color:.black)).cropped(to:rect)
+                .applyingFilter("CIMinimumCompositing",parameters:[kCIInputBackgroundImageKey:mask])
+        }
     }
     static func composition(trackID:CMPersistentTrackID,range:CMTimeRange,transform:CGAffineTransform,source:CGSize,
                             output:CGSize,start:Double,crops:[CropPlan.Frame],plan:RedactionPlan,strength:Double,rate:Double,style:RedactionSettings.Style = .frosted,imageData:Data? = nil) -> AVMutableVideoComposition {

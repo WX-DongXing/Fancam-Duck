@@ -231,7 +231,7 @@ final class RedactionTests: XCTestCase {
             }
         }
     }
-    func testImageOverlayHasNoBackingOrShadowAndOverscansCoverage() throws {
+    func testImageOverlayHasNoBackingOrShadowAndPreservesArtwork() throws {
         let size=64,row=size*4
         var bytes=[UInt8](repeating:255,count:size*row)
         for y in 0..<size {for x in 0..<size {
@@ -245,10 +245,10 @@ final class RedactionTests: XCTestCase {
         let transparent=CIImage(color:CIColor(red:1,green:0,blue:0,alpha:0)).cropped(to:CGRect(x:0,y:0,width:16,height:8))
         let frosted=RedactionRenderer.render(source,source:bounds.size,crop:bounds,output:bounds.size,boxes:[box],strength:0.65,style:.frosted)
         let image=RedactionRenderer.render(source,source:bounds.size,crop:bounds,output:bounds.size,boxes:[box],strength:0.65,style:.image,sticker:transparent)
-        let a=try XCTUnwrap(context.createCGImage(frosted,from:bounds)),b=try XCTUnwrap(context.createCGImage(image,from:bounds))
-        XCTAssertGreaterThan(Self.meanDifference(a,b),10,"Image mode must not also apply frosted video")
+        let b=try XCTUnwrap(context.createCGImage(image,from:bounds))
         XCTAssertLessThan(Self.meanDifference(original,b),0.01,"Transparent pixels must not create an external dark backing")
-        XCTAssertGreaterThan(Self.meanDifference(original,a),20,"The filter must actually obscure source detail")
+        let protectedCentre=CGRect(x:24,y:24,width:16,height:16)
+        XCTAssertGreaterThan(Self.meanDifference(try XCTUnwrap(context.createCGImage(image,from:protectedCentre)),try XCTUnwrap(context.createCGImage(frosted,from:protectedCentre))),60,"The protected centre must still obscure source detail while the edge feathers out")
         let untouched=CGRect(x:0,y:0,width:8,height:8)
         XCTAssertLessThan(Self.meanDifference(try XCTUnwrap(context.createCGImage(source,from:untouched)),try XCTUnwrap(context.createCGImage(image,from:untouched))),0.01)
         let sticker=CIImage(color:CIColor(red:1,green:0,blue:0)).cropped(to:CGRect(x:0,y:0,width:16,height:8))
@@ -256,11 +256,106 @@ final class RedactionTests: XCTestCase {
         var pixel=[UInt8](repeating:0,count:4)
         context.render(covered,toBitmap:&pixel,rowBytes:4,bounds:CGRect(x:32,y:32,width:1,height:1),format:.RGBA8,colorSpace:CGColorSpace(name:CGColorSpace.sRGB))
         XCTAssertGreaterThan(pixel[0],240);XCTAssertLessThan(pixel[1],10)
-        context.render(covered,toBitmap:&pixel,rowBytes:4,bounds:CGRect(x:16,y:17,width:1,height:1),format:.RGBA8,colorSpace:CGColorSpace(name:CGColorSpace.sRGB))
-        XCTAssertGreaterThan(pixel[0],240);XCTAssertLessThan(pixel[1],10,"Aspect fill must cover the full mask height without letterboxing")
+        let letterbox=CGRect(x:16,y:17,width:1,height:1)
+        XCTAssertLessThan(Self.meanDifference(try XCTUnwrap(context.createCGImage(source,from:letterbox)),try XCTUnwrap(context.createCGImage(covered,from:letterbox))),0.01,"Aspect fit preserves the complete artwork without stretching or cropping")
         let outside=CGRect(x:12,y:16,width:4,height:32)
         XCTAssertLessThan(Self.meanDifference(try XCTUnwrap(context.createCGImage(source,from:outside)),try XCTUnwrap(context.createCGImage(covered,from:outside))),0.01,"Enlarging the image must not expand onto neighboring people")
 
+    }
+    func testStickerRetainsBothEdgesAsPersonGrows() throws {
+        let bounds=CGRect(x:0,y:0,width:256,height:256),context=CIContext()
+        let source=CIImage(color:.black).cropped(to:bounds)
+        let stickerBounds=CGRect(x:0,y:0,width:80,height:40)
+        let sticker=CIImage(color:CIColor(red:0,green:1,blue:0)).cropped(to:CGRect(x:0,y:0,width:8,height:40))
+            .composited(over:CIImage(color:CIColor(red:0,green:0,blue:1)).cropped(to:CGRect(x:72,y:0,width:8,height:40)))
+            .composited(over:CIImage(color:CIColor(red:1,green:0,blue:0)).cropped(to:stickerBounds))
+        for side in [32.0,64.0,128.0] {
+            let box=NormalizedRect(x:(128-side/2)/256,y:(128-side/2)/256,width:side/256,height:side/256)
+            let result=RedactionRenderer.render(source,source:bounds.size,crop:bounds,output:bounds.size,boxes:[box],strength:0.65,style:.image,sticker:sticker)
+            for (x,channel) in [(128-side/2+side*0.05,1),(128+side/2-side*0.05,2)] {
+                var pixel=[UInt8](repeating:0,count:4)
+                context.render(result,toBitmap:&pixel,rowBytes:4,bounds:CGRect(x:x,y:128,width:1,height:1),format:.RGBA8,colorSpace:CGColorSpace(name:CGColorSpace.sRGB))
+                XCTAssertGreaterThan(pixel[channel],220,"Both artwork edges must remain visible at every target size")
+            }
+        }
+    }
+    func testFrostedMaskPreservesFlatColourAndDoesNotSpillOutsideCoverage() throws {
+        let bounds=CGRect(x:0,y:0,width:128,height:128),context=CIContext()
+        let source=CIImage(color:CIColor(red:0.8,green:0.2,blue:0.1)).cropped(to:bounds)
+        let result=RedactionRenderer.render(source,source:bounds.size,crop:bounds,output:bounds.size,boxes:[.init(x:0.25,y:0.25,width:0.5,height:0.5)],strength:1,style:.frosted)
+        XCTAssertLessThan(Self.meanDifference(try XCTUnwrap(context.createCGImage(source,from:bounds)),try XCTUnwrap(context.createCGImage(result,from:bounds))),0.1,"Blur must not tint or brighten a flat-colour face into a visible patch")
+        let textured=try XCTUnwrap(CIFilter(name:"CICheckerboardGenerator",parameters:["inputWidth":4])?.outputImage).cropped(to:bounds)
+        let blurred=RedactionRenderer.render(textured,source:bounds.size,crop:bounds,output:bounds.size,boxes:[.init(x:0.25,y:0.25,width:0.5,height:0.5)],strength:1,style:.frosted)
+        let outside=CGRect(x:0,y:0,width:32,height:128)
+        XCTAssertLessThan(Self.meanDifference(try XCTUnwrap(context.createCGImage(textured,from:outside)),try XCTUnwrap(context.createCGImage(blurred,from:outside))),0.1)
+        let centre=CGRect(x:56,y:56,width:16,height:16)
+        XCTAssertGreaterThan(Self.meanDifference(try XCTUnwrap(context.createCGImage(textured,from:centre)),try XCTUnwrap(context.createCGImage(blurred,from:centre))),20,"The protected centre must still remove image detail")
+    }
+    func testEveryIntegerStrengthLevelDisplaysWithoutFloatingPointTruncation() {
+        for level in 0...100 {
+            XCTAssertEqual(RedactionSettings.displayStrength(Double(level)/100),level)
+        }
+    }
+    func testStrengthScaleMatchesPreviousThirtyPercentAtMaximum() {
+        XCTAssertEqual(RedactionSettings.renderStrength(0),0)
+        XCTAssertEqual(RedactionSettings.renderStrength(1),0.3,accuracy:0.000001)
+        XCTAssertEqual(RedactionSettings.renderStrength(RedactionSettings.defaultStrength),0.03,accuracy:0.000001)
+        XCTAssertEqual(RedactionSettings.renderStrength(-1),0)
+        XCTAssertEqual(RedactionSettings.renderStrength(2),0.3)
+    }
+    @MainActor func testZeroStrengthIsAcceptedAndLeavesVideoUnchanged() throws {
+        let model=AppModel();model.startDemo();defer {model.goHome()}
+        model.setRedactionStrength(0)
+        XCTAssertEqual(model.project?.settings.redaction.strength,0)
+        model.setRedactionStrength(-0.2)
+        XCTAssertEqual(model.project?.settings.redaction.strength,0)
+        model.setRedactionStrength(0.1)
+        XCTAssertEqual(model.project?.settings.redaction.strength,0.1)
+        let bounds=CGRect(x:0,y:0,width:128,height:128),context=CIContext()
+        let source=try XCTUnwrap(CIFilter(name:"CICheckerboardGenerator",parameters:["inputWidth":4])?.outputImage).cropped(to:bounds)
+        for style in [RedactionSettings.Style.frosted,.mosaic] {
+            let result=RedactionRenderer.render(source,source:bounds.size,crop:bounds,output:bounds.size,
+                boxes:[.init(x:0.25,y:0.25,width:0.5,height:0.5)],strength:0,style:style)
+            XCTAssertLessThan(Self.meanDifference(try XCTUnwrap(context.createCGImage(source,from:bounds)),try XCTUnwrap(context.createCGImage(result,from:bounds))),0.01)
+        }
+    }
+    func testFrostedEdgeFadesBeforeTheProtectedCentre() throws {
+        let bounds=CGRect(x:0,y:0,width:128,height:128),context=CIContext()
+        let source=try XCTUnwrap(CIFilter(name:"CICheckerboardGenerator",parameters:["inputWidth":2])?.outputImage).cropped(to:bounds)
+        let result=RedactionRenderer.render(source,source:bounds.size,crop:bounds,output:bounds.size,
+            boxes:[.init(x:0.25,y:0.25,width:0.5,height:0.5)],strength:1,style:.frosted)
+        func change(_ rect:CGRect) throws -> Double {
+            Self.meanDifference(try XCTUnwrap(context.createCGImage(source,from:rect)),try XCTUnwrap(context.createCGImage(result,from:rect)))
+        }
+        XCTAssertLessThan(try change(CGRect(x:32,y:60,width:1,height:8)),40,"The outer transition must remain subtle instead of forming an obvious hard patch")
+        XCTAssertGreaterThan(try change(CGRect(x:40,y:60,width:2,height:8)),60,"Coverage must reach the face sides instead of shrinking to a small central patch")
+        XCTAssertGreaterThan(try change(CGRect(x:60,y:60,width:8,height:8)),60,"The centre must retain substantial detail removal")
+        XCTAssertEqual(RedactionSettings().strength,0.1)
+        let restored=try JSONDecoder().decode(RedactionSettings.self,from:Data("{}".utf8))
+        XCTAssertEqual(restored.strength,0.1)
+        let custom=RedactionSettings(strength:0.9)
+        XCTAssertEqual(try JSONDecoder().decode(RedactionSettings.self,from:JSONEncoder().encode(custom)).strength,0.9)
+    }
+    func testMovingMaskDoesNotAccumulateAPathSizedEnvelope() throws {
+        let input=(0..<20).map {index in RedactionFrame(time:Double(index)/6,rect:.init(x:0.1+Double(index)*0.025,y:0.3,width:0.05,height:0.07))}
+        let smoothed=RedactionMotion.smooth(input)
+        for (raw,frame) in zip(input,smoothed) {
+            XCTAssertLessThan(frame.rect.width,raw.rect.width*1.6)
+            let i=smoothed.firstIndex(of:frame)!
+            for neighbour in input[max(0,i-1)...min(input.count-1,i+1)] {
+                let halfway=CGRect(x:(raw.rect.x+neighbour.rect.x)/2,y:raw.rect.y,width:raw.rect.width,height:raw.rect.height)
+                XCTAssertTrue(frame.rect.cgRect.contains(halfway),"Keep coverage for the half-step detection-cache offset")
+            }
+            XCTAssertTrue(frame.rect.cgRect.contains(raw.rect.cgRect))
+        }
+    }
+    func testLegacyRedactionPlanDecodesButRequiresRebuild() throws {
+        var plan=RedactionPlan(subjects:[],region:.face,start:0,end:1,tracks:[])
+        var settings=EditSettings();settings.start=0;settings.end=1
+        XCTAssertTrue(plan.covers(settings))
+        plan.smoothingVersion=nil
+        let restored=try JSONDecoder().decode(RedactionPlan.self,from:JSONEncoder().encode(plan))
+        XCTAssertFalse(restored.covers(settings))
     }
     @MainActor func testImagePreparationTrimsTransparentPaddingAndRejectsInvisibleImage() throws {
         let format=UIGraphicsImageRendererFormat();format.scale=1;format.opaque=false

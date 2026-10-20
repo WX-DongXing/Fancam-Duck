@@ -160,21 +160,12 @@ struct ExportView: View {
         }.accessibilityIdentifier("exportResolution")
     }
     private func actionLabel(_ title:String,symbol:String,primary:Bool,enabled:Bool=true) -> some View {
-        #if targetEnvironment(macCatalyst)
-        Label(title,systemImage:symbol)
-            .font(.system(size:13,weight:primary ? .semibold : .regular))
-            .frame(maxWidth:.infinity).frame(height:primary ? 40 : 34).contentShape(Rectangle())
-            .foregroundStyle(primary ? Color.acOnAccent : .white)
-            .background(primary ? Color.acAccent : DesktopPalette.raised,in:RoundedRectangle(cornerRadius:8))
-            .opacity(enabled ? 1 : 0.5)
-        #else
         Label(title,systemImage:symbol)
             .font(primary ? .body.weight(.semibold) : .subheadline)
             .lineLimit(1).minimumScaleFactor(0.75)
             .frame(maxWidth:.infinity).frame(height:primary ? 56 : 48)
             .contentShape(Capsule())
             .modifier(StudioGlassSurface(shape:Capsule(),selected:primary && enabled))
-        #endif
     }
     private var backAction: some View {
         Button { model.backToEditor() } label: {

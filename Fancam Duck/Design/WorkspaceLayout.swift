@@ -71,9 +71,10 @@ enum DesktopPalette {
 }
 struct DesktopButtonStyle:ButtonStyle {
     var prominent=false
+    var height:CGFloat=44
     func makeBody(configuration:Configuration) -> some View {
         configuration.label.font(.system(size:13,weight:.medium))
-            .padding(.horizontal,14).frame(minHeight:34).contentShape(Capsule())
+            .padding(.horizontal,14).frame(minHeight:height).contentShape(Capsule())
             .foregroundStyle(.white)
             .modifier(StudioGlassSurface(shape:Capsule(),selected:prominent))
             .opacity(configuration.isPressed ? 0.7 : 1)

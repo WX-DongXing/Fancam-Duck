@@ -364,6 +364,7 @@ final class EditorFlowTests: XCTestCase {
         let tools=app.segmentedControls["editorToolbar"]
         let tool=tools.buttons["构图"]
         XCTAssertTrue(tool.waitForExistence(timeout:15))
+        XCTAssertEqual(app.buttons["primaryAction"].label,"生成预览")
         tool.tap()
         let picker=app.segmentedControls["compositionAspect"]
         XCTAssertTrue(picker.waitForExistence(timeout:5))
@@ -423,12 +424,23 @@ final class EditorFlowTests: XCTestCase {
         XCTAssertEqual(enabled.value as? String,"1")
         XCTAssertEqual(disabledSwitchFrame.maxX-enabled.frame.maxX,100,accuracy:1)
         region.tap()
+        XCTAssertTrue(app.buttons["人脸"].isHittable)
+        XCTAssertTrue(app.buttons["全身"].isHittable)
+        XCTAssertFalse(app.buttons["回到选人帧"].exists)
         app.buttons["全身"].tap()
         XCTAssertEqual(region.value as? String,"全身")
         XCTAssertEqual(style.buttons.count,2)
         XCTAssertFalse(style.buttons["贴片"].exists)
         let strength=app.sliders["redactionStrength"]
         XCTAssertTrue(strength.isHittable)
+        XCTAssertEqual(strength.value as? String,"10")
+        strength.adjust(toNormalizedSliderPosition:0)
+        XCTAssertEqual(strength.value as? String,"0")
+        strength.adjust(toNormalizedSliderPosition:1)
+        XCTAssertEqual(strength.value as? String,"100")
+        strength.adjust(toNormalizedSliderPosition:0.1)
+        // Intermediate touch positions can round by a few steps; defaults and endpoints are exact.
+        XCTAssertEqual(try XCTUnwrap(Double(strength.value as? String ?? "")),10,accuracy:3)
         strength.adjust(toNormalizedSliderPosition:0.8)
         style.buttons.element(boundBy:1).tap()
         XCTAssertTrue(style.buttons.element(boundBy:1).isSelected)

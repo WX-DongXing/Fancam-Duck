@@ -47,9 +47,11 @@ final class AppModel {
         let target:NormalizedRect?
         let targetTime:Double
         let settings:EditSettings
+        let redactionRevision:Int?
         init(_ project:VideoProject) {
             projectID=project.id;sourceFileName=project.sourceFileName;metadata=project.metadata
             target=project.target;targetTime=project.targetTime;settings=project.settings
+            redactionRevision=project.settings.redaction.enabled ? project.redactionPlan?.smoothingVersion : nil
         }
     }
     private var lastGeneratedRecipe:GenerationRecipe?
@@ -59,6 +61,7 @@ final class AppModel {
     }
     var hasReusableOutput:Bool {
         guard let project,let outputURL,lastGeneratedRecipe==GenerationRecipe(project) else {return false}
+        if project.settings.redaction.enabled,project.redactionPlan?.covers(project) != true {return false}
         return FileManager.default.fileExists(atPath:outputURL.path)
     }
     private var compositionAutomaticSettings:EditSettings?
@@ -1190,7 +1193,7 @@ extension AppModel {
     }
     func setRedactionStrength(_ value:Double) {
         guard settingsEnabled,value.isFinite else {return}
-        project?.settings.redaction.strength=min(1,max(0.3,value))
+        project?.settings.redaction.strength=min(1,max(0,value))
         refreshRedactionPreview();persist()
     }
     func enableAutomaticRedaction() {

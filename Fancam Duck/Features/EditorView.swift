@@ -5,7 +5,6 @@ struct EditorView: View {
     @Bindable var model: AppModel
     @State private var savingFile=false
     @State private var generatedPlaying=false
-    @State private var redactionStrengthEditing=false
     @State private var showRedactionHelp=false
     @State private var drawnBox: NormalizedRect?
     @Environment(\.scenePhase) private var scenePhase
@@ -139,7 +138,7 @@ struct EditorView: View {
                 Rectangle().fill(DesktopPalette.border).frame(width:1,height:24)
                 VStack(alignment:.leading,spacing:3) {
                     Text(model.project?.title ?? "视频编辑").font(.system(size:14,weight:.semibold)).lineLimit(1)
-                    Text("FANCAM DUCK  /  视频工作台").font(.system(size:9,weight:.medium,design:.monospaced)).foregroundStyle(.secondary)
+                    Text(model.hasCompletedTracking ? "FANCAM DUCK  /  视频工作台" : "FANCAM DUCK  /  人物分析").font(.system(size:9,weight:.medium,design:.monospaced)).foregroundStyle(.secondary)
                 }
                 Spacer(minLength:8)
 
@@ -179,8 +178,7 @@ struct EditorView: View {
                 if model.hasCompletedTracking {
                     if let tool=displayedTool {
                         settingsPanel(tool)
-                            .frame(height:tool == .redaction ? 188 : tool == .motion ? 104 : 154,alignment:.top)
-                            .clipped()
+                            .fixedSize(horizontal:false,vertical:true)
                     }
                 } else {Text(model.project?.target == nil ? "请在画面中选择主角" : "主角已选择").font(.subheadline)}
                 if let activity=model.editorActivityText {
@@ -194,7 +192,8 @@ struct EditorView: View {
                 HStack(spacing:10) {
                     Button(model.generatingVideo ? "取消生成" : "重新选择") {
                         if model.generatingVideo {model.cancelGeneration()} else {model.reselectAnalysisTarget()}
-                    }.buttonStyle(DesktopButtonStyle())
+                    }.buttonStyle(DesktopButtonStyle(height:bottomControlHeight))
+                        .accessibilityIdentifier("reselectAnalysis")
                     processingAction
                 }
             } else {
@@ -542,7 +541,7 @@ struct EditorView: View {
                 }.buttonStyle(.plain).contentShape(Capsule())
                     .modifier(StudioGlassSurface(shape:Capsule(),selected:isProcessing || canStart))
                     .disabled(isProcessing ? !isPaused : !canStart)
-                    .accessibilityLabel(isProcessing ? (model.generatingVideo ? "正在生成视频" : isPaused ? "继续分析" : model.phase.progress>=0.9 ? "正在补全未完成片段" : "正在分析人物") : startTitle)
+                    .accessibilityLabel(isProcessing ? (model.generatingVideo ? "正在生成预览" : isPaused ? "继续分析" : model.phase.progress>=0.9 ? "正在补全未完成片段" : "正在分析人物") : startTitle)
                     .accessibilityValue(isProcessing ? processingPercent : "")
                     .accessibilityHint(isProcessing ? (isPaused ? "点按继续分析" : "请使用旁边的重新选择或取消操作") : "按当前工作台状态继续")
                     .accessibilityIdentifier("primaryAction")
@@ -561,7 +560,7 @@ struct EditorView: View {
     }
     private var usesExpandedWorkspace:Bool {
         #if targetEnvironment(macCatalyst)
-        false
+        true
         #else
         horizontalSizeClass == .regular
         #endif
@@ -586,11 +585,10 @@ struct EditorView: View {
             if isBlocked || model.manualSelection {
                 recoveryDock.frame(height:model.manualSelection ? 244 : 180)
             } else if isProcessing {
-                Text(model.generatingVideo ? "正在生成视频" : isPaused ? "分析已暂停" : "正在分析人物").font(.subheadline).padding(.horizontal,18)
+                Text(model.generatingVideo ? "正在生成预览" : isPaused ? "分析已暂停" : "正在分析人物").font(.subheadline).padding(.horizontal,18)
             } else if isCompleted {completedActions}
             else if let tool=displayedTool {
-                inlineSettings(tool).frame(height:tool == .composition ? 154 : tool == .redaction ? 184 : 104,alignment:.top)
-                    .clipped()
+                inlineSettings(tool).fixedSize(horizontal:false,vertical:true)
             } else {
                 VStack(alignment:.leading,spacing:12) {
                     Text(model.project?.target == nil ? "在原片中轻点主角" : "主角已选中")
@@ -618,7 +616,7 @@ struct EditorView: View {
         if model.isPlaying {return "请先暂停预览"}
         if model.needsRegeneration {return "重新生成"}
 
-        return model.hasReusableOutput ? "预览成片" : "生成视频"
+        return model.hasReusableOutput ? "预览成片" : "生成预览"
     }
 
     private func selectTool(_ tool: WorkspaceTool) {
@@ -627,7 +625,7 @@ struct EditorView: View {
         model.pausePreview(refresh: false)
         if model.redactionEditing && tool != .redaction {model.finishRedaction(commit:true,keepComposition:true)}
         if tool == .composition || tool == .motion {model.beginComposition();guard model.compositionEditing else {return}}
-        if tool == .redaction {redactionStrengthEditing=false;model.beginRedaction()}
+        if tool == .redaction {model.beginRedaction()}
         activeTool=tool;lastSettingsTool=tool
     }
     private func finishTool(commit: Bool) {
@@ -673,18 +671,8 @@ struct EditorView: View {
         }.dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
     // Shared control sizing and spacing for phone, wide layouts and Mac Catalyst.
-    private let panelSpacing:CGFloat = 0
     private let panelInset:CGFloat = 12
-    private var panelFont:Font {.caption}
-    @ViewBuilder private var redactionPanel: some View {
-        #if targetEnvironment(macCatalyst)
-        fullRedactionPanel
-        #else
-        if horizontalSizeClass == .compact {phoneRedactionPanel}
-        else {fullRedactionPanel}
-        #endif
-    }
-    private var phoneRedactionPanel: some View {
+    private var redactionPanel: some View {
         VStack(spacing:8) {
             HStack(spacing:0) {
                 Toggle(isOn:Binding(
@@ -716,11 +704,7 @@ struct EditorView: View {
                         ForEach(RedactionSettings.Region.allCases,id:\.self) {region in
                             Text(region == .face ? "人脸" : "全身").tag(region)
                         }
-                    }
-                    if model.redactionPrimaryBody == nil {
-                        Divider()
-                        Button("回到选人帧",systemImage:"viewfinder") {model.seek(to:model.project?.targetTime ?? 0)}
-                    }
+                    }.pickerStyle(.inline).labelsHidden()
                 } label: {
                     HStack(spacing:5) {
                         Text(model.project?.settings.redaction.region == .person ? "全身" : "人脸")
@@ -743,26 +727,17 @@ struct EditorView: View {
             .frame(height:48).accessibilityIdentifier("redactionStyle")
             HStack(spacing:10) {
                 if model.project?.settings.redaction.style == .image {
-                    ForEach(RedactionSticker.allCases) {sticker in
-                        Button {model.setRedactionSticker(sticker)} label: {
-                            if let image=sticker.image {
-                                Image(uiImage:image).resizable().scaledToFit().frame(width:34,height:34)
-                                    .frame(maxWidth:.infinity,minHeight:44).contentShape(Rectangle())
-                                    .background(model.project?.settings.redaction.imageData == sticker.data ? .white.opacity(0.16) : .clear,in:RoundedRectangle(cornerRadius:12))
-                            }
-                        }.buttonStyle(.plain).accessibilityLabel(sticker.title+"贴片")
-                            .accessibilityIdentifier("redactionSticker-"+sticker.rawValue)
-                            .accessibilityAddTraits(model.project?.settings.redaction.imageData == sticker.data ? .isSelected : [])
-                    }
+                    stickerChoices
                 } else {
                     Text("强度").font(.caption)
                     Slider(value:Binding(
-                        get:{model.project?.settings.redaction.strength ?? 0.65},
-                        set:{model.setRedactionStrength($0)}
-                    ),in:0.3...1)
+                        get:{(model.project?.settings.redaction.strength ?? RedactionSettings.defaultStrength)*100},
+                        set:{model.setRedactionStrength($0/100)}
+                    ),in:0...100,step:1)
                     .tint(.white).accessibilityLabel("打码强度")
+                    .accessibilityValue("\(RedactionSettings.displayStrength(model.project?.settings.redaction.strength ?? RedactionSettings.defaultStrength))")
                     .accessibilityIdentifier("redactionStrength")
-                    Text("\(Int((model.project?.settings.redaction.strength ?? 0.65)*100))%")
+                    Text("\(RedactionSettings.displayStrength(model.project?.settings.redaction.strength ?? RedactionSettings.defaultStrength))")
                         .font(.caption.monospacedDigit()).frame(width:34,alignment:.trailing)
                         .accessibilityHidden(true)
                 }
@@ -771,42 +746,18 @@ struct EditorView: View {
             .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24),interactive:false))
             .accessibilityElement(children:.contain)
     }
-    private var fullRedactionPanel: some View {
-        VStack(spacing:max(8,panelSpacing)) {
-            if redactionStrengthEditing && model.project?.settings.redaction.style != .image {
-                HStack(spacing:12) {
-                    Text("强度").font(.caption)
-                    Slider(value:Binding(get:{model.project?.settings.redaction.strength ?? 0.65},set:{model.setRedactionStrength($0)}),in:0.3...1)
-                        .tint(.white).accessibilityLabel("打码强度").accessibilityIdentifier("redactionStrength")
-                }.frame(height:50)
-            } else {
-                NativeSegmentedControl(title:"打码范围",options:RedactionSettings.Region.allCases,selection:Binding(
-                    get:{model.project?.settings.redaction.region ?? .face},set:{model.setRedactionRegion($0)}
-                ),label:{$0.rawValue})
-                .frame(height:48)
-                .accessibilityIdentifier("redactionRegion")
-            }
-            NativeSegmentedControl(title:"打码样式",options:RedactionSettings.Style.allCases.filter {model.project?.settings.redaction.region != .person || $0 != .image},selection:Binding(
-                get:{model.project?.settings.redaction.style ?? .frosted},set:{model.setRedactionStyle($0)}
-            ),label:{$0.rawValue})
-            .frame(height:48)
-            .accessibilityIdentifier("redactionStyle")
-            HStack(spacing:12) {
-                if model.importingRedactionImage {ProgressView().frame(width:44,height:44)}
-                else if model.redactionPrimaryBody == nil {
-                    StudioTextButton(title:"预览遮挡") {model.seek(to:model.project?.targetTime ?? 0)}.font(panelFont)
-                } else if model.project?.settings.redaction.style == .image {
-                    Label {Text("直拍鸭 Logo").font(.caption)} icon: {Image("BrandLogo").resizable().scaledToFit().frame(width:24,height:24)}
-                } else {
-                    StudioTextButton(title:redactionStrengthEditing ? "范围" : "强度") {redactionStrengthEditing.toggle()}
-                        .font(panelFont).accessibilityLabel("打码强度设置")
+    private var stickerChoices:some View {
+        ForEach(RedactionSticker.allCases) {sticker in
+            Button {model.setRedactionSticker(sticker)} label: {
+                if let image=sticker.image {
+                    Image(uiImage:image).resizable().scaledToFit().frame(width:34,height:34)
+                        .frame(maxWidth:.infinity,minHeight:44).contentShape(Rectangle())
+                        .background(model.project?.settings.redaction.imageData == sticker.data ? .white.opacity(0.16) : .clear,in:RoundedRectangle(cornerRadius:12))
                 }
-                StudioTextButton(title:model.project?.settings.redaction.enabled == true ? "关闭打码" : "开启打码") {
-                    if model.project?.settings.redaction.enabled == true {model.clearRedactions()} else {model.enableAutomaticRedaction()}
-                }.font(panelFont)
-            }.buttonStyle(.plain)
-        }.padding(panelInset)
-            .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24),interactive:false))
+            }.buttonStyle(.plain).accessibilityLabel(sticker.title+"贴片")
+                .accessibilityIdentifier("redactionSticker-"+sticker.rawValue)
+                .accessibilityAddTraits(model.project?.settings.redaction.imageData == sticker.data ? .isSelected : [])
+        }
     }
     private var motionPanel: some View {
         VStack(alignment:.leading,spacing:12) {
@@ -828,7 +779,7 @@ struct EditorView: View {
         }
     }
     private var compositionPanel: some View {
-        VStack(spacing:max(6,panelSpacing)) {
+        VStack(spacing:6) {
             NativeSegmentedControl(title:"画面比例",options:OutputAspectRatio.allCases,selection:Binding(
                 get:{model.project?.settings.aspectRatio ?? .portrait},set:{model.setCompositionAspect($0)}
             ),label:{$0.rawValue})

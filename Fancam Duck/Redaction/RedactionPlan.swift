@@ -16,10 +16,13 @@ struct RedactionSettings: Codable, Equatable, Sendable {
     var imageData: Data?
     var subjects: [RedactionSubject] = []
     var region: Region = .face
-    var strength: Double = 0.65
+    static let defaultStrength=0.1
+    static func displayStrength(_ value:Double) -> Int {Int((min(1,max(0,value))*100).rounded())}
+    static func renderStrength(_ value:Double) -> Double {min(1,max(0,value))*0.3}
+    var strength: Double = RedactionSettings.defaultStrength
     var allOthers = false
     var enabled: Bool { allOthers || !subjects.isEmpty }
-    init(subjects:[RedactionSubject]=[],region:Region = .face,strength:Double=0.65,style:Style = .frosted,imageData:Data?=nil,allOthers:Bool=false) {
+    init(subjects:[RedactionSubject]=[],region:Region = .face,strength:Double=RedactionSettings.defaultStrength,style:Style = .frosted,imageData:Data?=nil,allOthers:Bool=false) {
         self.subjects=subjects;self.region=region;self.strength=strength;self.style=style;self.imageData=imageData;self.allOthers=allOthers
     }
     private enum CodingKeys:String,CodingKey {case subjects,region,strength,style,imageData,allOthers}
@@ -28,7 +31,7 @@ struct RedactionSettings: Codable, Equatable, Sendable {
         allOthers=try values.decodeIfPresent(Bool.self,forKey:.allOthers) ?? false
         subjects=try values.decodeIfPresent([RedactionSubject].self,forKey:.subjects) ?? []
         region=try values.decodeIfPresent(Region.self,forKey:.region) ?? .face
-        strength=try values.decodeIfPresent(Double.self,forKey:.strength) ?? 0.65
+        strength=try values.decodeIfPresent(Double.self,forKey:.strength) ?? Self.defaultStrength
         style=try values.decodeIfPresent(Style.self,forKey:.style) ?? .frosted
         imageData=try values.decodeIfPresent(Data.self,forKey:.imageData)
     }
@@ -48,6 +51,9 @@ struct RedactionPlan: Codable, Equatable, Sendable {
     var start: Double
     var end: Double
     var tracks: [RedactionTrack]
+    // Also invalidates cached output when the rendering response changes.
+    static let currentSmoothingVersion=6
+    var smoothingVersion:Int? = RedactionPlan.currentSmoothingVersion
     var automaticTimes: [Double]? = nil
     var automaticPrimary: RedactionAnchor? = nil
 
@@ -59,6 +65,7 @@ struct RedactionPlan: Codable, Equatable, Sendable {
     }
 
     func covers(_ settings: EditSettings) -> Bool {
+        guard smoothingVersion == Self.currentSmoothingVersion else {return false}
         let options = settings.redaction
         if options.allOthers {
             guard region == options.region, let times=automaticTimes, let first=times.first, let last=times.last,
@@ -119,34 +126,34 @@ enum RedactionError: LocalizedError {
     }
 }
 
-/// Offline temporal envelope: short look-ahead, immediate expansion, slow contraction.
+/// Local temporal envelope: short look-ahead without a persistent movement trail.
 /// Always contains the observed region; no fading or delayed centre that could reveal a face.
 enum RedactionMotion {
     static func smooth(_ input: [RedactionFrame]) -> [RedactionFrame] {
         let sorted = input.sorted { $0.time < $1.time }
         guard !sorted.isEmpty else { return [] }
-        var envelopes = sorted.enumerated().map { index, frame -> CGRect in
-            let neighbours = sorted[max(0,index-1)...min(sorted.count-1,index+1)]
-            return neighbours.reduce(frame.rect.cgRect) { $0.union($1.rect.cgRect) }
-        }
-        for reverse in [false, true] {
-            let indices = reverse ? Array(envelopes.indices.reversed()) : Array(envelopes.indices)
-            var previous: CGRect?
-            for index in indices {
-                let raw = envelopes[index]
-                if let old = previous {
-                    // Keeping 65% of the old envelope smooths contraction without delaying coverage.
-                    let left = min(raw.minX,old.minX*0.65+raw.minX*0.35)
-                    let top = min(raw.minY,old.minY*0.65+raw.minY*0.35)
-                    let right = max(raw.maxX,old.maxX*0.65+raw.maxX*0.35)
-                    let bottom = max(raw.maxY,old.maxY*0.65+raw.maxY*0.35)
-                    envelopes[index] = CGRect(x:left,y:top,width:right-left,height:bottom-top)
-                }
-                previous = envelopes[index]
+        return sorted.enumerated().map { index, frame in
+            let before=sorted[max(0,index-1)].rect.cgRect
+            let current=frame.rect.cgRect
+            let after=sorted[min(sorted.count-1,index+1)].rect.cgRect
+            // Smooth locally without accumulating the entire path into a large trailing envelope.
+            // Union with this observation preserves its full coverage during size changes.
+            func average(_ a:CGFloat,_ b:CGFloat,_ c:CGFloat) -> CGFloat {a*0.25+b*0.5+c*0.25}
+            let left=average(before.minX,current.minX,after.minX)
+            let top=average(before.minY,current.minY,after.minY)
+            let right=average(before.maxX,current.maxX,after.maxX)
+            let bottom=average(before.maxY,current.maxY,after.maxY)
+            var filtered=CGRect(x:left,y:top,width:right-left,height:bottom-top).union(current)
+            // Cached detections can be reused within half a sampling interval. Retain that
+            // local travel envelope without unioning whole neighbouring frames or a long trail.
+            for neighbour in [before,after] {
+                let halfway=CGRect(x:(current.minX+neighbour.minX)/2,y:(current.minY+neighbour.minY)/2,
+                    width:(current.width+neighbour.width)/2,height:(current.height+neighbour.height)/2)
+                filtered=filtered.union(halfway)
             }
-        }
-        return zip(sorted,envelopes).map { frame, rect in
-            .init(time:frame.time,rect:clamped(rect.insetBy(dx:-0.003,dy:-0.003)))
+            let marginX=max(0.0005,current.width*0.015)
+            let marginY=max(0.0005,current.height*0.015)
+            return .init(time:frame.time,rect:clamped(filtered.insetBy(dx:-marginX,dy:-marginY)))
         }
     }
     static func clamped(_ rect: CGRect) -> NormalizedRect {
