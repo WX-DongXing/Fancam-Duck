@@ -152,3 +152,7 @@ Mac 控件统一（2026-10-20）：Mac Inspector 直接复用手机的 `processi
 添加 PrivacyInfo.xcprivacy，声明无追踪、无开发者数据收集，以及应用容器文件时间戳 C617.1 用途。plist 格式检查通过。iOS Simulator 与 Mac Catalyst 构建通过，逐一读取实际产物 Info.plist，确认 Bundle ID 为 com.fancamduck.com，且应用包内隐私清单与源文件一致。工程 Debug／Release 主应用、单元测试、UI 测试标识均核对通过。未执行 Apple 分发签名、App Store Connect 注册、上传或后台隐私申报；构建验证不代表商店审核通过。
 
 关于页开源入口（2026-10-20）：新增仓库与 AGPL-3.0-only LICENSE 链接，Mac Catalyst 构建通过。iPhone 设置 UI 回归通过，覆盖两个入口可点击、协议标识显示及原有返回流程；SwiftUI Link 在本机未以 XCTest Link 类型暴露，测试按实际标识查询后通过。未自动跳转外部浏览器。
+
+## 隐私与支持静态网站（2026-10-20）
+
+新增网站首页、隐私政策、支持页与 404 页；静态文件内部链接及资源存在性检查通过，根目录 Vercel 配置仅输出 website/public。部署脚本语法、生产／预览参数及非法参数拒绝使用模拟 CLI 验证通过，未实际上传。浏览器本地检查首页、隐私、支持路径及原生 FAQ 展开；检查约 710px 视口并补充中等宽度单栏样式，未完成真实手机浏览器或 Vercel 生产验证。Git 忽略规则检查排除本地发布凭据及模型，允许网站文件与部署配置。正式域名、匿名生产访问和应用内隐私链接仍待部署后确认。

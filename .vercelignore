@@ -1,0 +1,6 @@
+# Only upload the public static site and its deployment config from the CLI.
+/*
+!/vercel.json
+!/website/
+/website/*
+!/website/public/

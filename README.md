@@ -186,3 +186,9 @@ xcodebuild -project 'Fancam Duck.xcodeproj' -scheme 'Fancam Duck' \
 ## macOS 安装包
 
 本地 `.env.release` 配置团队 ID、证书、公证 profile、版本号和输出路径后，运行 `tools/release/release-macos.sh` 一键构建签名发布包；临时本地试用可运行 `tools/release/release-macos.sh --local`。配置模板为 `.env.release.example`，实际配置不提交。Developer ID 签名及 Apple 公证参数见 [macOS 发布指南](docs/ai/macos-release.md)。产物默认保存在已忽略的 `build/macos/`。
+
+## 隐私政策与支持网站
+
+静态网站位于 [website](website/README.md)，包含产品介绍、隐私政策及使用支持，可一键部署到 Vercel。部署后使用 `/privacy` 与 `/support` 填写 App Store Connect；正式域名确认后再接入应用内隐私入口。
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FWX-DongXing%2FFancam-Duck&project-name=fancam-duck&repository-name=fancam-duck-site)

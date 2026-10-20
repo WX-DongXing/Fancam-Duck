@@ -32,3 +32,6 @@ __pycache__/
 /.env.release
 /.env.release.*
 !/.env.release.example
+
+# Vercel local project linkage
+.vercel/
