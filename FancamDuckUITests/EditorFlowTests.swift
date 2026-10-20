@@ -12,6 +12,29 @@ final class EditorFlowTests: XCTestCase {
     @MainActor private func ready(_ button: XCUIElement) {
         expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: button); waitForExpectations(timeout: 12)
     }
+    @MainActor func testOverlappingPeopleAutomaticallyOfferSelectableThumbnails() throws {
+        let app=XCUIApplication()
+        app.launchArguments=["--demo-editor"]
+        app.launchEnvironment["FANCAM_DUCK_UI_OVERLAP"]="1"
+        app.launch()
+        let first=app.buttons["overlapPerson-1"],second=app.buttons["overlapPerson-2"]
+        XCTAssertTrue(first.waitForExistence(timeout:8))
+        XCTAssertTrue(second.isHittable)
+        XCTAssertLessThanOrEqual(first.frame.width,48)
+        XCTAssertLessThanOrEqual(first.frame.height,58)
+        XCTAssertFalse(app.staticTexts["人物重叠，点选缩略图"].exists)
+        second.tap()
+        XCTAssertTrue(second.isSelected)
+        XCTAssertFalse(first.isSelected)
+        XCTAssertTrue(app.buttons["primaryAction"].isEnabled)
+        let selected=app.descendants(matching:.any).matching(identifier:"selectedTargetFrame").firstMatch
+        XCTAssertEqual(selected.frame.midX,app.buttons["dancer2"].frame.midX,accuracy:2)
+        first.tap()
+        XCTAssertTrue(first.isSelected)
+        XCTAssertFalse(second.isSelected)
+        XCTAssertEqual(selected.frame.midX,app.buttons["dancer1"].frame.midX,accuracy:2)
+        capture(app,"automatic-overlap-thumbnails")
+    }
     @MainActor func testAnalysisZoomKeepsSelectionAlignedAndResets() throws {
         let app=launch()
         let person=app.buttons["dancer1"]
@@ -443,12 +466,13 @@ final class EditorFlowTests: XCTestCase {
         handlePoint.press(forDuration:0.1,thenDragTo:handlePoint.withOffset(CGVector(dx:-60,dy:0)))
         XCTAssertNotEqual(endHandle.value as? String,previousEnd)
         XCTAssertTrue(tools.exists,"Trimming within analyzed footage keeps settings available")
+        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"compositionCanvas").firstMatch.exists,"Trimming must retain the composition viewport")
         capture(app,"settings-selected-time-range")
         ready(app.buttons["primaryAction"])
         app.buttons["primaryAction"].tap()
         let generatingStage=app.descendants(matching:.any).matching(identifier:"editorStage").firstMatch
         XCTAssertTrue(generatingStage.waitForExistence(timeout:3))
-        XCTAssertEqual(generatingStage.label,"构图预览")
+        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"compositionCanvas").firstMatch.exists)
         capture(app,"generation-keeps-composition")
         app.buttons["取消生成"].tap()
     }

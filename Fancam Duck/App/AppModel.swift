@@ -587,6 +587,15 @@ final class AppModel {
     func scrub(to time:Double, within bounds:ClosedRange<Double>? = nil, sourceOnly:Bool = false) {
         guard phase == .editing else {return}
         if compositionEditing && !sourceOnly {seek(to:time);return}
+        if compositionEditing,hasCompletedTracking,let project,time.isFinite {
+            pausePreview(refresh:false)
+            let limits=bounds ?? project.settings.start...project.settings.end
+            currentTime=min(limits.upperBound,max(limits.lowerBound,time))
+            compositionCrop=CropPlan.rect(at:currentTime,in:compositionFrames)
+            player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
+            previewPlayer?.seek(to:CMTime(seconds:max(0,currentTime-project.settings.start),preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
+            return
+        }
         guard controlsEnabled,let project,time.isFinite else {return}
         pausePreview(refresh:false)
         detectionID=UUID();detectionTask?.cancel();detecting=false;observations=[];detectionNotice=nil
@@ -603,16 +612,27 @@ final class AppModel {
             if !isDemo { detectPeople() }
         } else { seek(to:currentTime) }
     }
+    // Completed trajectories retain the original analyzed bounds even after narrowing a trim.
+    var trimBounds:ClosedRange<Double>? {
+        guard let project else {return nil}
+        guard hasCompletedTracking else {return 0...max(0,project.metadata.duration)}
+        let times=targetSamples.map(\.time).filter(\.isFinite)
+        let lower=max(0,min(project.settings.start,times.min() ?? project.settings.start))
+        let upper=max(lower,min(project.metadata.duration,max(project.settings.end,times.max() ?? project.settings.end)))
+        return lower...upper
+    }
     func updateRange(start: Double? = nil, end: Double? = nil, previewTime: Double? = nil) {
         guard settingsEnabled,!compositionAdjusting,
               start?.isFinite != false,end?.isFinite != false,previewTime?.isFinite != false,
               let project else { return }
         pausePreview(refresh:false)
         let wasAnalyzed=hasCompletedTracking
-        let minimum = min(0.5, project.metadata.duration)
+        let bounds=trimBounds ?? 0...project.metadata.duration
+        let minimum = min(0.5, bounds.upperBound-bounds.lowerBound)
         var settings = project.settings
-        if let start { settings.start = min(max(0, start), max(0, min(project.metadata.duration, end ?? settings.end) - minimum)) }
-        if let end { settings.end = min(project.metadata.duration, max(settings.start + minimum, end)) }
+        let upper=min(bounds.upperBound,max(bounds.lowerBound+minimum,end ?? settings.end))
+        if let start { settings.start = min(max(bounds.lowerBound,start),upper-minimum) }
+        if let end { settings.end = min(bounds.upperBound,max(settings.start+minimum,end)) }
         self.project?.settings = settings
         if let selected=self.project {
             if selected.isDemo {
@@ -1294,6 +1314,20 @@ extension AppModel {
         selectReviewFrame(at:1.0/6)
     }
     #endif
+    var canRetryReviewDetection:Bool {
+        guard isReviewing,!restoringTracking,!manualSelection,let frame=currentReviewFrame,
+              frame.body == nil,reviewTasks[frame.id] == nil,let project else {return false}
+        return store.sourceURL(for:project) != nil
+    }
+    /// Only an explicit retry invalidates this point's detection cache; confirmed boxes stay intact.
+    func retryCurrentReviewDetection() {
+        guard canRetryReviewDetection,let frame=currentReviewFrame else {return}
+        analysisReview?.detected.remove(frame.id)
+        analysisReview?.people.removeValue(forKey:frame.id)
+        analyzedPeople.removeValue(forKey:frame.id)
+        detectionNotice=nil
+        selectReviewFrame(at:frame.time)
+    }
     /// Review navigation never resumes the tracking pipeline. A completed request is cached even when empty.
     func selectReviewFrame(at time:Double) {
         guard isReviewing,!restoringTracking,time.isFinite,let frame=reviewFrames.min(by:{abs($0.time-time)<abs($1.time-time)}),let project else {return}
@@ -1304,6 +1338,7 @@ extension AppModel {
         let key=frame.id
         observations=analysisReview?.detected.contains(key) == true ? analysisReview?.people[key]?.primary ?? [] : []
         detecting=reviewTasks[key] != nil
+        detectionNotice=observations.isEmpty && analysisReview?.detected.contains(key) == true ? "未找到候选人物，可重新识别或手动框选" : nil
         guard frame.body == nil,analysisReview?.detected.contains(key) != true,reviewTasks[key] == nil,
               let source=store.sourceURL(for:project) else {return}
         detecting=true;detectionNotice=nil
@@ -1318,15 +1353,15 @@ extension AppModel {
                 self.reviewTasks[key]=nil
                 if abs(self.currentTime-frame.time)<0.001 {
                     self.observations=found;self.detecting=false
-                    self.detectionNotice=found.isEmpty ? "未识别到人物，可直接手动框选" : nil
+                    self.detectionNotice=found.isEmpty ? "未找到候选人物，可重新识别或手动框选" : nil
                 }
                 self.persist()
             } catch {
-                guard let self,self.reviewID==token,self.project?.id==project.id,self.isReviewing else {return}
-                // A failed request is also attempted once; the human can always supply the box.
+                guard let self,!Task.isCancelled,self.reviewID==token,self.project?.id==project.id,self.isReviewing else {return}
+                // Failures are cached until the user explicitly retries this point.
                 self.analysisReview?.detected.insert(key);self.reviewTasks[key]=nil
                 self.analysisReview?.people[key] = .init(primary:[],relaxed:[])
-                if abs(self.currentTime-frame.time)<0.001 {self.detecting=false;self.observations=[];self.detectionNotice="识别失败，请手动框选人物"}
+                if abs(self.currentTime-frame.time)<0.001 {self.detecting=false;self.observations=[];self.detectionNotice="识别失败：\(error.localizedDescription) 可重新识别或手动框选。"}
                 self.persist()
             }
         }

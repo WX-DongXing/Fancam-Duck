@@ -9,14 +9,16 @@ private actor QueueDetectionGate {
 }
 private actor QueueTracker:TargetTracking {
     let gate:QueueDetectionGate?
-    init(gate:QueueDetectionGate?=nil) {self.gate=gate}
+    let retryRecovery:Bool
+    init(gate:QueueDetectionGate?=nil,retryRecovery:Bool=false) {self.gate=gate;self.retryRecovery=retryRecovery}
     private(set) var calls:[Int:Int]=[:]
     private(set) var analyses=0
     let box=NormalizedRect(x:0.3,y:0.2,width:0.2,height:0.6)
     func detections(source:URL,time:Double,region:NormalizedRect?) async throws -> [PersonObservation] {
         let key=AnalysisSampling.key(time);calls[key,default:0]+=1
         if key>0,let gate {await gate.wait()}
-        return key==5000 ? [] : [.init(id:1,body:box,confidence:0.95,embedding:[1,0])]
+        if retryRecovery,key==5000,calls[key] == 1 {throw TrackingError.invalidInput}
+        return key==5000 && (!retryRecovery || calls[key,default:0]<2) ? [] : [.init(id:1,body:box,confidence:0.95,embedding:[1,0])]
     }
     func analyze(source:URL,project:VideoProject,onUpdate:@escaping @Sendable(TrackingUpdate) async -> Void) async throws -> TrackingResult {
         analyses+=1
@@ -75,6 +77,38 @@ final class AnalysisReviewTests:XCTestCase {
         XCTAssertEqual(analyses,1);XCTAssertEqual(after,calls)
         let saved=try await store.analysis(for:try XCTUnwrap(model.project))
         XCTAssertNotNil(saved)
+        model.goHome()
+    }
+    @MainActor func testExplicitRetryBypassesOnlyCurrentCacheAndCanRecoverFromFailure() async throws {
+        let directory=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer {try? FileManager.default.removeItem(at:directory)}
+        let store=ProjectStore(directory:directory),tracker=QueueTracker(retryRecovery:true)
+        try await store.prepare();try Data([1]).write(to:directory.appendingPathComponent("source.mp4"))
+        let box=NormalizedRect(x:0.3,y:0.2,width:0.2,height:0.6)
+        var p=VideoProject(title:"Retry",sourceFileName:"source.mp4",metadata:.init(width:1920,height:1080,duration:1,frameRate:30),settings:EditSettings())
+        p.settings.end=1;p.target=box
+        try await store.save(p)
+        let review=AnalysisReview(frames:[.init(time:0.5)],samples:(0...6).filter {$0 != 3}.map {.init(time:Double($0)/6,body:box)},people:[5000:.init(primary:[],relaxed:[])],detected:[5000])
+        try await store.saveReview(review,project:p)
+        let model=AppModel(store:store,pipeline:tracker)
+        model.open(p);try await wait {model.isReviewing && !model.restoringTracking}
+        XCTAssertTrue(model.canRetryReviewDetection)
+        let initial=await tracker.calls;XCTAssertTrue(initial.isEmpty)
+        model.retryCurrentReviewDetection();model.retryCurrentReviewDetection()
+        try await wait {!model.detecting}
+        XCTAssertTrue(model.detectionNotice?.contains("无法读取") == true)
+        let failedCalls=await tracker.calls;XCTAssertEqual(failedCalls[5000],1)
+        model.selectReviewFrame(at:0.5)
+        let navigatedCalls=await tracker.calls;XCTAssertEqual(navigatedCalls[5000],1,"Navigation must not trigger another attempt")
+        model.retryCurrentReviewDetection();model.retryCurrentReviewDetection()
+        try await wait {!model.detecting}
+        let retriedCalls=await tracker.calls;XCTAssertEqual(retriedCalls[5000],2)
+        XCTAssertFalse(model.observations.isEmpty)
+        XCTAssertNil(model.reviewSelection,"Retry must not select a person automatically")
+        XCTAssertNil(model.currentReviewFrame?.body)
+        model.selectTarget(box);model.confirmReviewFrame()
+        try await wait {model.hasCompletedTracking}
+        let analyses=await tracker.analyses;XCTAssertEqual(analyses,0,"Retry must never restart video analysis")
         model.goHome()
     }
     @MainActor func testReviewPersistsConfirmedAndEmptyDetectionsAcrossReopen() async throws {

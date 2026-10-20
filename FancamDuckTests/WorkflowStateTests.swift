@@ -112,7 +112,7 @@ private actor WorkflowExporter:VideoExporting {
         XCTAssertEqual(restored.project?.settings.aspectRatio,.square,"Leaving during preview preparation must preserve immediate settings")
 
     }
-    func testExtendingRangeBeyondAnalyzedFramesRequiresAnalysisAndRetainsComposition() async throws {
+    func testCompletedAnalysisClampsTrimToCachedBoundsAndRetainsComposition() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer {try? FileManager.default.removeItem(at:root)}
         let model=AppModel(store:ProjectStore(directory:root),pipeline:WorkflowTracker(),exporter:WorkflowExporter())
@@ -125,15 +125,27 @@ private actor WorkflowExporter:VideoExporting {
         model.hasCompletedTracking=true
         model.beginComposition();try await wait {!model.compositionBusy}
         let scale=model.project?.settings.compositionScale
+        model.scrub(to:0.7,within:0.2...1,sourceOnly:true)
+        XCTAssertTrue(model.compositionEditing)
+        XCTAssertNotNil(model.compositionCrop)
+        XCTAssertEqual(model.currentTime,0.7)
         model.updateRange(end:1.5,previewTime:1.5)
-        XCTAssertFalse(model.hasCompletedTracking)
-        XCTAssertFalse(model.compositionEditing)
-        XCTAssertNil(model.previewPlayer)
-        XCTAssertEqual(model.project?.settings.end,1.5)
+        XCTAssertTrue(model.hasCompletedTracking)
+        XCTAssertTrue(model.compositionEditing)
+        XCTAssertEqual(model.project?.settings.end,1)
         XCTAssertEqual(model.project?.settings.compositionScale,scale)
         XCTAssertTrue(model.canConfirm)
-        model.updateRange(end:1)
-        XCTAssertTrue(model.hasCompletedTracking,"Returning inside cached analysis reuses it")
+        model.updateRange(start:0,end:2)
+        XCTAssertEqual(model.project?.settings.start,0.2)
+        XCTAssertEqual(model.project?.settings.end,1)
+        model.updateRange(start:0.3,end:0.9)
+        XCTAssertEqual(model.project?.settings.start,0.3)
+        XCTAssertEqual(model.project?.settings.end,0.9)
+        XCTAssertEqual(model.trimBounds,0.2...1)
+        model.updateRange(start:0.2,end:1)
+        XCTAssertEqual(model.project?.settings.start,0.2)
+        XCTAssertEqual(model.project?.settings.end,1)
+        XCTAssertTrue(model.hasCompletedTracking,"Restoring the analyzed range must reuse analysis")
     }
     func testReselectDuringAnalysisClearsTargetAndRejectsOldDemoUpdates() async throws {
         let model=AppModel();model.startDemo();defer {model.goHome()}

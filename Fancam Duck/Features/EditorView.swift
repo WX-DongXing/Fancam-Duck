@@ -46,7 +46,15 @@ struct EditorView: View {
     }
     private var isBlocked: Bool { model.phase.issue != nil }
     private var people: [(id: Int, number: Int, box: NormalizedRect)] {
-        if model.isDemo { return (0..<4).map { (id: $0, number: $0, box: DemoStage.body(index: $0, time: model.currentTime)) } }
+        if model.isDemo {
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["FANCAM_DUCK_UI_OVERLAP"] == "1" {
+                return [(1,1,NormalizedRect(x:0.1,y:0.1,width:0.5,height:0.8)),
+                        (2,2,NormalizedRect(x:0.33,y:0.1,width:0.5,height:0.8))]
+            }
+            #endif
+            return (0..<4).map { (id:$0,number:$0,box:DemoStage.body(index:$0,time:model.currentTime)) }
+        }
         return model.observations.sorted { $0.body.center.x < $1.body.center.x }.enumerated().map { (id: $0.element.id, number: $0.offset, box: $0.element.body) }
     }
     var body: some View {
@@ -226,7 +234,14 @@ struct EditorView: View {
     }
     private var showsComposition: Bool {
         (model.compositionEditing || model.hasCompletedTracking && !isBlocked)
-            && !timelineTrimming && model.compositionCrop != nil
+            && model.compositionCrop != nil
+    }
+    private var overlappingPeople:[OverlapPerson] {
+        let candidates=people.map {OverlapPerson(id:$0.id,number:$0.number,body:$0.box)}
+        return OverlapSelection.candidates(candidates)
+    }
+    private var showsOverlapThumbnails:Bool {
+        selectionZoomEnabled && !model.isPlaying && !model.detecting && !overlappingPeople.isEmpty
     }
     private var selectionZoomEnabled:Bool {
         !showsComposition && !isCompleted && !isProcessing && !model.manualSelection && !timelineTrimming
@@ -240,7 +255,7 @@ struct EditorView: View {
         GeometryReader { geometry in
             let source = model.project?.metadata.size ?? CGSize(width: 1920, height: 1080)
             let inset:CGFloat=showsComposition ? 16 : 12
-            let area=CGSize(width:max(1,geometry.size.width-inset*2),height:max(1,geometry.size.height-(showsComposition ? 12 : 48)))
+            let area=CGSize(width:max(1,geometry.size.width-inset*2),height:max(1,geometry.size.height-(showsOverlapThumbnails ? 140 : showsComposition ? 12 : 48)))
             let baseRect=CropGeometry.aspectFit(video:(showsComposition || isCompleted) ? (model.project?.settings.aspectRatio ?? .portrait).size : source,container:area).offsetBy(dx:inset,dy:0)
             let zoom=selectionZoomEnabled ? min(4,max(1,selectionZoom*selectionPinch)) : 1
             let pan=clampedSelectionPan(CGSize(width:selectionPan.width+selectionDrag.width,height:selectionPan.height+selectionDrag.height),rect:baseRect,scale:zoom)
@@ -253,13 +268,13 @@ struct EditorView: View {
                             .position(x:rect.midX,y:rect.midY)
                     } else {
                         CompositionVideoViewport(model:model,source:source,viewport:rect.size,composition:showsComposition,
-                            canvas:geometry.size,viewportOrigin:rect.origin)
+                            canvas:geometry.size,viewportOrigin:rect.origin,interactionEnabled:!timelineTrimming)
                     }
                 }
                     .frame(width:geometry.size.width,height:geometry.size.height)
                     .accessibilityElement(children:showsComposition ? .contain : .ignore)
                     .accessibilityLabel(isCompleted ? "成片预览" : showsComposition ? "构图预览" : "原片画面")
-                    .accessibilityIdentifier(showsComposition ? "compositionViewport" : "sourceVideoSurface")
+                            .accessibilityIdentifier(showsComposition ? "compositionViewport" : "sourceVideoSurface")
                 if !model.redactionEditing && !model.compositionEditing && model.controlsEnabled && (!model.hasCompletedTracking || isBlocked) && !isCompleted && !model.manualSelection && !model.isPlaying && !timelineTrimming {
                     ForEach(people, id: \.id) { person in
                         let number = person.number, box = person.box
@@ -277,7 +292,7 @@ struct EditorView: View {
                     }
                 }
                 if let box = activeBox, !isCompleted, !showsComposition && !model.manualSelection && !model.isPlaying {
-                    TargetBox(label: boxLabel, status: isBlocked ? "待确认主角" : isProcessing ? "正在跟随主角" : "主角已选中", warning: isBlocked && model.redactionIssue == nil, dashed: isProcessing && model.trackedSample?.estimated == true, badgeInside: rect.minY + rect.height * box.y < 34)
+                    TargetBox(label: boxLabel, warning: isBlocked && model.redactionIssue == nil, dashed: isProcessing && model.trackedSample?.estimated == true, badgeInside: rect.minY + rect.height * box.y < 34)
                         .frame(width: rect.width * box.width, height: rect.height * box.height)
                         .position(x: rect.minX + rect.width * box.center.x, y: rect.minY + rect.height * box.center.y)
                         .allowsHitTesting(false)
@@ -288,6 +303,9 @@ struct EditorView: View {
                 }
                 }
                 .frame(width:geometry.size.width,height:geometry.size.height)
+                .mask(alignment:.top) {
+                    Rectangle().frame(height:showsOverlapThumbnails ? max(1,geometry.size.height-140) : geometry.size.height)
+                }
                 .contentShape(Rectangle())
                 .simultaneousGesture(MagnifyGesture()
                     .updating($selectionPinch) {value,state,_ in state=value.magnification}
@@ -303,11 +321,19 @@ struct EditorView: View {
                 .accessibilityIdentifier("analysisZoomCanvas")
                 .accessibilityValue(String(format:"%.2f",Double(zoom)))
                 .accessibilityAction(named:"放大人物画面") {if selectionZoomEnabled {selectionZoom=min(4,selectionZoom*1.5)}}
-                if !isProcessing && !isCompleted && !model.compositionEditing {
+                if !isProcessing && !isCompleted && !model.compositionEditing && !showsOverlapThumbnails {
                     HStack(spacing: 8) {
                         if model.detecting || model.restoringTracking { ProgressView().tint(.white) }
                         Text(sourceHint).font(.system(size: 11)).foregroundStyle(.white.opacity(0.65)).lineLimit(2)
                     }.padding(.horizontal, 20).frame(height: 44).padding(.bottom,58).allowsHitTesting(false)
+                }
+                if showsOverlapThumbnails,let project=model.project {
+                    OverlappingPeoplePicker(people:overlappingPeople,projectID:project.id,
+                        source:(model.player?.currentItem?.asset as? AVURLAsset)?.url,
+                        sourceSize:source,time:model.currentTime,demo:model.isDemo,
+                        preview:model.processingPreview,selected:activeBox,onSelect:{model.selectTarget($0)})
+                        .frame(width:max(1,geometry.size.width-36),height:60)
+                        .position(x:geometry.size.width/2,y:max(30,geometry.size.height-100))
                 }
                 playbackControl
                     .position(x:geometry.size.width/2,y:max(22,geometry.size.height-36))
@@ -343,6 +369,10 @@ struct EditorView: View {
         if let notice = model.detectionNotice { return notice }
         return "轻点人物进行选择"
     }
+    private var reviewConfirmationDisabled:Bool {
+        model.reviewSelection == nil || model.restoringTracking ||
+            (model.analysisReview?.pending.isEmpty != true && model.currentReviewFrame?.body == model.reviewSelection)
+    }
     @ViewBuilder private var recoveryDock: some View {
         if model.manualSelection {
             VStack(spacing: 12) {
@@ -360,23 +390,54 @@ struct EditorView: View {
                 Spacer().frame(height: 10)
             }.padding(.horizontal, 24)
         } else if model.isReviewing {
-            VStack(spacing:10) {
+            VStack(spacing:12) {
+                HStack(alignment:.firstTextBaseline) {
+                    Text("待确认 \(model.analysisReview?.pending.count ?? 0) / \(model.reviewFrames.count)")
+                        .font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("reviewPendingCount")
+                    Spacer(minLength:8)
+                }.lineLimit(1).minimumScaleFactor(0.8)
                 HStack(spacing:12) {
                     StudioIcon(symbol:"chevron.left",label:"上一个待确认") {model.moveReview(-1)}
                         .disabled(!model.reviewFrames.contains {$0.body == nil && $0.time<model.currentTime-0.001})
-                    VStack(spacing:3) {
-                        Text("待确认 \(model.analysisReview?.pending.count ?? 0) / \(model.reviewFrames.count) · \(String(format:"%.2fs",model.currentTime))")
-                            .font(.caption2.monospacedDigit()).lineLimit(1).minimumScaleFactor(0.8)
-                        StudioTextButton(title:"手动框选",fillsWidth:false) {beginManual()}.font(.caption)
-                    }
+                    Button {model.confirmReviewFrame()} label: {
+                        HStack(spacing:8) {
+                            Image(systemName:model.currentReviewFrame?.body == nil ? "checkmark" : "checkmark.circle")
+                            Text(model.analysisReview?.pending.isEmpty == true ? "完成人物分析" : model.currentReviewFrame?.body == nil ? "确认此时刻" : "已确认")
+                                .lineLimit(1).minimumScaleFactor(0.75)
+                        }.font(.subheadline.weight(.semibold))
+                            .frame(maxWidth:.infinity).frame(height:48).contentShape(Capsule())
+                    }.buttonStyle(.plain)
+                        .modifier(StudioGlassSurface(shape:Capsule(),selected:!reviewConfirmationDisabled))
+                        .disabled(reviewConfirmationDisabled).opacity(reviewConfirmationDisabled ? 0.4 : 1)
+                        .accessibilityIdentifier("confirmReviewFrame")
                     StudioIcon(symbol:"chevron.right",label:"下一个待确认") {model.moveReview(1)}
                         .disabled(!model.reviewFrames.contains {$0.body == nil && $0.time>model.currentTime+0.001})
                 }
-                StudioAction(title:model.analysisReview?.pending.isEmpty == true ? "完成人物分析" : model.currentReviewFrame?.body == nil ? "确认此时刻" : "已确认，可前往下一处",
-                             disabled:model.reviewSelection == nil || model.restoringTracking || (model.analysisReview?.pending.isEmpty != true && model.currentReviewFrame?.body == model.reviewSelection)) {
-                    model.confirmReviewFrame()
-                }.accessibilityIdentifier("confirmReviewFrame")
-            }.padding(.horizontal,24)
+                HStack(spacing:8) {
+                    Button {model.retryCurrentReviewDetection()} label: {
+                        HStack(spacing:6) {
+                            if model.detecting {ProgressView().controlSize(.mini)}
+                            else {Image(systemName:"arrow.clockwise")}
+                            Text(model.detecting ? "识别中…" : "重新识别")
+                        }.font(.caption.weight(.medium)).padding(.horizontal,12)
+                            .frame(height:44).contentShape(Capsule())
+                    }.buttonStyle(.plain).accessibilityLabel("重新识别")
+                        .modifier(StudioGlassSurface(shape:Capsule()))
+                        .disabled(!model.canRetryReviewDetection)
+                        .accessibilityIdentifier("retryReviewDetection")
+                    Spacer(minLength:8)
+                    Button {beginManual()} label: {
+                        Label("手动框选",systemImage:"viewfinder")
+                            .font(.caption.weight(.medium)).padding(.horizontal,12)
+                            .frame(height:44).contentShape(Capsule())
+                    }.buttonStyle(.plain).accessibilityLabel("手动框选")
+                        .modifier(StudioGlassSurface(shape:Capsule()))
+                        .disabled(model.detecting || model.restoringTracking)
+                        .accessibilityIdentifier("reviewManualSelection")
+                }
+            }.padding(.horizontal,24).padding(.bottom,8)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         } else if isBlocked {
             VStack(spacing: 10) {
                 HStack(spacing: 24) {
@@ -823,28 +884,23 @@ struct EditorView: View {
 
 struct TargetBox:View {
     let label:String
-    let status:String
     var warning:Bool
     var dashed:Bool
     var badgeInside = false
     private var tint:Color { warning ? .orange : .acAccent }
     var body:some View {
-        GeometryReader { geometry in
+        GeometryReader { _ in
             Rectangle()
                 .stroke(tint.opacity(0.5),style:StrokeStyle(lineWidth:1,dash:dashed ? [4,3] : []))
                 .overlay {
                     CandidateCorners().stroke(tint,style:StrokeStyle(lineWidth:3,lineCap:.square,lineJoin:.miter))
                 }
                 .overlay(alignment:.topLeading) {
-                    HStack(spacing:4) {
-                        Image(systemName:warning ? "exclamationmark" : "sparkle").font(.system(size:10,weight:.semibold))
-                        Text(status).font(.system(size:10,weight:.medium))
-                            .lineLimit(1).minimumScaleFactor(0.7)
-                    }
+                    Text(label).font(.system(size:10,weight:.medium))
+                    .lineLimit(1).fixedSize(horizontal:true,vertical:false)
                     .padding(.horizontal,8).frame(height:24)
                     .foregroundStyle(Color.acOnAccent)
                     .background(tint,in:RoundedRectangle(cornerRadius:4))
-                    .frame(maxWidth:geometry.size.width,alignment:.leading)
                     .offset(y:badgeInside ? 6 : -30)
                 }
         }

@@ -89,14 +89,15 @@ struct TrimTimeline:View {
             draftRange = project.settings.start...project.settings.end
             onEditingChanged(true)
         }
-        let range = draftRange!, minimum = min(0.5, project.metadata.duration)
+        let bounds=model.trimBounds ?? 0...project.metadata.duration
+        let range = draftRange!, minimum = min(0.5, bounds.upperBound-bounds.lowerBound)
         if isStart {
-            draftRange = min(max(0, time), range.upperBound - minimum)...range.upperBound
+            draftRange = min(max(bounds.lowerBound,time),range.upperBound-minimum)...range.upperBound
         } else {
-            draftRange = range.lowerBound...min(project.metadata.duration, max(range.lowerBound + minimum, time))
+            draftRange = range.lowerBound...min(bounds.upperBound,max(range.lowerBound+minimum,time))
         }
         model.scrub(to: isStart ? draftRange!.lowerBound : draftRange!.upperBound,
-                    within: 0...project.metadata.duration, sourceOnly: true)
+                    within:bounds,sourceOnly:true)
     }
     private func cancelTrim() {
         guard draftRange != nil else { return }

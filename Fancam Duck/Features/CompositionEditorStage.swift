@@ -9,6 +9,7 @@ struct CompositionVideoViewport: View {
     let composition: Bool
     let canvas: CGSize
     let viewportOrigin: CGPoint
+    var interactionEnabled=true
     var body: some View {
         let crop=composition ? model.compositionCrop ?? CGRect(origin:.zero,size:source) : CGRect(origin:.zero,size:source)
         let scale=viewport.width/max(1,crop.width)
@@ -45,7 +46,7 @@ struct CompositionVideoViewport: View {
                         .frame(width:viewport.width,height:viewport.height)
                         .offset(x:viewportOrigin.x,y:viewportOrigin.y).allowsHitTesting(false)
                 }
-                CompositionGestureSurface(enabled:model.compositionEditing && model.settingsEnabled && !model.redactionEditing && model.compositionCrop != nil && !model.isPlaying,
+                CompositionGestureSurface(enabled:interactionEnabled && model.compositionEditing && model.settingsEnabled && !model.redactionEditing && model.compositionCrop != nil && !model.isPlaying,
                     viewport:window, crop:{model.compositionCrop ?? .zero},begin:{model.beginCompositionGesture()},
                     change:{model.applyCompositionCrop($0)},end:{model.endCompositionGesture(cancelled:$0)},
                     value:"\(model.project?.settings.compositionScale ?? 1),\(model.project?.settings.compositionX ?? 0),\(model.project?.settings.compositionY ?? 0)")
