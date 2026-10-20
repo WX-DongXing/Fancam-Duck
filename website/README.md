@@ -1,6 +1,6 @@
 # 直拍鸭支持网站
 
-无构建依赖的静态网站，内容在 `public/`，发布目录只包含 HTML、CSS 与应用 Logo。
+无构建依赖的静态网站，内容在 `public/`，发布目录只包含 HTML、CSS、站内 JavaScript 与应用 Logo。
 
 - `/`：产品介绍。
 - `/privacy`：隐私政策（可填入 App Store Connect 的 Privacy Policy URL）。
@@ -39,3 +39,11 @@ python3 website/preview.py
 政策基于当前 App 行为：本机处理、无开发者数据收集、无追踪。网站没有分析脚本、外部字体或 Cookie；托管方可能处理访问日志，政策单独说明。新增服务或更改部署商后重新核对。
 
 支持渠道目前使用公开 GitHub Issues，不填写虚构邮箱。可后续替换为维护者确认的邮箱。没有虚构 App Store 下载链接、域名或版权持有人信息。发布前应确认维护者接受该支持渠道，并按实际运营主体、地区及服务情况校对政策。
+
+## 落地页设计
+
+首页采用深色舞台与暖黄品牌色，结构为首屏交互示意 → 三步使用流程 → 本机处理说明 → 六项 FAQ → 体验入口。主要操作为“体验直拍效果”；没有确认的商店地址前，保留 GitHub 项目入口。
+
+`landing.css` 提供全站基础样式，`landing.js` 仅用于首页交互。隐私、帮助与 404 页面复用首页品牌、导航、按钮与页脚样式，并通过 `style.css` 补充长文、目录、FAQ 与错误页布局。动效参考 React Bits 的 [Split Text](https://reactbits.dev/text-animations/split-text)、[Magnet](https://reactbits.dev/animations/magnet)、[Spotlight Card](https://reactbits.dev/components/spotlight-card)，以原生 CSS/JS 实现，没有引入 React 或复制组件源代码。支持减少动态效果设置与键盘操作；演示人物为 SVG 绘制，模式切换是概念示意，不是真实视频处理输出。
+
+保持常青内容可索引；首页 title 与 description 围绕群舞转个人直拍，FAQ 使用可读取的正文。没有虚构评价、处理速度或准确率。设计来源：[MengTo landing-page](https://github.com/MengTo/Skills/tree/main/agent-skills/web-design/landing-page)。
