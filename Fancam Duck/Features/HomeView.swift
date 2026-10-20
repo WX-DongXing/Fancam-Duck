@@ -7,6 +7,7 @@ struct HomeView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selection: PhotosPickerItem?
     @State private var importingFile=false
+    @State private var showingSettings=false
     @State private var pendingDelete: VideoProject?
     var body: some View {
         let isImporting = model.importing
@@ -24,6 +25,7 @@ struct HomeView: View {
                         BrandLogo()
                         Text("直拍鸭").font(.title2.weight(.semibold))
                         Spacer()
+                        settingsButton
                     }
                     VStack(alignment: .leading, spacing: 10) {
                         Text("直拍快剪").font(.largeTitle.bold())
@@ -86,6 +88,7 @@ struct HomeView: View {
             }
             #endif
             }
+            .sheet(isPresented:$showingSettings) {SettingsView()}
             .fileImporter(isPresented:$importingFile,allowedContentTypes:[.movie]) {result in
                 guard case .success(let url)=result else {return}
                 Task {
@@ -132,6 +135,10 @@ struct HomeView: View {
             }
         }.preferredColorScheme(.dark)
     }
+    private var settingsButton:some View {
+        StudioIcon(symbol:"gearshape",label:"设置") {showingSettings=true}
+            .accessibilityLabel("设置").accessibilityIdentifier("openSettings")
+    }
     private var expandedLibrary:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:24) {
@@ -145,6 +152,7 @@ struct HomeView: View {
                         Text("选择主角，让镜头跟上动作。").font(.subheadline).foregroundStyle(.secondary)
                     }
                     Spacer()
+                    settingsButton
                     Button {model.showGuide=true} label: {Image(systemName:"questionmark.circle").font(.title2).frame(width:48,height:48).contentShape(Rectangle())}
                         .buttonStyle(.plain).accessibilityLabel("查看操作指引")
                 }
@@ -195,6 +203,9 @@ struct HomeView: View {
                         .background(.white.opacity(0.07),in:RoundedRectangle(cornerRadius:8))
                 }
                 Spacer()
+                Button {showingSettings=true} label: {
+                    Label("设置",systemImage:"gearshape").frame(maxWidth:.infinity,minHeight:44,alignment:.leading).contentShape(Rectangle())
+                }.buttonStyle(.plain).font(.system(size:12)).accessibilityIdentifier("openSettings")
                 Button {model.showGuide=true} label: {Label("使用指南",systemImage:"questionmark.circle").frame(minHeight:44).contentShape(Rectangle())}
                     .buttonStyle(.plain).font(.system(size:12)).foregroundStyle(.secondary)
                 StudioTextButton(title:"体验演示",fillsWidth:false) {model.startDemo()}.buttonStyle(.plain).font(.system(size:12)).foregroundStyle(.secondary)
