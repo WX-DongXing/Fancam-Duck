@@ -129,7 +129,7 @@ actor VideoExporter:VideoExporting {
               }) else { throw TrackingError.invalidTrajectory }
         let sorted=samples.sorted {$0.time<$1.time}
         guard sorted.first!.time<=start+0.001,sorted.last!.time>=end-0.001,
-              zip(sorted,sorted.dropFirst()).allSatisfy({$1.time-$0.time<=0.151}) else { throw TrackingError.invalidTrajectory }
+              zip(sorted,sorted.dropFirst()).allSatisfy({$1.time-$0.time<=AnalysisSampling.maximumSampleGap}) else { throw TrackingError.invalidTrajectory }
     }
     func exportMovingCrop(source:URL,project:VideoProject,samples:[TargetSample]) async throws -> URL {
         try await exportMovingCrop(source:source,project:project,samples:samples,onProgress:{_ in})

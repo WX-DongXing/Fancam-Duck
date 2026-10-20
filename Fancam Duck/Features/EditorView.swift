@@ -55,13 +55,14 @@ struct EditorView: View {
                 WorkspaceArrangement(size:CGSize(width:geometry.size.width,height:max(1,geometry.size.height-52))) {
                     VStack(spacing:0) {
                         sourceStage.accessibilityElement(children:.contain).accessibilityIdentifier("editorStage")
-                        if usesExpandedWorkspace && !isBlocked && !model.manualSelection {editorTimeline.padding(.bottom,12)}
+                        if usesExpandedWorkspace && ((!isBlocked && !model.manualSelection) || model.isReviewing) {editorTimeline.padding(.bottom,12)}
                     }
                 } controls: {
                     if usesExpandedWorkspace {expandedControls}
                     else {
                         VStack(spacing:0) {
                             if isBlocked || model.manualSelection {
+                                if model.isReviewing {editorTimeline}
                                 recoveryDock.frame(height:model.manualSelection ? 244 : 180,alignment:.bottom)
                             } else {
                                 editorTimeline
@@ -136,7 +137,7 @@ struct EditorView: View {
                     sourceStage.padding(.horizontal,8)
                         .accessibilityElement(children:.contain).accessibilityIdentifier("editorStage")
                     Divider()
-                    if !isBlocked && !model.manualSelection {
+                    if (!isBlocked && !model.manualSelection) || model.isReviewing {
                         editorTimeline.padding(.bottom,16).background(DesktopPalette.panel)
                     }
                 }.frame(maxWidth:.infinity,maxHeight:.infinity)
@@ -281,6 +282,7 @@ struct EditorView: View {
         }
         if model.redactionIssue != nil {return "轻点需要继续打码的同一人物"}
         if model.redactionEditing {return model.project?.settings.redaction.enabled == true ? "自动遮挡所有其他人物 · 主角保持清晰" : "打码已关闭"}
+        if model.isReviewing {return model.detectionNotice ?? "选择同一主角后确认 · 黄色待确认，绿色已确认"}
         if isBlocked { return "轻点原片中的目标舞者" }
         if model.detecting { return "正在识别人物" }
         if let notice = model.detectionNotice { return notice }
@@ -302,6 +304,24 @@ struct EditorView: View {
                 }
                 Spacer().frame(height: 10)
             }.padding(.horizontal, 24)
+        } else if model.isReviewing {
+            VStack(spacing:10) {
+                HStack(spacing:12) {
+                    StudioIcon(symbol:"chevron.left",label:"上一个待确认") {model.moveReview(-1)}
+                        .disabled(!model.reviewFrames.contains {$0.body == nil && $0.time<model.currentTime-0.001})
+                    VStack(spacing:3) {
+                        Text("待确认 \(model.analysisReview?.pending.count ?? 0) / \(model.reviewFrames.count) · \(String(format:"%.2fs",model.currentTime))")
+                            .font(.caption2.monospacedDigit()).lineLimit(1).minimumScaleFactor(0.8)
+                        StudioTextButton(title:"手动框选",fillsWidth:false) {beginManual()}.font(.caption)
+                    }
+                    StudioIcon(symbol:"chevron.right",label:"下一个待确认") {model.moveReview(1)}
+                        .disabled(!model.reviewFrames.contains {$0.body == nil && $0.time>model.currentTime+0.001})
+                }
+                StudioAction(title:model.analysisReview?.pending.isEmpty == true ? "完成人物分析" : model.currentReviewFrame?.body == nil ? "确认此时刻" : "已确认，可前往下一处",
+                             disabled:model.reviewSelection == nil || model.restoringTracking || (model.analysisReview?.pending.isEmpty != true && model.currentReviewFrame?.body == model.reviewSelection)) {
+                    model.confirmReviewFrame()
+                }.accessibilityIdentifier("confirmReviewFrame")
+            }.padding(.horizontal,24)
         } else if isBlocked {
             VStack(spacing: 10) {
                 HStack(spacing: 24) {
@@ -335,7 +355,7 @@ struct EditorView: View {
                     .font(.system(size: 22)).frame(width: 44, height: 44).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityLabel((isCompleted ? generatedPlaying : model.isPlaying) ? "暂停预览" : "播放预览")
                 .accessibilityIdentifier("editorPlayback").keyboardShortcut(.space,modifiers:[])
-                .disabled(isProcessing || timelineTrimming || (!isCompleted && model.hasCompletedTracking && model.project?.settings.redaction.enabled == true && model.project?.redactionPlan?.covers(model.project!) != true) || model.compositionEditing && !model.hasCompletedTracking || model.compositionBusy)
+                .disabled(isProcessing || model.isReviewing || timelineTrimming || (!isCompleted && model.hasCompletedTracking && model.project?.settings.redaction.enabled == true && model.project?.redactionPlan?.covers(model.project!) != true) || model.compositionEditing && !model.hasCompletedTracking || model.compositionBusy)
             Spacer()
             Text(model.project?.settings.aspectRatio.rawValue ?? "16:9").foregroundStyle(.white.opacity(0.45)).frame(width: 60, alignment: .trailing)
         }.font(.system(.caption, design: .monospaced)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.65)
@@ -436,7 +456,7 @@ struct EditorView: View {
             playbackRow
             TrimTimeline(model:model,onEditingChanged:{timelineTrimming=$0})
                 .coordinateSpace(.named("timeline")).padding(.horizontal,18)
-                .disabled(isProcessing || isBlocked).allowsHitTesting(!isProcessing && !isBlocked)
+                .disabled(isProcessing || (isBlocked && !model.isReviewing)).allowsHitTesting(!isProcessing && (!isBlocked || model.isReviewing))
         }
     }
     private var expandedControls:some View {
@@ -511,7 +531,7 @@ struct EditorView: View {
         withTransaction(transaction) {
             finishTool(commit: true)
             model.beginManualSelection()
-            drawnBox = model.project?.target ?? .init(x: 0.32, y: 0.12, width: 0.36, height: 0.76)
+            drawnBox = model.reviewSelection ?? model.project?.target ?? .init(x: 0.32, y: 0.12, width: 0.36, height: 0.76)
         }
     }
 
@@ -720,6 +740,7 @@ struct EditorView: View {
         }.buttonStyle(.plain).accessibilityLabel("构图" + title)
     }
     private var activeBox: NormalizedRect? {
+        if model.isReviewing {return model.reviewSelection}
         if model.redactionEditing || model.redactionIssue != nil {return model.redactionPrimaryBody}
         if isBlocked && !model.targetExplicitlySelected { return nil }
 

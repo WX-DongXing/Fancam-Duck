@@ -19,9 +19,9 @@
 `Route` 为 `home`、`editor`、`export`。`ProcessingPhase` 独立表示业务阶段；不要用页面是否显示来替代流程判断。
 
 ```text
-editing（选人／选段）→ processing（分析）→ editing（已分析，构图／打码）
+editing（选人／选段）→ processing（6Hz 扫描）→ editing（已分析，构图／运镜／打码）
                                 ↕ paused
-                                ↓ blocked → 确认同一主角 → processing
+                                ↓ blocked（扫描结束的待确认队列）→ 逐点保存 → editing
 editing（已分析）→ processing（准备打码／生成）→ completed（预览／导出）
                                                ↓ 返回修改
                                         editing（复用分析）
@@ -58,7 +58,7 @@ AppModel 保存多个 Task，并以 operationID、detectionID、compositionID、
 
 生成前提交构图设置后会退出编辑态，但构图预览展示不再依赖 `compositionEditing`：已有完整分析且保留 `compositionCrop` 时，生成期间继续使用同一裁剪视窗；身份阻塞仍回到问题帧。构图手势仅在可编辑且处于构图编辑态时开放。
 
-构图与打码继续复用既有计算和 GPU 合成链路。若完整打码计划尚未覆盖新范围，允许静态编辑，不允许播放未覆盖的动态预览。身份不确定仍停在问题帧；手动框选确认直接通过 selectTarget 保存区域锚点，同时使旧检测代次失效；不额外调用 detectPeople(region:)，后续分析与身份门控保持不变。生成取消保留主角分析与设置，旧成片保留至新文件成功写入。任务 ID、项目 ID 和取消后回调校验不可移除。
+构图与打码继续复用既有计算和 GPU 合成链路。若完整打码计划尚未覆盖新范围，允许静态编辑，不允许播放未覆盖的动态预览。身份不确定仍停在问题帧；首次选人手动框通过 selectTarget 保存区域锚点；扫描后的确认点直接保存区域，同时使旧检测代次失效；不额外调用 detectPeople(region:)，后续分析与身份门控保持不变。生成取消保留主角分析与设置，旧成片保留至新文件成功写入。任务 ID、项目 ID 和取消后回调校验不可移除。
 
 手机设置展开与收起使用短动画，紧凑状态不为设置预留大块空白；工作台保持同一 editor 路由。视频时间轴在分析前及分析后的设置阶段均可修改起止点；运行中的分析／生成及身份阻塞时禁用。裁短且轨迹仍覆盖时复用分析并重建区间预览；扩大到轨迹未覆盖部分时退出设置、要求重新分析，不使用旧预览。修改画幅、打码不更改时间范围。
 
@@ -66,4 +66,6 @@ AppModel 保存多个 Task，并以 operationID、detectionID、compositionID、
 
 分析侧操作使用“重新选择”而非用户主动暂停：reselectAnalysisTarget 复用 cancelTasks 的任务代次失效与管线清理屏障，清空人物、轨迹及成片引用后回到 editing；未选择新人物时 canConfirm 为 false。后台暂停／恢复仍保留原机制。
 
-管线会在 Session 保存待回补时间点、已确认外观和扫描状态；缺失帧不作为完成轨迹提交。完整扫描后进行缓存关联及局部回补，最终 issue.requiresManualSelection 会让 AppModel 定位并开启手动框选。恢复时使用同一 Session 和新的用户锚点；取消／切项目仍通过任务屏障清理管线状态。处理进度前 90% 为扫描，后 10% 为回补，不能因回到缺失时间点而倒退。
+管线扫描完成后返回 TrackingResult.reviewTimes；AppModel.analysisReview 维护待确认／已确认点和完整扫描批次，不使用旧的 analyze 恢复。首次进入每个待确认点调用一次 detections，独立任务按 reviewID 和 projectID 校验，空结果也缓存。点击人物仅暂存选框，确认按钮保存，左右箭头跳到前后待确认点；时间轴标记可查看已确认点。手动框确认直接写入区域。全部确认后 completeReview 校验轨迹并保存，hasCompletedTracking 变为 true 后进入默认构图设置。
+
+persist 将 review 快照排在项目保存之后写入独立 review 文件，open 在恢复完整分析之前读取未完成确认。goHome 先保存快照再取消任务；切项目、删除和重新选择使旧 reviewID 失效。取消不等待已完成的模型操作撤回，晚到结果必须经过有效性校验。

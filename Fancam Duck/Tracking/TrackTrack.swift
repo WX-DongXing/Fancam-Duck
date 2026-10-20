@@ -21,7 +21,7 @@ struct TrackTrackTracker {
     var matchThreshold = 0.65
     var highConfidence: Float = 0.5
     var initializationConfidence: Float = 0.6
-    var maxLostSteps = 15
+    var maxLostSteps = Int((1.5 / AnalysisSampling.interval).rounded())
 
     mutating func seed(_ observations: [PersonObservation], selectedID: Int, time: Double) -> Int? {
         tracks = []

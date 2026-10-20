@@ -17,6 +17,14 @@ final class AppModel {
     var player: AVPlayer?
     var observations: [PersonObservation] = []
     private var analyzedPeople:[Int:DetectionBatch]=[:]
+    var analysisReview:AnalysisReview?
+    var reviewSelection:NormalizedRect?
+    private var reviewID=UUID()
+    private var reviewTasks:[Int:Task<Void,Never>]=[:]
+    var isReviewing:Bool {analysisReview != nil && !hasCompletedTracking}
+    var reviewFrames:[AnalysisReviewFrame] {analysisReview?.frames ?? []}
+    var currentReviewFrame:AnalysisReviewFrame? {reviewFrames.first {abs($0.time-currentTime)<0.001}}
+
     private var selectionObservation:PersonObservation?
     var processingPreview: CGImage?
     var trackedSample: TargetSample?
@@ -114,7 +122,7 @@ final class AppModel {
     }
     var isDemo: Bool { project?.isDemo == true }
     var canConfirm: Bool {
-        guard !restoringTracking,!detecting,!importingRedactionImage,!isPlaying,!manualSelection,!compositionBusy,!compositionAdjusting,let project,
+        guard !isReviewing,!restoringTracking,!detecting,!importingRedactionImage,!isPlaying,!manualSelection,!compositionBusy,!compositionAdjusting,let project,
               (hasCompletedTracking || hasReusableOutput || (project.targetTime>=project.settings.start && project.targetTime<=project.settings.end)) else { return false }
         return ProcessingGate.canContinue(phase: phase, target: project.target, explicitlySelected: targetExplicitlySelected)
     }
@@ -241,6 +249,7 @@ final class AppModel {
             let previousSave=persistenceTask
             restorationTask=Task { [weak self,store=self.store] in
                 await previousSave?.value
+                let review=try? await store.review(for:project)
                 let analysis=try? await store.analysis(for:project)
                 let cached=analysis?.samples,people=analysis?.people
                 let output=try? await store.output(for:project)
@@ -266,11 +275,21 @@ final class AppModel {
                 else if output == nil && (project.targetTime<project.settings.start || project.targetTime>project.settings.end) {
                     self.project?.target=nil;self.project?.settings.compositionAnchor=nil;self.targetExplicitlySelected=false
                 }
+                if let review,cached == nil {
+                    self.analysisReview=review;self.targetSamples=review.samples;self.analyzedPeople=review.people
+                    if review.pending.isEmpty {self.completeReview()}
+                    else {self.selectReviewFrame(at:review.pending[0].time)}
+                    return
+                }
                 self.detectPeople();self.refreshRedactionPreview()
             }
         } else { player = nil }
     }
     func selectTarget(_ rect: NormalizedRect) {
+        if isReviewing {
+            guard !restoringTracking,rect.isValid,rect.width>0.015,rect.height>0.03 else {return}
+            reviewSelection=rect;targetExplicitlySelected=true;return
+        }
         guard controlsEnabled, rect.isValid, rect.width > 0.015, rect.height > 0.03 else { return }
         if let issue=redactionIssue {
             guard canRedactPerson(rect) else {detectionNotice="主角不参与打码";return}
@@ -303,6 +322,7 @@ final class AppModel {
         confirmProcessing()
     }
     func confirmProcessing() {
+        guard !isReviewing else {return}
         if redactionEditing {finishRedaction(commit:true)}
         if compositionEditing { finishComposition(commit:true,refreshDetections:false) }
         guard canConfirm, let project else { return }
@@ -352,6 +372,14 @@ final class AppModel {
                 let reuse:[String:Any] = ["projectID":project.id.uuidString,"reused":cached != nil,"sampleCount":result.samples.count,"start":project.settings.start,"end":project.settings.end]
                 if let data=try? JSONSerialization.data(withJSONObject:reuse) {try? data.write(to:FileManager.default.temporaryDirectory.appendingPathComponent("FancamDuck-last-cache.json"),options:.atomic)}
                 #endif
+                if !result.reviewTimes.isEmpty {
+                    let people=await pipeline.cachedPeople(source:url)
+                    guard !Task.isCancelled,self.isCurrent(id,projectID:project.id) else {return}
+                    self.analysisReview=AnalysisReview(frames:result.reviewTimes.sorted().map {.init(time:$0)},samples:result.samples,people:people)
+                    self.analyzedPeople=people;self.processingPreview=nil;self.generatingVideo=false
+                    self.phase = .blocked(result.issue ?? .init(time:result.reviewTimes[0],message:"请逐一确认同一主角",checkpoint:1))
+                    self.persist();self.selectReviewFrame(at:result.reviewTimes[0]);return
+                }
                 if let issue=result.issue {
                     self.processingPreview=nil;self.phase = .blocked(issue);self.seek(to:issue.time)
                     if issue.requiresManualSelection {self.beginManualSelection()}
@@ -541,6 +569,7 @@ final class AppModel {
     }
     func seek(to time: Double) {
         guard let project else { return }
+        if isReviewing {selectReviewFrame(at:time);return}
         if compositionEditing {
             guard hasCompletedTracking,time.isFinite else { return }
             currentTime=min(project.settings.end,max(project.settings.start,time))
@@ -638,10 +667,16 @@ final class AppModel {
         default:project.progressState=hasCompletedTracking ? "已分析 · 可预览" : (project.target == nil ? "待选人" : "待处理")
         }
         project.updatedAt=Date();self.project=project
+        let review=analysisReview
         let previous=persistenceTask
         persistenceTask=Task {
             await previous?.value
-            do { try await store.save(project);await loadProjects() }
+            do {
+                try await store.save(project)
+                if let review {try await store.saveReview(review,project:project)}
+                else {try await store.removeReview(project.id)}
+                await loadProjects()
+            }
             catch { errorMessage="自动保存失败：\(error.localizedDescription)" }
         }
     }
@@ -765,6 +800,7 @@ final class AppModel {
         phase = .processing(progress:max(phase.progress,update.progress * (regenerating ? generationAnalysisWeight : analysisOnly ? 1 : project?.settings.redaction.enabled == true ? 0.85 : 1)))
     }
     func detectPeople(region: NormalizedRect? = nil) {
+        if isReviewing {selectReviewFrame(at:currentTime);return}
         guard controlsEnabled,!restoringTracking,let project,let source=store.sourceURL(for:project) else { return }
         if hasCompletedTracking,!analyzedPeople.isEmpty,region == nil {
             detectionID=UUID();detectionTask?.cancel();detecting=false;detectionNotice=nil
@@ -796,7 +832,7 @@ final class AppModel {
         }
     }
     func beginManualSelection() {
-        guard controlsEnabled else {return}
+        guard controlsEnabled,!restoringTracking else {return}
         pausePreview(refresh:false)
         detectionID=UUID();detectionTask?.cancel();detecting=false
         detectionNotice=nil;manualSelection=true
@@ -805,6 +841,10 @@ final class AppModel {
         guard controlsEnabled else {return false}
         guard box.isValid,box.width>0.015,box.height>0.03 else {
             detectionNotice="选区太小，请扩大人物框";return false
+        }
+        if isReviewing {
+            reviewSelection=box;manualSelection=false
+            confirmReviewFrame();return true
         }
         if let issue=redactionIssue {
             guard project?.settings.redaction.subjects.contains(where:{$0.id==issue.subjectID}) == true else {return false}
@@ -823,6 +863,8 @@ final class AppModel {
     }
     func suspend() { pause();pausePreview(refresh:false);previewPlayer?.pause();persist() }
     private func cancelTasks(preserveAnalysis:Bool=false) {
+        reviewID=UUID();reviewTasks.values.forEach {$0.cancel()};reviewTasks=[:]
+        analysisReview=nil;reviewSelection=nil
         if redactionEditing { finishRedaction(commit:true) }
         generatingVideo=false;analysisOnly=false;generateAfterAnalysis=false
         redactionIssue=nil;redactionPreviewID=UUID();redactionPreviewTask?.cancel();redactionImageID=UUID();importingRedactionImage=false
@@ -1211,5 +1253,98 @@ extension AppModel {
         guard progress.isFinite,isCurrent(id,projectID:projectID),case .processing = phase else {return}
         let base=generationAnalysisWeight+generationRedactionWeight
         phase = .processing(progress:max(phase.progress,base+min(1,max(0,progress))*(0.99-base)))
+    }
+}
+
+
+extension AppModel {
+    #if DEBUG
+    func prepareAnalysisReviewDemo() {
+        startDemo()
+        project?.metadata = .init(width:1920,height:1080,duration:1,frameRate:30)
+        project?.settings.end=1
+        let box=DemoStage.body(index:1,time:0)
+        project?.target=box;project?.targetTime=0
+        let frames=[AnalysisReviewFrame(time:1.0/6),AnalysisReviewFrame(time:0.5)]
+        let batch=DetectionBatch(primary:[.init(id:1,body:box,confidence:1)],relaxed:[])
+        analysisReview = .init(frames:frames,samples:(0...6).filter {$0 != 1 && $0 != 3}.map {.init(time:Double($0)/6,body:box)},
+            people:[1667:batch,5000:batch],detected:[1667,5000])
+        selectReviewFrame(at:1.0/6)
+    }
+    #endif
+    /// Review navigation never resumes the tracking pipeline. A completed request is cached even when empty.
+    func selectReviewFrame(at time:Double) {
+        guard isReviewing,!restoringTracking,time.isFinite,let frame=reviewFrames.min(by:{abs($0.time-time)<abs($1.time-time)}),let project else {return}
+        pausePreview(refresh:false);processingPreview=nil;manualSelection=false
+        currentTime=frame.time;reviewSelection=frame.body;targetExplicitlySelected=frame.body != nil
+        phase = .blocked(.init(time:frame.time,message:"请选择与开始时相同的主角",checkpoint:1))
+        player?.seek(to:CMTime(seconds:frame.time,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
+        let key=frame.id
+        observations=analysisReview?.detected.contains(key) == true ? analysisReview?.people[key]?.primary ?? [] : []
+        detecting=reviewTasks[key] != nil
+        guard frame.body == nil,analysisReview?.detected.contains(key) != true,reviewTasks[key] == nil,
+              let source=store.sourceURL(for:project) else {return}
+        detecting=true;detectionNotice=nil
+        let token=reviewID,pipeline=self.pipeline
+        reviewTasks[key]=Task { [weak self] in
+            do {
+                let found=try await pipeline.detections(source:source,time:frame.time,region:nil)
+                guard let self,!Task.isCancelled,self.reviewID==token,self.project?.id==project.id,self.isReviewing else {return}
+                self.analysisReview?.people[key] = .init(primary:found,relaxed:[])
+                self.analysisReview?.detected.insert(key)
+                self.analyzedPeople[key] = .init(primary:found,relaxed:[])
+                self.reviewTasks[key]=nil
+                if abs(self.currentTime-frame.time)<0.001 {
+                    self.observations=found;self.detecting=false
+                    self.detectionNotice=found.isEmpty ? "未识别到人物，可直接手动框选" : nil
+                }
+                self.persist()
+            } catch {
+                guard let self,self.reviewID==token,self.project?.id==project.id,self.isReviewing else {return}
+                // A failed request is also attempted once; the human can always supply the box.
+                self.analysisReview?.detected.insert(key);self.reviewTasks[key]=nil
+                self.analysisReview?.people[key] = .init(primary:[],relaxed:[])
+                if abs(self.currentTime-frame.time)<0.001 {self.detecting=false;self.observations=[];self.detectionNotice="识别失败，请手动框选人物"}
+                self.persist()
+            }
+        }
+    }
+    func moveReview(_ direction:Int) {
+        let pending=reviewFrames.filter {$0.body == nil}.sorted {$0.time<$1.time}
+        let next=direction>0 ? pending.first {$0.time>currentTime+0.001} : pending.last {$0.time<currentTime-0.001}
+        if let next {selectReviewFrame(at:next.time)}
+    }
+    func confirmReviewFrame() {
+        guard isReviewing,!restoringTracking,let box=reviewSelection,
+              analysisReview?.confirm(time:currentTime,box:box) == true else {return}
+        targetSamples=analysisReview?.samples ?? [];targetExplicitlySelected=true
+        persist()
+        if analysisReview?.pending.isEmpty == true {completeReview()}
+    }
+    private func completeReview() {
+        guard let review=analysisReview,review.pending.isEmpty,let project else {return}
+        do {try VideoExporter.validateTrajectory(review.samples,project:project)}
+        catch {errorMessage="确认数据不完整，请重新分析";return}
+        let id=operationID,token=reviewID,previous=persistenceTask
+        restoringTracking=true
+        processingTask=Task { [weak self,store=self.store,pipeline=self.pipeline] in
+            await previous?.value
+            guard let self,!Task.isCancelled,self.isCurrent(id,projectID:project.id),self.reviewID==token else {return}
+            do {
+                try await store.saveTrajectory(project:project,samples:review.samples,people:review.people)
+                guard !Task.isCancelled,self.isCurrent(id,projectID:project.id),self.reviewID==token else {return}
+                if let source=store.sourceURL(for:project) {await pipeline.restorePeople(review.people,source:source)}
+                guard !Task.isCancelled,self.isCurrent(id,projectID:project.id),self.reviewID==token else {return}
+                self.reviewID=UUID();self.reviewTasks.values.forEach {$0.cancel()};self.reviewTasks=[:]
+                self.targetSamples=review.samples;self.analyzedPeople=review.people
+                self.analysisReview=nil;self.reviewSelection=nil;self.hasCompletedTracking=true
+                self.restoringTracking=false;self.detecting=false;self.detectionNotice=nil;self.manualSelection=false
+                self.phase = .editing;self.route = .editor;self.generatingVideo=false;self.analysisOnly=false
+                self.seek(to:project.settings.start);self.persist()
+            } catch {
+                guard self.isCurrent(id,projectID:project.id),self.reviewID==token else {return}
+                self.restoringTracking=false;self.errorMessage="确认结果保存失败：\(error.localizedDescription)"
+            }
+        }
     }
 }

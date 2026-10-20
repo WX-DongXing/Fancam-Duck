@@ -31,6 +31,7 @@ actor ProjectStore {
         try JSONEncoder().encode(all).write(to: directory.appendingPathComponent("projects.json"), options: .atomic)
     }
     func remove(_ project: VideoProject) throws {
+        try removeReview(project.id)
         let outputDirectory=artifactsURL(project.id)
         if FileManager.default.fileExists(atPath:outputDirectory.path) {try FileManager.default.removeItem(at:outputDirectory)}
         let cache=trajectoryURL(project.id)
@@ -53,7 +54,7 @@ actor ProjectStore {
         var people:[Int:DetectionBatch]? = nil
     }
     // Bump when inference preprocessing, identity matching or occlusion policy changes.
-    static let analysisVersion="yolo26s640-osnet025-tracktrack10hz-deferred-v2"
+    static let analysisVersion="yolo26s640-osnet025-tracktrack6hz-review-v3"
     private struct DigestEntry {let size:UInt64;let date:Date;let digest:String}
     private var digests:[URL:DigestEntry]=[:]
     private func trajectoryURL(_ id:UUID) -> URL {directory.appendingPathComponent("trajectory-\(id).json")}
@@ -73,6 +74,34 @@ actor ProjectStore {
         try VideoExporter.validateTrajectory(samples,project:project)
         let record=TrajectoryRecord(version:Self.analysisVersion,sourceDigest:try digest(source),sourceFileName:project.sourceFileName,metadata:project.metadata,target:project.target,targetTime:project.targetTime,samples:samples,people:people)
         try JSONEncoder().encode(record).write(to:trajectoryURL(project.id),options:.atomic)
+    }
+    private struct ReviewRecord:Codable {
+        let version:String
+        let digest:String
+        let sourceFileName:String?
+        let start:Double
+        let end:Double
+        let target:NormalizedRect?
+        let targetTime:Double
+        let review:AnalysisReview
+    }
+    private func reviewURL(_ id:UUID)->URL {directory.appendingPathComponent("review-\(id).json")}
+    func saveReview(_ review:AnalysisReview,project:VideoProject) throws {
+        guard let source=sourceURL(for:project),try projects().contains(where:{$0.id==project.id}) else {return}
+        let record=ReviewRecord(version:Self.analysisVersion,digest:try digest(source),sourceFileName:project.sourceFileName,
+            start:project.settings.start,end:project.settings.end,target:project.target,targetTime:project.targetTime,review:review)
+        try JSONEncoder().encode(record).write(to:reviewURL(project.id),options:.atomic)
+    }
+    func review(for project:VideoProject) throws -> AnalysisReview? {
+        guard let source=sourceURL(for:project),let data=try? Data(contentsOf:reviewURL(project.id)),
+              let record=try? JSONDecoder().decode(ReviewRecord.self,from:data),record.version==Self.analysisVersion,
+              record.sourceFileName==project.sourceFileName,record.start==project.settings.start,record.end==project.settings.end,
+              record.target==project.target,record.targetTime==project.targetTime,record.digest == (try digest(source)) else {return nil}
+        return record.review
+    }
+    func removeReview(_ id:UUID) throws {
+        let url=reviewURL(id)
+        if FileManager.default.fileExists(atPath:url.path) {try FileManager.default.removeItem(at:url)}
     }
     struct SavedAnalysis:Sendable {
         let samples:[TargetSample]

@@ -42,6 +42,9 @@ struct FancamDuckApp: App {
                     model.open(project)
                 }
                 #endif
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--demo-review") {model.prepareAnalysisReviewDemo()}
+                #endif
                 if ProcessInfo.processInfo.arguments.contains("--demo-editor") {
                     model.startDemo()
                     #if DEBUG

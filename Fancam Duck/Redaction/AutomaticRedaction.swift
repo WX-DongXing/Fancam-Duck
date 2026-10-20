@@ -60,16 +60,16 @@ enum AutomaticRedaction {
             func flush() {
                 guard !segment.isEmpty else {return}
                 // Cover the interval before a new detection as well, so a face cannot appear
-                // uncovered between the 10 Hz detection grid and the output frame grid.
+                // uncovered between the 6 Hz detection grid and the output frame grid.
                 if let first=segment.first,first.time>project.settings.start+0.001 {
-                    segment.insert(.init(time:max(project.settings.start,first.time-0.1),rect:first.rect),at:0)
+                    segment.insert(.init(time:max(project.settings.start,first.time-AnalysisSampling.interval),rect:first.rect),at:0)
                     if let body=bodies.first {bodies.insert(.init(time:segment[0].time,rect:body.rect),at:0)}
                 }
                 tracks.append(.init(subjectID:UUID(),frames:RedactionMotion.smooth(segment),bodies:bodies))
                 segment=[];bodies=[]
             }
             for (frame,body) in zip(record.frames,record.bodies) {
-                if let last=segment.last,frame.time-last.time>0.151 {flush()}
+                if let last=segment.last,frame.time-last.time>AnalysisSampling.maximumSampleGap {flush()}
                 segment.append(frame);bodies.append(body)
             }
             flush()

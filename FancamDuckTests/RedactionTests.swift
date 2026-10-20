@@ -44,6 +44,19 @@ final class RedactionTests: XCTestCase {
         let enabled=try JSONDecoder().decode(RedactionSettings.self,from:JSONEncoder().encode(project.settings.redaction))
         XCTAssertTrue(enabled.enabled);XCTAssertTrue(enabled.subjects.isEmpty)
     }
+    func testSixHzBystanderMasksRemainOneContinuousTrack() throws {
+        var project=VideoProject.demo;project.settings.end=1
+        project.settings.redaction = .init(allOthers:true)
+        let primary=observation(id:1,x:0.4),other=observation(id:2,x:0.05,feature:[0,1])
+        project.target=primary.body
+        let times=(0...6).map {Double($0)/6}
+        let frames=times.map {($0,DetectionBatch(primary:[primary,other],relaxed:[]))}
+        let samples=times.map {TargetSample(time:$0,body:primary.body)}
+        let plan=try AutomaticRedaction.build(frames:frames,project:project,samples:samples)
+        XCTAssertTrue(plan.covers(project))
+        XCTAssertEqual(plan.tracks.count,1,"6Hz intervals must not split one person into isolated masks")
+        for time in stride(from:0.0,through:1,by:1.0/30) {XCTAssertEqual(plan.rectangles(at:time).count,1)}
+    }
     func testAutomaticExclusionFollowsPrimaryRatherThanDetectionNumber() throws {
         let left=observation(id:1,x:0.05),right=observation(id:2,x:0.7)
         XCTAssertEqual(AutomaticRedaction.candidates([left,right],primary:right.body).map(\.id),[left.id])

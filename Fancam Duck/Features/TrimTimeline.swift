@@ -33,6 +33,17 @@ struct TrimTimeline:View {
                         RoundedRectangle(cornerRadius:6).strokeBorder(Color.white,lineWidth:2).frame(width:max(0,endX-startX),height:48).offset(x:startX).allowsHitTesting(false)
                         handle(true,x:startX,width:width,duration:duration)
                         handle(false,x:endX,width:width,duration:duration)
+                        ForEach(model.reviewFrames) {frame in
+                            Button {model.selectReviewFrame(at:frame.time)} label: {
+                                Rectangle().fill(frame.body == nil ? Color.yellow : Color.green)
+                                    .frame(width:2,height:44)
+                                    .frame(width:18,height:44).contentShape(Rectangle())
+                            }.buttonStyle(.plain)
+                                .position(x:22+width*frame.time/duration,y:26)
+                                .accessibilityLabel((frame.body == nil ? "待确认 " : "已确认 ")+String(format:"%.3f 秒",frame.time))
+                                .accessibilityIdentifier("reviewMarker-\(frame.id)")
+                                .accessibilityValue(frame.body == nil ? "待确认" : "已确认")
+                        }
                         Capsule().fill(.white).frame(width:2,height:52).shadow(color:.black.opacity(0.5),radius:1).offset(x:22+width*model.currentTime/duration).allowsHitTesting(false)
                     }
                 }.frame(height:52)

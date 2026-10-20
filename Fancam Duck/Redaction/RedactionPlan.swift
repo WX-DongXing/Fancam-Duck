@@ -63,10 +63,10 @@ struct RedactionPlan: Codable, Equatable, Sendable {
         if options.allOthers {
             guard region == options.region, let times=automaticTimes, let first=times.first, let last=times.last,
                   first <= settings.start+0.001, last >= settings.end-0.001,
-                  times.allSatisfy(\.isFinite), zip(times,times.dropFirst()).allSatisfy({$1>$0 && $1-$0<=0.151}) else {return false}
+                  times.allSatisfy(\.isFinite), zip(times,times.dropFirst()).allSatisfy({$1>$0 && $1-$0<=AnalysisSampling.maximumSampleGap}) else {return false}
             return Set(tracks.map(\.subjectID)).count == tracks.count && tracks.allSatisfy { track in
                 !track.frames.isEmpty && track.frames.allSatisfy {$0.time.isFinite && $0.rect.isValid && $0.time>=first-0.001 && $0.time<=last+0.001} &&
-                zip(track.frames,track.frames.dropFirst()).allSatisfy {$1.time>$0.time && $1.time-$0.time<=0.151}
+                zip(track.frames,track.frames.dropFirst()).allSatisfy {$1.time>$0.time && $1.time-$0.time<=AnalysisSampling.maximumSampleGap}
             }
         }
         guard automaticTimes == nil else {return false}
@@ -77,7 +77,7 @@ struct RedactionPlan: Codable, Equatable, Sendable {
             guard let a = track.frames.first, let b = track.frames.last,
                   a.time <= settings.start + 0.001, b.time >= settings.end - 0.001 else { return false }
             return track.frames.allSatisfy { $0.time.isFinite && $0.rect.isValid } &&
-                zip(track.frames, track.frames.dropFirst()).allSatisfy { $1.time > $0.time && $1.time - $0.time <= 0.151 }
+                zip(track.frames, track.frames.dropFirst()).allSatisfy { $1.time > $0.time && $1.time - $0.time <= AnalysisSampling.maximumSampleGap }
         }
     }
     func rectangles(at time: Double) -> [NormalizedRect] {

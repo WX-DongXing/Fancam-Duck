@@ -44,6 +44,7 @@ struct TrackingUpdate: Sendable {
 struct TrackingResult: Sendable {
     let samples: [TargetSample]
     let issue: TrackingIssue?
+    var reviewTimes:[Double]=[]
 }
 
 protocol TargetTracking: Sendable {

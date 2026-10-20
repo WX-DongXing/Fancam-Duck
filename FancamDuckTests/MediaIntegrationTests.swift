@@ -33,25 +33,27 @@ final class MediaIntegrationTests: XCTestCase {
         XCTAssertEqual(metadata.height, 192, accuracy: 0.01)
     }
 
-    func testDeferredRecoveryDeliversMovingVideoFramesAfterManualConfirmation() async throws {
+    func testSixHzScanCachesEveryFrameAndReturnsAllMissingTimesWithoutRetry() async throws {
         let source=try await makeVideo(animated:true)
         defer {try? FileManager.default.removeItem(at:source)}
         let pipeline=CoreMLTrackingPipeline()
         var project=VideoProject(title:"Synthetic missing person",metadata:try await MediaService.shared.metadata(url:source),settings:EditSettings())
         project.settings.end=0.8
         project.target = .init(x:0.25,y:0.15,width:0.3,height:0.7)
-        let first=try await pipeline.analyze(source:source,project:project) {_ in}
-        let issue=try XCTUnwrap(first.issue)
-        XCTAssertTrue(issue.requiresManualSelection)
-        project.targetTime=issue.time
         let frames=RecoveryPreviewFrames()
-        let resumed=try await pipeline.analyze(source:source,project:project) {await frames.record($0)}
+        let result=try await pipeline.analyze(source:source,project:project) {await frames.record($0)}
+        XCTAssertNotNil(result.issue)
+        XCTAssertEqual(result.reviewTimes.count,5)
+        XCTAssertEqual(result.reviewTimes.first ?? -1,1.0/6,accuracy:0.001)
+        XCTAssertEqual(result.reviewTimes.last ?? -1,0.8,accuracy:0.001)
+        let people=await pipeline.cachedPeople(source:source)
+        XCTAssertEqual(people.count,6)
+        let metrics=await pipeline.performanceMetrics()
+        XCTAssertEqual(metrics?.poseCalls,6,"Each sampled frame is inferred once, including an empty detection result")
+        XCTAssertEqual(result.samples.count,1,"Missing predictions must not be saved as confirmed identities")
         let previews=await frames.previews
-        XCTAssertGreaterThan(previews.count,1,"Manual recovery must update the video, not only the target rectangle")
-        XCTAssertGreaterThan(Set(previews.map(\.1)).count,1,"The synthetic video changes color over time")
-        XCTAssertEqual(previews.map(\.0),previews.map(\.0).sorted())
-        XCTAssertTrue(previews.allSatisfy {$0.0>issue.time})
-        XCTAssertNotNil(resumed.issue,"A video without people must still block; display references cannot become confirmed tracks")
+        XCTAssertGreaterThan(previews.count,1)
+        XCTAssertGreaterThan(Set(previews.map(\.1)).count,1)
     }
 
     private func makeVideo(rotated: Bool = false, animated:Bool=false) async throws -> URL {
@@ -193,7 +195,7 @@ final class AudioSyncTests: XCTestCase {
 private actor RecoveryPreviewFrames {
     var previews:[(Double,Data)]=[]
     func record(_ update:TrackingUpdate) {
-        guard update.message?.contains("回补") == true,let image=update.preview,
+        guard let image=update.preview,
               let data=image.dataProvider?.data else {return}
         previews.append((update.sample.time,data as Data))
     }
