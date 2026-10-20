@@ -13,9 +13,9 @@ final class SettingsFlowTests:XCTestCase {
         about.coordinate(withNormalizedOffset:CGVector(dx:0.85,dy:0.5)).tap()
         XCTAssertTrue(app.staticTexts["appVersion"].waitForExistence(timeout:5))
         XCTAssertTrue(app.staticTexts["Fancam Duck"].exists)
-        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"sourceRepository").firstMatch.isHittable)
-        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"sourceLicense").firstMatch.isHittable)
-        XCTAssertTrue(app.staticTexts["AGPL-3.0-only"].exists)
+        XCTAssertFalse(app.descendants(matching:.any).matching(identifier:"sourceRepository").firstMatch.exists)
+        XCTAssertFalse(app.descendants(matching:.any).matching(identifier:"sourceLicense").firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["本机处理 · 原片不上传"].isHittable)
         let shot=XCTAttachment(screenshot:app.screenshot());shot.name="about-duck";shot.lifetime = .keepAlways;add(shot)
         app.navigationBars.buttons["设置"].tap()
         XCTAssertTrue(app.buttons["rateDuck"].waitForExistence(timeout:5))
@@ -23,4 +23,27 @@ final class SettingsFlowTests:XCTestCase {
         XCTAssertTrue(entry.waitForExistence(timeout:5))
         XCTAssertFalse(app.buttons["rateDuck"].exists)
     }
+    @MainActor func testOfflineLicenses() {
+        let app=XCUIApplication();app.launch()
+        let settings=app.buttons["openSettings"]
+        XCTAssertTrue(settings.waitForExistence(timeout:10));settings.tap()
+        app.buttons["openSourceLicenses"].tap()
+        XCTAssertFalse(app.descendants(matching:.any)["versionSource"].exists)
+        for (file,notice) in [("AGPL-3.0","GNU AFFERO GENERAL PUBLIC LICENSE"),
+                              ("Ultralytics-AGPL","GNU AFFERO GENERAL PUBLIC LICENSE"),
+                              ("OSNet-MIT","Copyright (c) 2018 Kaiyang Zhou"),
+                              ("TrackTrack-MIT","Copyright (c) 2024 Kyujin Shim")] {
+            let row=app.buttons["license-\(file)"]
+            for _ in 0..<4 {
+                if row.exists && row.isHittable {break}
+                app.swipeUp()
+            }
+            XCTAssertTrue(row.waitForExistence(timeout:5));row.tap()
+            let text=app.staticTexts["offlineLicenseText"]
+            XCTAssertTrue(text.waitForExistence(timeout:5))
+            XCTAssertTrue(text.label.contains(notice))
+            app.navigationBars.buttons["开源许可"].tap()
+        }
+    }
+
 }

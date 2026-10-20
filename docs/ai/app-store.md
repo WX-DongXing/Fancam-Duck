@@ -40,3 +40,7 @@ Apple 参考：[隐私清单](https://developer.apple.com/documentation/bundlere
 ## 隐私与支持网站
 
 仓库 `website/public` 提供首页、`/privacy` 与 `/support`，根目录 vercel.json 配置只输出该静态目录。Vercel 部署按钮与 CLI 脚本、本地预览方法见 [网站说明](../../website/README.md)。当前支持联系人为 GitHub Issues，未虚构邮箱。正式生产域名尚未确定，App 尚未添加隐私链接，后台链接也未填报；部署后需验证匿名可访问再接入。
+
+## 应用内开源许可
+
+设置 → 开源许可展示离线正文（Resources 下四份 txt）及第三方来源。应用内不展示本版本源码入口，关于页也不再展示重复的仓库与协议链接。发布时仍须提供与分发构建对应的完整源码。修改根 LICENSE 或第三方许可时同步更新打包副本。

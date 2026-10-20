@@ -136,7 +136,11 @@ struct HomeView: View {
         }.preferredColorScheme(.dark)
     }
     private var settingsButton:some View {
-        StudioIcon(symbol:"gearshape",label:"设置") {showingSettings=true}
+        Button {showingSettings=true} label: {
+            Image(systemName:"gearshape")
+                .font(.title3)
+                .frame(minWidth:32,minHeight:32)
+        }.buttonStyle(.bordered).buttonBorderShape(.circle)
             .accessibilityLabel("设置").accessibilityIdentifier("openSettings")
     }
     private var expandedLibrary:some View {
