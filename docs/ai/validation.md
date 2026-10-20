@@ -146,3 +146,9 @@ Mac 控件统一（2026-10-20）：Mac Inspector 直接复用手机的 `processi
 ## 首页设置（2026-10-20）
 
 设置仅提供关于与系统评价。iPhone 17 Pro／iOS 26.3.1、iPhone Duo／iOS 27.1 各通过 1 项 UI 测试，覆盖首页入口、整行空白区打开关于、实际版本信息、返回及关闭；Mac Catalyst 构建通过。Duo 测试附件为黑色画面，未据此认定视觉验收通过。系统评分是否弹出由 StoreKit 控制，未验证正式商店评价流程。
+
+## 隐私清单与商店标识（2026-10-20）
+
+添加 PrivacyInfo.xcprivacy，声明无追踪、无开发者数据收集，以及应用容器文件时间戳 C617.1 用途。plist 格式检查通过。iOS Simulator 与 Mac Catalyst 构建通过，逐一读取实际产物 Info.plist，确认 Bundle ID 为 com.fancamduck.com，且应用包内隐私清单与源文件一致。工程 Debug／Release 主应用、单元测试、UI 测试标识均核对通过。未执行 Apple 分发签名、App Store Connect 注册、上传或后台隐私申报；构建验证不代表商店审核通过。
+
+关于页开源入口（2026-10-20）：新增仓库与 AGPL-3.0-only LICENSE 链接，Mac Catalyst 构建通过。iPhone 设置 UI 回归通过，覆盖两个入口可点击、协议标识显示及原有返回流程；SwiftUI Link 在本机未以 XCTest Link 类型暴露，测试按实际标识查询后通过。未自动跳转外部浏览器。

@@ -2,7 +2,7 @@
 
 ## 产品名称
 
-中文名「直拍鸭」，英文名「Fancam Duck」，突出从群舞视频中剪出个人直拍。工程与 Scheme 使用 Fancam Duck，Swift 模块与标识符使用 FancamDuck，测试模块使用 FancamDuckTests／FancamDuckUITests。中文系统显示直拍鸭，英文系统显示 Fancam Duck。签名 Bundle ID 保留 com.aicut.app，保证已有安装仍可访问自己的数据。Application Support 默认使用 Fancam Duck；首次打开时仅在新目录不存在的情况下迁移旧 AICut 数据目录，不覆盖已有新目录。
+中文名「直拍鸭」，英文名「Fancam Duck」，突出从群舞视频中剪出个人直拍。工程与 Scheme 使用 Fancam Duck，Swift 模块与标识符使用 FancamDuck，测试模块使用 FancamDuckTests／FancamDuckUITests。中文系统显示直拍鸭，英文系统显示 Fancam Duck。签名 Bundle ID 使用 com.fancamduck.com，测试使用 .tests／.uitests 后缀，iOS 与 Mac Catalyst 共用主标识。Bundle ID 从旧标识切换后会使用独立应用容器，旧安装的数据不会自动跨容器迁移。Application Support 默认使用 Fancam Duck；首次打开时仅在新目录不存在的情况下迁移旧 AICut 数据目录，不覆盖已有新目录。
 
 首页手机标题、宽屏标题和 Mac 侧栏使用同一 A1 鸭子 Logo（`BrandLogo`），与系统 AppIcon 共用母图。Logo 仅用于品牌位置，功能按钮保留语义图标。
 
@@ -84,4 +84,4 @@ iPhone 紧凑首页“第一次使用？”直接启动现有演示流程，不�
 
 手动框确认未通过（如选区过小、打码冲突）时保留草稿和框选界面，显示原因；只有接纳成功才退出框选。
 
-首页提供「设置」入口：手机品牌行右侧、宽屏首页右上角、Mac 侧栏底部。设置仅包含「关于直拍鸭」和「评价」，沿用玻璃材质、整行点击及原生导航；关于页展示 Logo、中英文名称、实际版本与构建号、产品简介。评价调用系统 StoreKit 评分请求，是否显示由系统决定，不使用虚构的 App Store 链接。
+首页提供「设置」入口：手机品牌行右侧、宽屏首页右上角、Mac 侧栏底部。设置仅包含「关于直拍鸭」和「评价」，沿用玻璃材质、整行点击及原生导航；关于页展示 Logo、中英文名称、实际版本与构建号、产品简介，并提供开源仓库及 AGPL-3.0-only 协议链接；两行均可整行点击，在系统浏览器打开对应 GitHub 页面。评价调用系统 StoreKit 评分请求，是否显示由系统决定，不使用虚构的 App Store 链接。

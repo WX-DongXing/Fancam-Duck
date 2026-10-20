@@ -10,6 +10,7 @@
 | 排查流程、取消或恢复 | [架构与状态](architecture.md) | `AppModel`、`ProjectStore` |
 | 优化跟踪、构图或打码 | [媒体处理链路](pipeline.md) | `CoreMLTrackingPipeline`、`CropPlan`、`Redaction` |
 | 修改手机、Duo、桌面布局 | [产品约束](product.md) | `WorkspaceLayout`、各 Features 视图 |
+| App Store 标识与隐私申报 | [商店发布配置](app-store.md) | `PrivacyInfo.xcprivacy`、工程 Build Settings |
 | 构建 macOS 发布产物 | [macOS 发布指南](macos-release.md) | `tools/release/release-macos.sh`、`.env.release.example` |
 | 编译、测试和复现 | [验证指南](validation.md) | 单元与 UI 测试 |
 | 提交代码与工程维护 | [提交规范](contributing.md) | 暂存区与提交信息 |

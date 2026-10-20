@@ -63,9 +63,34 @@ private struct AboutDuckView:View {
                     .font(.body).multilineTextAlignment(.center).padding(.top,8)
                 Text("本机处理 · 原片不上传")
                     .font(.caption).foregroundStyle(.secondary)
+                VStack(spacing:0) {
+                    openSourceLink("开源项目",detail:"WX-DongXing / Fancam-Duck",symbol:"chevron.left.forwardslash.chevron.right",
+                                   destination:URL(string:"https://github.com/WX-DongXing/Fancam-Duck")!)
+                        .accessibilityIdentifier("sourceRepository")
+                    Divider().padding(.leading,56)
+                    openSourceLink("开源协议",detail:"AGPL-3.0-only",symbol:"doc.text",
+                                   destination:URL(string:"https://github.com/WX-DongXing/Fancam-Duck/blob/main/LICENSE")!)
+                        .accessibilityIdentifier("sourceLicense")
+                }.modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24)))
+                    .padding(.top,12)
             }.padding(.horizontal,24).padding(.vertical,36).frame(maxWidth:520)
                 .frame(maxWidth:.infinity)
         }.background {StudioBackground()}
             .navigationTitle("关于直拍鸭").navigationBarTitleDisplayMode(.inline)
+    }
+    private func openSourceLink(_ title:String,detail:String,symbol:String,destination:URL)->some View {
+        Link(destination:destination) {
+            HStack(spacing:14) {
+                Image(systemName:symbol).font(.system(size:20)).frame(width:24)
+                VStack(alignment:.leading,spacing:5) {
+                    Text(title).font(.body)
+                    Text(detail).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal:false,vertical:true)
+                }
+                Spacer(minLength:8)
+                Image(systemName:"arrow.up.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            }.foregroundStyle(.primary).padding(18)
+                .frame(maxWidth:.infinity,minHeight:60,alignment:.leading).contentShape(Rectangle())
+        }.buttonStyle(.plain)
     }
 }
