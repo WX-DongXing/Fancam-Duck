@@ -28,8 +28,8 @@ struct HomeView: View {
                         settingsButton
                     }
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("直拍快剪").font(.largeTitle.bold())
-                        Text("选择舞者，让镜头跟上动作。").font(.subheadline).foregroundStyle(.secondary)
+                        Text("这一次，你是主角").font(.largeTitle.bold())
+                        Text("将群舞变成你的个人直拍").font(.subheadline).foregroundStyle(.secondary)
                     }.padding(.vertical, 8)
                     Button { model.startDemo() } label: {
                         HStack(spacing:12) {
@@ -40,30 +40,31 @@ struct HomeView: View {
                     }.buttonStyle(.plain).accessibilityLabel("第一次使用？了解选人、跟随和纠正")
                         .accessibilityIdentifier("startDemo")
                 }
-                .listRowInsets(EdgeInsets(top:24,leading:24,bottom:24,trailing:24))
+                .listRowInsets(EdgeInsets(top:24,leading:0,bottom:24,trailing:0))
                 .listRowSeparator(.hidden).listRowBackground(Color.clear)
                 HStack {
                     Text("最近项目").font(.title3.bold())
                     Spacer()
                     Text("自动保存").font(.caption).foregroundStyle(.secondary)
-                }.listRowInsets(EdgeInsets(top:0,leading:24,bottom:8,trailing:24))
+                }.listRowInsets(EdgeInsets(top:0,leading:0,bottom:8,trailing:0))
                     .listRowSeparator(.hidden).listRowBackground(Color.clear)
                 if model.projects.isEmpty {
                     Text("还没有项目，导入一段舞蹈视频开始吧。")
                         .font(.subheadline).foregroundStyle(.secondary)
-                        .listRowInsets(EdgeInsets(top:8,leading:24,bottom:16,trailing:24))
+                        .listRowInsets(EdgeInsets(top:8,leading:0,bottom:16,trailing:0))
                         .listRowSeparator(.hidden).listRowBackground(Color.clear)
                 }
                 ForEach(model.projects) { project in
                     RecentProjectRow(project:project,onOpen:{ model.open(project) })
-                        .listRowInsets(EdgeInsets(top:6,leading:24,bottom:6,trailing:24))
+                        .listRowInsets(EdgeInsets(top:6,leading:0,bottom:6,trailing:0))
                         .listRowSeparator(.hidden).listRowBackground(Color.clear)
                         .swipeActions(edge:.trailing,allowsFullSwipe:false) {
                             Button("删除",systemImage:"trash") { pendingDelete=project }
                                 .tint(.red).accessibilityIdentifier("deleteProject-\(project.id)")
                         }
                 }
-            }.frame(maxWidth:900).frame(maxWidth:.infinity).listStyle(.plain).scrollContentBackground(.hidden)
+            }.listStyle(.plain).scrollContentBackground(.hidden)
+                .padding(.horizontal,24).frame(maxWidth:900).frame(maxWidth:.infinity)
             }
             }
             .background { StudioBackground() }
@@ -135,13 +136,22 @@ struct HomeView: View {
             }
         }.preferredColorScheme(.dark)
     }
-    private var settingsButton:some View {
-        Button {showingSettings=true} label: {
-            Image(systemName:"gearshape")
-                .font(.title3)
-                .frame(minWidth:32,minHeight:32)
-        }.buttonStyle(.bordered).buttonBorderShape(.circle)
-            .accessibilityLabel("设置").accessibilityIdentifier("openSettings")
+    @ViewBuilder private var settingsButton:some View {
+        if #available(iOS 26.0, *) {
+            Button {showingSettings=true} label: {
+                Label("设置",systemImage:"gearshape").labelStyle(.iconOnly)
+                    .frame(maxWidth:.infinity,maxHeight:.infinity)
+            }
+                .buttonStyle(.glass).buttonBorderShape(.circle).frame(width:44,height:44)
+                .accessibilityIdentifier("openSettings")
+        } else {
+            Button {showingSettings=true} label: {
+                Label("设置",systemImage:"gearshape").labelStyle(.iconOnly)
+                    .frame(maxWidth:.infinity,maxHeight:.infinity)
+            }
+                .buttonStyle(.bordered).buttonBorderShape(.circle).frame(width:44,height:44)
+                .accessibilityIdentifier("openSettings")
+        }
     }
     private var expandedLibrary:some View {
         ScrollView {
@@ -152,8 +162,8 @@ struct HomeView: View {
                             BrandLogo(size: 32)
                             Text("直拍鸭").font(.headline)
                         }
-                        Text("直拍快剪").font(.largeTitle.bold())
-                        Text("选择主角，让镜头跟上动作。").font(.subheadline).foregroundStyle(.secondary)
+                        Text("这一次，你是主角").font(.largeTitle.bold())
+                        Text("将群舞变成你的个人直拍").font(.subheadline).foregroundStyle(.secondary)
                     }
                     Spacer()
                     settingsButton
@@ -207,9 +217,9 @@ struct HomeView: View {
                         .background(.white.opacity(0.07),in:RoundedRectangle(cornerRadius:8))
                 }
                 Spacer()
-                Button {showingSettings=true} label: {
-                    Label("设置",systemImage:"gearshape").frame(maxWidth:.infinity,minHeight:44,alignment:.leading).contentShape(Rectangle())
-                }.buttonStyle(.plain).font(.system(size:12)).accessibilityIdentifier("openSettings")
+                Button("设置",systemImage:"gearshape") {showingSettings=true}
+                    .buttonStyle(.automatic)
+                    .accessibilityIdentifier("openSettings")
                 Button {model.showGuide=true} label: {Label("使用指南",systemImage:"questionmark.circle").frame(minHeight:44).contentShape(Rectangle())}
                     .buttonStyle(.plain).font(.system(size:12)).foregroundStyle(.secondary)
                 StudioTextButton(title:"体验演示",fillsWidth:false) {model.startDemo()}.buttonStyle(.plain).font(.system(size:12)).foregroundStyle(.secondary)
@@ -221,8 +231,8 @@ struct HomeView: View {
             VStack(alignment:.leading,spacing:24) {
                 HStack(alignment:.center) {
                     VStack(alignment:.leading,spacing:7) {
-                        Text("直拍快剪").font(.system(size:26,weight:.semibold))
-                        Text("让镜头专注主角，留下完整动作。").font(.system(size:12)).foregroundStyle(.secondary)
+                        Text("这一次，你是主角").font(.system(size:26,weight:.semibold))
+                        Text("将群舞变成你的个人直拍").font(.system(size:12)).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Button {importingFile=true} label: {Label(model.importing ? "正在导入…" : "导入视频",systemImage:"plus")}
@@ -315,11 +325,15 @@ private struct ProjectThumbnail:View {
     var height:CGFloat=64
     @State private var image:UIImage?
     var body:some View {
-        ZStack {
-            Color.primary.opacity(0.04)
-            if let image { Image(uiImage:image).resizable().scaledToFill() }
-            else { Image(systemName:"film").foregroundStyle(.secondary) }
-        }.frame(width:width,height:height).frame(maxWidth:width == nil ? .infinity : nil).clipped().clipShape(RoundedRectangle(cornerRadius:12))
+        GeometryReader { geometry in
+            ZStack {
+                Color.primary.opacity(0.04)
+                if let image { Image(uiImage:image).resizable().scaledToFill() }
+                else { Image(systemName:"film").foregroundStyle(.secondary) }
+            }
+            .frame(width:width ?? geometry.size.width,height:height)
+            .clipped().clipShape(RoundedRectangle(cornerRadius:12))
+        }.frame(width:width,height:height)
             .task(id:project.id) {
                 guard let url=ProjectStore.shared.sourceURL(for:project) else { return }
                 image=await MediaService.shared.thumbnails(url:url,duration:project.metadata.duration,count:1,maximumSize:width == nil ? CGSize(width:960,height:540) : CGSize(width:192,height:192)).first

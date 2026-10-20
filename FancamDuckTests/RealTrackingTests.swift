@@ -3,6 +3,79 @@ import AVFoundation
 @testable import FancamDuck
 
 final class RealTrackingTests: XCTestCase {
+    func testSavedManualCorrectionSequence() async throws {
+        guard let initialPath=ProcessInfo.processInfo.environment["FANCAM_DUCK_INITIAL_PROJECT"],
+              let correctionPath=ProcessInfo.processInfo.environment["FANCAM_DUCK_RECOVERY_PROJECT"] else {throw XCTSkip("Opt-in local correction sequence")}
+        let initial=try JSONDecoder().decode(VideoProject.self,from:Data(contentsOf:URL(fileURLWithPath:initialPath)))
+        let correction=try JSONDecoder().decode(VideoProject.self,from:Data(contentsOf:URL(fileURLWithPath:correctionPath)))
+        let source=try TestVideoFixture.people(),pipeline=CoreMLTrackingPipeline()
+        let first=try await pipeline.analyze(source:source,project:initial) {_ in}
+        XCTAssertNotNil(first.issue)
+        var resumed=try await pipeline.analyze(source:source,project:correction) {_ in}
+        if let extraPath=ProcessInfo.processInfo.environment["FANCAM_DUCK_EXTRA_PROJECT"] {
+            let extra=try JSONDecoder().decode(VideoProject.self,from:Data(contentsOf:URL(fileURLWithPath:extraPath)))
+            resumed=try await pipeline.analyze(source:source,project:extra) {_ in}
+        }
+        print("CORRECTION_SEQUENCE first=\(String(describing:first.issue?.time)) resumed=\(String(describing:resumed.issue?.time)) samples=\(resumed.samples.count)")
+        XCTAssertNil(resumed.issue,"The actual saved correction must resolve the reported interval")
+        if resumed.issue == nil {try VideoExporter.validateTrajectory(resumed.samples,project:correction)}
+    }
+    func testSavedManualAnchorCompletesFullVideo() async throws {
+        guard ProcessInfo.processInfo.environment["FANCAM_DUCK_MANUAL_RECOVERY_VALIDATION"] == "1",
+              let casePath=ProcessInfo.processInfo.environment["FANCAM_DUCK_RECOVERY_PROJECT"] else {throw XCTSkip("Opt-in local saved manual anchor case")}
+        let project=try JSONDecoder().decode(VideoProject.self,from:Data(contentsOf:URL(fileURLWithPath:casePath)))
+        let source=try TestVideoFixture.people(),pipeline=CoreMLTrackingPipeline()
+        let first=try await pipeline.analyze(source:source,project:project) {_ in}
+        print("SAVED_MANUAL_ANCHOR issue=\(String(describing:first.issue?.time)) samples=\(first.samples.count)")
+        let expectedTail=ProcessInfo.processInfo.environment["FANCAM_DUCK_EXPECTED_FINAL_ISSUE_TIME"].flatMap(Double.init)
+        let alreadyAtTail=expectedTail.map {abs((first.issue?.time ?? -.infinity)-$0)<0.001} ?? false
+        let before=await pipeline.performanceMetrics()
+        let result:TrackingResult
+        if first.issue != nil && !alreadyAtTail {
+            result=try await pipeline.analyze(source:source,project:project) {_ in}
+            let after=await pipeline.performanceMetrics()
+            print("SAVED_MANUAL_CONFIRMED issue=\(String(describing:result.issue?.time)) samples=\(result.samples.count) poseCalls=\((after?.poseCalls ?? 0)-(before?.poseCalls ?? 0))")
+            XCTAssertLessThan((after?.poseCalls ?? 0)-(before?.poseCalls ?? 0),max(5,(before?.poseCalls ?? 0)/10),"Manual confirmation must reuse detections instead of scanning the video again")
+        } else {result=first}
+        if let expected=expectedTail {
+            let issue=try XCTUnwrap(result.issue)
+            XCTAssertEqual(issue.time,expected,accuracy:0.001)
+            if !alreadyAtTail {XCTAssertNotEqual(first.issue?.time,issue.time,"Confirmation must advance to the next unresolved interval")}
+            XCTAssertThrowsError(try VideoExporter.validateTrajectory(result.samples,project:project),"An invisible tail must remain blocked")
+            var visible=project
+            visible.settings.end=try XCTUnwrap(result.samples.last).time
+            try VideoExporter.validateTrajectory(result.samples,project:visible)
+        } else {
+            XCTAssertNil(result.issue,"Confirming the saved explicit manual anchor must complete the original video")
+            if result.issue == nil {try VideoExporter.validateTrajectory(result.samples,project:project)}
+        }
+    }
+    func testManualCorrectionCompletesOccludedInterval() async throws {
+        guard ProcessInfo.processInfo.environment["FANCAM_DUCK_MANUAL_RECOVERY_VALIDATION"] == "1",
+              let casePath=ProcessInfo.processInfo.environment["FANCAM_DUCK_RECOVERY_PROJECT"] else {throw XCTSkip("Opt-in local manual recovery case")}
+        var project=try JSONDecoder().decode(VideoProject.self,from:Data(contentsOf:URL(fileURLWithPath:casePath)))
+        let source=try TestVideoFixture.people(),pipeline=CoreMLTrackingPipeline()
+        let manual=try XCTUnwrap(project.target),manualTime=project.targetTime
+        project.settings.start=0;project.settings.end=project.metadata.duration;project.targetTime=0
+        let people=try await pipeline.detections(source:source,time:0,region:nil)
+        project.target=try XCTUnwrap(people.min {abs($0.body.center.x-manual.center.x)<abs($1.body.center.x-manual.center.x)}).body
+        let first=try await pipeline.analyze(source:source,project:project) {_ in}
+        print("RECOVERY_FIRST issue=\(String(describing:first.issue?.time)) samples=\(first.samples.count)")
+        guard first.issue != nil else {return XCTFail("Fixture must exercise an actual manual correction")}
+        project.target=manual;project.targetTime=manualTime
+        let before=await pipeline.performanceMetrics()
+        let resumed=try await pipeline.analyze(source:source,project:project) {_ in}
+        let after=await pipeline.performanceMetrics()
+        print("RECOVERY_REUSE poseCalls=\((after?.poseCalls ?? 0)-(before?.poseCalls ?? 0))")
+        XCTAssertLessThan((after?.poseCalls ?? 0)-(before?.poseCalls ?? 0),max(5,(before?.poseCalls ?? 0)/10))
+        print("RECOVERY_RESUMED issue=\(String(describing:resumed.issue?.time)) samples=\(resumed.samples.count)")
+        XCTAssertNil(resumed.issue,"The saved explicit manual anchor must recover this bounded occlusion interval")
+        if resumed.issue == nil {
+            try VideoExporter.validateTrajectory(resumed.samples,project:project)
+            XCTAssertEqual(resumed.samples.first(where:{abs($0.time-manualTime)<0.001})?.body,manual,"Detection must not replace the explicit human box")
+            XCTAssertEqual(Set(resumed.samples.map {Int(($0.time*10000).rounded())}).count,resumed.samples.count)
+        }
+    }
     func testRealPeopleInferenceTrackingAndMovingExport() async throws {
         let url = try TestVideoFixture.people()
         let pipeline = CoreMLTrackingPipeline()

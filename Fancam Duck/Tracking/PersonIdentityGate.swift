@@ -15,6 +15,20 @@ enum PersonIdentityGate {
     /// TrackTrack may match a relaxed-NMS candidate instead of its high-score duplicate.
     /// Two detections of the same pose must not become two competing identities.
     static func samePose(_ a:PersonObservation,_ b:PersonObservation) -> Bool {
+        let overlap=a.body.cgRect.intersection(b.body.cgRect)
+        let smallerArea=min(a.body.width*a.body.height,b.body.width*b.body.height)
+        let sharedPartial=zip(a.keypoints,b.keypoints).filter {$0.confidence>0.3 && $1.confidence>0.3}
+        // A region retry may return only the visible side of the same pose.
+        // Require containment and matching joints spread over the body; a single
+        // coincident shoulder or overlapping appearance is insufficient.
+        if !overlap.isNull,smallerArea>0,overlap.width*overlap.height/smallerArea>0.8,sharedPartial.count>=4 {
+            let scale=max(0.01,min(a.body.height,b.body.height))
+            let distances=sharedPartial.map {hypot($0.x-$1.x,$0.y-$1.y)}
+            let ys=sharedPartial.map {$0.0.y}
+            if (ys.max()!-ys.min()!)>scale*0.5,
+               distances.reduce(0,+)/Double(distances.count)<scale*0.035,
+               distances.max()!<scale*0.05 {return true}
+        }
         guard a.body.iou(b.body)>0.4 else { return false }
         let torso=[5,6,11,12].filter { a.keypoints.indices.contains($0) && b.keypoints.indices.contains($0) && a.keypoints[$0].confidence>0.6 && b.keypoints[$0].confidence>0.6 }
         if torso.count>=3 {

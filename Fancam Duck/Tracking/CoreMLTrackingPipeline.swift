@@ -10,7 +10,7 @@ actor CoreMLTrackingPipeline: TargetTracking {
     private let previewInterval:Double
     init(reuseBuffers:Bool=true,previewInterval:Double=0.2) {self.reuseBuffers=reuseBuffers;self.previewInterval=previewInterval}
     private var selectionCache: (source: URL, time: Double, observations: [PersonObservation])?
-    private struct Leg { var start: Double; var end: Double; var box: NormalizedRect }
+    private struct Leg { var start: Double; var end: Double; var box: NormalizedRect; var manual=false }
     private struct Configuration:Equatable {
         let source:URL
         let start:Double
@@ -30,6 +30,7 @@ actor CoreMLTrackingPipeline: TargetTracking {
         var cursor: Double = 0
         var seeded = false
         var blocked = false
+        var correctionTime:Double?
         var scanned:Double=0
         var deferred=DeferredTargetRecovery()
         var searching=false
@@ -54,9 +55,9 @@ actor CoreMLTrackingPipeline: TargetTracking {
         if let models { return models }
         let loaded = try CoreMLPeopleModels(reuseBuffers:reuseBuffers); models = loaded; return loaded
     }
-    func discard(projectID: UUID) { sessions[projectID] = nil }
-    func cachedPeople(source:URL) -> [Int:DetectionBatch] {redactionSource == source ? redactionBatches : [:]}
-    func restorePeople(_ batches:[Int:DetectionBatch],source:URL) {
+    func discard(projectID: UUID) async { sessions[projectID] = nil }
+    func cachedPeople(source:URL) async -> [Int:DetectionBatch] {redactionSource == source ? redactionBatches : [:]}
+    func restorePeople(_ batches:[Int:DetectionBatch],source:URL) async {
         redactionSource=source;redactionBatches=batches
     }
     func performanceMetrics() -> CoreMLPeopleModels.Metrics? { models?.metrics }
@@ -82,21 +83,21 @@ actor CoreMLTrackingPipeline: TargetTracking {
         }
         let engine=try engine()
         if state.blocked,state.legs.isEmpty {
-            // A user-drawn correction is an explicit anchor, not another candidate search.
-            let image=try await engine.image(source:source,time:anchor)
-            try Task.checkCancellation()
-            let embedding=try engine.embedding(image,body:box)
-            state.samples.removeAll {abs($0.time-anchor)<0.001}
-            state.samples.append(.init(time:anchor,body:box,trackID:state.targetID))
-            state.deferred.resolve(anchor);state.knownIdentities.append(embedding)
+            // Restart the whole failed interval. Resolving only this 0.1s frame caused
+            // the next still-occluded frame to reopen manual selection indefinitely.
+            if let range=state.deferred.restartRange(around:state.correctionTime ?? anchor,manualTime:anchor,anchors:state.samples) {
+                state.legs=[Leg(start:anchor,end:range.upperBound,box:box,manual:true),
+                            Leg(start:anchor,end:range.lowerBound,box:box,manual:true)]
+                state.seeded=false;state.occlusion.reset();state.lastPreviewTime=nil
+            }
             state.blocked=false;sessions[project.id]=state
         }
         if state.blocked, let pending = state.legs.first {
             // Cover the uncertain gap as well as the remaining segment if the user seeks to a clearer frame.
             state.legs.removeFirst()
             let oldCursor = state.cursor
-            state.legs.insert(Leg(start: anchor, end: pending.end, box: box), at: 0)
-            if abs(anchor-oldCursor) > 0.001 { state.legs.insert(Leg(start: anchor, end: oldCursor, box: box), at: 0) }
+            state.legs.insert(Leg(start: anchor, end: pending.end, box: box,manual:true), at: 0)
+            if abs(anchor-oldCursor) > 0.001 { state.legs.insert(Leg(start: anchor, end: oldCursor, box: box,manual:true), at: 0) }
             state.seeded = false; state.blocked = false; state.occlusion.reset()
         }
         while let leg = state.legs.first {
@@ -104,7 +105,9 @@ actor CoreMLTrackingPipeline: TargetTracking {
             if !state.seeded {
                 let seedImage=try await engine.image(source:source,time:leg.start)
                 try Task.checkCancellation()
-                var batch = try autoreleasepool { try engine.detect(seedImage,features:true) }
+                var batch:DetectionBatch
+                if leg.manual,let cached=redactionBatches[Int((leg.start*10000).rounded())] {batch=cached}
+                else {batch=try autoreleasepool {try engine.detect(seedImage,features:true)}}
                 if !batch.primary.contains(where: { $0.body.iou(leg.box) > 0.4 }) {
                     let local = try autoreleasepool { try engine.detect(seedImage,region:leg.box,features:true) }
                     // Local detections get disjoint IDs before joining the full-frame pool.
@@ -122,18 +125,38 @@ actor CoreMLTrackingPipeline: TargetTracking {
                 remember(batch,time:leg.start,source:source,enabled:true)
                 let detected=batch.primary.max(by:{$0.body.iou(leg.box)<$1.body.iou(leg.box)})
                 let chosen:PersonObservation
-                if let detected,detected.body.iou(leg.box)>0.15 {chosen=detected}
+                var verifiedSeedAppearance=true
+                if leg.manual || (detected?.body.iou(leg.box) ?? 0)<0.8 {
+                    // The human's rectangle is authoritative even if the full-frame
+                    // detector still misses the person or overlaps an occluder.
+                    let pose=DeferredTargetRecovery.manualSeed(box:leg.box,observations:batch.primary+batch.relaxed,gallery:state.knownIdentities)
+                    let embedding=try pose?.embedding ?? engine.embedding(seedImage,body:leg.box)
+                    verifiedSeedAppearance=pose != nil || state.knownIdentities.isEmpty
+                    chosen = .init(id:30000,body:leg.box,confidence:1,keypoints:pose?.keypoints ?? [],embedding:embedding)
+                    batch.primary.removeAll {d in
+                        d.body.iou(leg.box)>0.8 || pose.map {$0.id==d.id || PersonIdentityGate.samePose($0,d)} == true
+                            || DeferredTargetRecovery.duplicatesManualSeed(d,box:leg.box,embedding:chosen.embedding)
+                    }
+                    batch.primary.append(chosen)
+                    remember(batch,time:leg.start,source:source,enabled:true)
+                } else if let detected,detected.body.iou(leg.box)>0.15 {chosen=detected}
                 else {
                     chosen = .init(id:30000,body:leg.box,confidence:1,embedding:try engine.embedding(seedImage,body:leg.box))
                     batch.primary.append(chosen)
                 }
-                state.knownIdentities.append(chosen.embedding)
+                // A human location on a fully occluded frame does not validate the
+                // occluder's pixels as a new appearance of the selected person.
+                if verifiedSeedAppearance {state.knownIdentities.append(chosen.embedding)}
                 state.searching=false;state.confirmation = .init()
                 state.tracker = TrackTrackTracker()
-                state.targetID = state.tracker.seed(batch.primary, selectedID: chosen.id, time: leg.start)!
-                state.identity = chosen.embedding; state.gallery=[chosen.embedding]
+                state.targetID = state.tracker.seed(DeferredTargetRecovery.seedPeople(batch.primary,selected:chosen), selectedID: chosen.id, time: leg.start)!
+                state.identity = verifiedSeedAppearance ? chosen.embedding : (state.knownIdentities.first ?? chosen.embedding)
+                // A crop drawn during an occlusion can contain mostly the occluder.
+                // Keep previously verified appearances for the look-ahead in both directions.
+                state.gallery=leg.manual ? Array(state.knownIdentities.prefix(1))+Array(state.knownIdentities.suffix(15)) : [chosen.embedding]
                 state.cursor = leg.start; state.seeded = true
                 let seed=TargetSample(time:leg.start,body:chosen.body,protection:chosen.protectionBody,trackID:state.targetID,focusX:chosen.focusX)
+                state.samples.removeAll {abs($0.time-leg.start)<0.001}
                 state.samples.append(seed);state.deferred.resolve(leg.start);state.trusted=seed;state.occlusion.reset()
             }
             let direction = leg.end >= leg.start ? 1.0 : -1.0
@@ -152,7 +175,9 @@ actor CoreMLTrackingPipeline: TargetTracking {
                 for (index,time) in times.reversed().enumerated() {
                     try Task.checkCancellation()
                     let image=try await reader.imageCancellable(at:time)
-                    let batch=try autoreleasepool {try engine.detect(image,features:true,relaxedFeatureThreshold:state.tracker.highConfidence)}
+                    let batch:DetectionBatch
+                    if leg.manual,let cached=redactionBatches[Int((time*10000).rounded())] {batch=cached}
+                    else {batch=try autoreleasepool {try engine.detect(image,features:true,relaxedFeatureThreshold:state.tracker.highConfidence)}}
                     remember(batch,time:time,source:source,enabled:true)
                     let preview=try compressedPreview(image,engine:engine)
                     reverse[Int((time*10000).rounded())]=(batch,preview)
@@ -166,7 +191,8 @@ actor CoreMLTrackingPipeline: TargetTracking {
                 let batch:DetectionBatch
                 if let forward {
                     image=try await forward.imageCancellable(at:time)
-                    batch=try autoreleasepool {try engine.detect(image,features:true,relaxedFeatureThreshold:state.tracker.highConfidence)}
+                    if leg.manual,let cached=redactionBatches[Int((time*10000).rounded())] {batch=cached}
+                    else {batch=try autoreleasepool {try engine.detect(image,features:true,relaxedFeatureThreshold:state.tracker.highConfidence)}}
                 } else {
                     guard let cached=reverse.removeValue(forKey:Int((time*10000).rounded())),let preview=CIImage(data:cached.1) else {throw TrackingError.invalidInput}
                     batch=cached.0;image=preview
@@ -206,24 +232,28 @@ actor CoreMLTrackingPipeline: TargetTracking {
                 }
                 var proposed = state.tracker
                 let matches = proposed.update(batch, time: time)
-                let matchedCandidate = matches[state.targetID]
+                let confirmed=leg.manual ? state.samples.first {abs($0.time-time)<0.001 && $0.estimated != true} : nil
+                let known=confirmed.flatMap {sample in
+                    (batch.primary+batch.relaxed).first {$0.body.iou(sample.body)>0.999 && !$0.embedding.isEmpty}
+                }
+                let matchedCandidate = known ?? matches[state.targetID]
                 let distance = matchedCandidate.map { c in state.gallery.map { Appearance.distance($0,c.embedding) }.min() ?? 1 } ?? 1
                 let previousFocus=state.tracker.tracks.first { $0.id==state.targetID }?.observation.focusX ?? box.center.x
-                let ambiguous = matchedCandidate.map { c in
+                let ambiguous = known == nil && (matchedCandidate.map { c in
                     PersonIdentityGate.isAmbiguous(target:c,others:batch.primary.filter { $0.id != c.id },previousFocus:previousFocus,gallery:state.gallery)
-                } ?? false
+                } ?? false)
                 let reference=state.trusted!
                 let prediction=state.tracker.coastingTarget(id:state.targetID,time:time)
                 let rawPrediction=prediction?.filter.box ?? reference.body
                 let predictionWidth=min(1,max(0.001,rawPrediction.width)),predictionHeight=min(1,max(0.001,rawPrediction.height))
                 let predicted=ManualBoxGeometry.move(.init(x:rawPrediction.x,y:rawPrediction.y,width:predictionWidth,height:predictionHeight),dx:0,dy:0)
-                let directReliable=matchedCandidate.map {$0.confidence>=0.25 && distance<0.5 && !ambiguous} ?? false
+                let directReliable=known != nil || (matchedCandidate.map {$0.confidence>=0.25 && distance<0.5 && !ambiguous} ?? false)
                 if !directReliable && !state.occlusion.isActive { state.occlusion.protectedTrackIDs=Set(state.tracker.tracks.filter {$0.id != state.targetID}.map(\.id)) }
                 let protectedIDs=state.occlusion.protectedTrackIDs
                 let owned=matches.filter { protectedIDs.contains($0.key) }.map(\.value)
                 let unavailable=Set((batch.primary+batch.relaxed).filter { d in owned.contains {$0.id==d.id || PersonIdentityGate.samePose($0,d)} }.map(\.id))
                 if !directReliable || state.occlusion.isActive {state.unavailableByTime[Int((time*10000).rounded())]=unavailable}
-                let decision=state.occlusion.step(time:time,reference:reference,predicted:predicted,candidate:matchedCandidate,directReliable:directReliable,observations:batch.primary,gallery:state.gallery,unavailableIDs:unavailable,trackID:state.targetID)
+                let decision=state.occlusion.step(time:time,reference:reference,predicted:predicted,candidate:matchedCandidate,directReliable:directReliable,observations:batch.primary,gallery:state.gallery,unavailableIDs:unavailable,trackID:state.targetID,confirmedIdentity:known != nil)
                 let accepted:PersonObservation
                 switch decision {
                 case .predicted(let sample):
@@ -282,10 +312,14 @@ actor CoreMLTrackingPipeline: TargetTracking {
             state.occlusion.reset()
             state.legs.removeFirst(); state.seeded = false; sessions[project.id] = state
         }
+        // A reverse re-track can coast over an already confirmed boundary. A missed
+        // detection there must not reopen that human/observed anchor as a new gap.
+        for sample in state.samples where sample.estimated != true {state.deferred.resolve(sample.time)}
         if !state.deferred.isEmpty {
             let anchors=state.samples.filter {$0.estimated != true}.sorted {$0.time<$1.time}
             let pending=state.deferred.orderedTimes
             var reader:AnalysisFrameReader?
+            state.lastPreviewTime=nil
             defer {reader?.cancel()}
             for (index,time) in pending.enumerated() {
                 try Task.checkCancellation()
@@ -295,10 +329,13 @@ actor CoreMLTrackingPipeline: TargetTracking {
                 let excluded=state.unavailableByTime[key] ?? []
                 let unavailable=(batch.primary+batch.relaxed).filter {excluded.contains($0.id)}
                 var found=DeferredTargetRecovery.candidate(batch.primary+batch.relaxed,gallery:state.knownIdentities,reference:reference,unavailable:unavailable)
-                if found == nil,let reference {
+                var image:CIImage?
+                if reference != nil {
                     if reader == nil {reader=try await AnalysisFrameReader(source:source,start:max(0,pending.first!-0.1),end:min(project.metadata.duration,pending.last!+0.001))}
-                    let image=try await reader!.imageCancellable(at:time)
+                    image=try await reader!.imageCancellable(at:time)
                     try Task.checkCancellation()
+                }
+                if found == nil,let reference,let image {
                     let box=reference.body
                     let left=max(0,box.x-box.width*0.5),top=max(0,box.y-box.height*0.25)
                     let region=NormalizedRect(x:left,y:top,width:min(1,box.x+box.width*1.5)-left,height:min(1,box.y+box.height*1.25)-top)
@@ -313,13 +350,20 @@ actor CoreMLTrackingPipeline: TargetTracking {
                     state.deferred.resolve(time)
                 }
                 sessions[project.id]=state
-                if let reference {
-                    await onUpdate(.init(sample:reference,progress:0.9+Double(index+1)/Double(pending.count)*0.099,
+                if let reference,let image {
+                    // Keep the displayed frame and box at the same source time after manual recovery.
+                    let sample=found.map {TargetSample(time:time,body:$0.body,protection:$0.protectionBody,trackID:state.targetID,focusX:$0.focusX)} ?? reference
+                    let preview=renderPreview(image,sample:sample,force:index == pending.count-1,state:&state,engine:engine)
+                    await onUpdate(.init(sample:sample,progress:0.9+Double(index+1)/Double(pending.count)*0.099,preview:preview,
                         message:"正在回补缺失片段 · \(index+1)/\(pending.count)"))
                 }
             }
+            for sample in state.deferred.boundedBridges(anchors:state.samples,batches:redactionBatches) {
+                state.samples.removeAll {abs($0.time-sample.time)<0.001}
+                state.samples.append(sample);state.deferred.resolve(sample.time)
+            }
             if let time=state.deferred.orderedTimes.first {
-                state.blocked=true;sessions[project.id]=state
+                state.blocked=true;state.correctionTime=time;sessions[project.id]=state
                 return .init(samples:state.samples.sorted {$0.time<$1.time},issue:.init(time:time,
                     message:"自动回补后仍无法确认主角，请手动框选人物",checkpoint:0.999,requiresManualSelection:true))
             }
@@ -350,7 +394,7 @@ actor CoreMLTrackingPipeline: TargetTracking {
         return engine.preview(image)
     }
     private func block(_ state:inout Session,projectID:UUID,time:Double,start:Double,end:Double) -> TrackingResult {
-        state.blocked=true
+        state.blocked=true;state.correctionTime=time
         // Discard speculative progress; correction resumes from the last confirmed sample.
         state.cursor=state.trusted?.time ?? state.cursor
         sessions[projectID]=state

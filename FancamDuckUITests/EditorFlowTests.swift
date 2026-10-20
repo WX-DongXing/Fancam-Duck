@@ -23,6 +23,36 @@ final class EditorFlowTests: XCTestCase {
         app.buttons["dancer2"].tap();XCTAssertTrue(app.buttons["primaryAction"].isEnabled)
         capture(app,"analysis-reselect-new-target")
     }
+    @MainActor func testManualBoxNudgesAndJoystickStopsOnRelease() throws {
+        let app=launch();app.buttons["dancer1"].tap();app.buttons["primaryAction"].tap()
+        XCTAssertTrue(app.buttons["dancer0"].waitForExistence(timeout:15))
+        app.buttons["手动框选人物"].tap()
+        let box=app.descendants(matching:.any).matching(identifier:"manualBox").firstMatch
+        let right=app.buttons["manualNudge-right"]
+        guard right.waitForExistence(timeout:3) else {return XCTFail("Missing manual positioning controls")}
+        let initial=box.frame
+        right.tap();XCTAssertGreaterThan(box.frame.midX,initial.midX)
+        app.buttons["manualNudge-left"].tap()
+        XCTAssertEqual(box.frame.midX,initial.midX,accuracy:1)
+        app.buttons["manualNudge-up"].tap();XCTAssertLessThan(box.frame.midY,initial.midY)
+        app.buttons["manualNudge-down"].tap()
+        XCTAssertEqual(box.frame.midY,initial.midY,accuracy:1)
+        let joystick=app.descendants(matching:.any).matching(identifier:"manualJoystick").firstMatch
+        XCTAssertGreaterThanOrEqual(right.frame.minX-joystick.frame.maxX,11)
+        XCTAssertGreaterThanOrEqual(joystick.frame.minX-app.buttons["manualNudge-left"].frame.maxX,11)
+        XCTAssertGreaterThanOrEqual(joystick.frame.minY-app.buttons["manualNudge-up"].frame.maxY,11)
+        XCTAssertGreaterThanOrEqual(app.buttons["manualNudge-down"].frame.minY-joystick.frame.maxY,11)
+        let center=joystick.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5))
+        center.press(forDuration:0.1,thenDragTo:center.withOffset(CGVector(dx:16,dy:0)),withVelocity:.slow,thenHoldForDuration:0.5)
+        XCTAssertGreaterThan(box.frame.midX,initial.midX+2)
+        XCTAssertEqual(box.frame.width,initial.width,accuracy:1)
+        XCTAssertEqual(box.frame.height,initial.height,accuracy:1)
+        let stopped=box.frame
+        Thread.sleep(forTimeInterval:0.25)
+        XCTAssertEqual(box.frame.midX,stopped.midX,accuracy:1)
+        XCTAssertTrue(app.buttons["primaryAction"].isHittable)
+        capture(app,"manual-position-controls")
+    }
     @MainActor func testManualSelectionUsesFourRectangularEdgeHandles() throws {
         let app=launch();app.buttons["dancer1"].tap();app.buttons["primaryAction"].tap()
         XCTAssertTrue(app.buttons["dancer0"].waitForExistence(timeout:15))
@@ -35,12 +65,14 @@ final class EditorFlowTests: XCTestCase {
         let before=right.frame.midX
         let point=right.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5))
         point.press(forDuration:0.1,thenDragTo:point.withOffset(CGVector(dx:20,dy:0)))
-        XCTAssertGreaterThan(right.frame.midX,before)
+        XCTAssertEqual(right.frame.midX-before,20,accuracy:2)
+        XCTAssertEqual(app.descendants(matching:.any).matching(identifier:"manualBox").count,1)
         let box=app.descendants(matching:.any).matching(identifier:"manualBox").firstMatch
         let beforeMove=box.frame
         let center=box.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5))
         center.press(forDuration:0.1,thenDragTo:center.withOffset(CGVector(dx:15,dy:10)))
-        XCTAssertGreaterThan(box.frame.midX,beforeMove.midX)
+        XCTAssertEqual(box.frame.midX-beforeMove.midX,15,accuracy:2)
+        XCTAssertEqual(box.frame.midY-beforeMove.midY,10,accuracy:2)
         XCTAssertEqual(box.frame.width,beforeMove.width,accuracy:1)
         XCTAssertEqual(box.frame.height,beforeMove.height,accuracy:1)
         capture(app,"manual-selection-rectangular-edge-handles")
@@ -265,6 +297,15 @@ final class EditorFlowTests: XCTestCase {
         app.buttons["cancelTool"].tap(); app.buttons["tool-构图"].tap(); ready(commit)
         XCTAssertEqual(canvas.value as? String, committed, "Cancel restores the committed crop")
         commit.tap(); XCTAssertEqual(action.frame, fixed)
+    }
+    @MainActor func testFirstAspectTapCommitsWithoutRetry() throws {
+        let app=launch();app.buttons["dancer1"].tap();app.buttons["primaryAction"].tap()
+        XCTAssertTrue(app.buttons["dancer0"].waitForExistence(timeout:15))
+        app.buttons["dancer0"].tap();app.buttons["primaryAction"].tap()
+        let picker=app.segmentedControls["compositionAspect"]
+        XCTAssertTrue(picker.waitForExistence(timeout:15))
+        picker.buttons["1:1"].tap()
+        XCTAssertTrue(picker.buttons["1:1"].isSelected)
     }
     @MainActor func testNativeAspectSegmentsSupportDraggingWithoutDisablingPanel() throws {
         let app=launch()

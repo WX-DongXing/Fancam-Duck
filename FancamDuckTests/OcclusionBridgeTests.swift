@@ -48,4 +48,17 @@ final class OcclusionBridgeTests:XCTestCase {
         tracker.recover(id:id,observation:found,prediction:prediction,protectedIDs:Set(tracker.tracks.filter {$0.id != id}.map(\.id)))
         XCTAssertEqual(tracker.tracks.count,2);XCTAssertEqual(tracker.tracks.first {$0.id==id}?.observation.id,4)
     }
+    func testPreviouslyConfirmedBoundaryIsNotRejectedByANewManualCropAppearance() {
+        var bridge=OcclusionBridge()
+        let box=NormalizedRect(x:0.3,y:0.2,width:0.1,height:0.5)
+        let reference=TargetSample(time:0,body:box)
+        _=bridge.step(time:0.1,reference:reference,predicted:box,candidate:nil,directReliable:false,observations:[],gallery:[[1,0]],unavailableIDs:[],trackID:1)
+        let known=PersonObservation(id:2,body:box,confidence:0.9,embedding:[0,1])
+        let first=bridge.step(time:0.2,reference:reference,predicted:box,candidate:known,directReliable:true,observations:[known],gallery:[[1,0]],unavailableIDs:[],trackID:1,confirmedIdentity:true)
+        guard case .predicted=first else {return XCTFail("One boundary observation is insufficient")}
+        let second=bridge.step(time:0.3,reference:reference,predicted:box,candidate:known,directReliable:true,observations:[known],gallery:[[1,0]],unavailableIDs:[],trackID:1,confirmedIdentity:true)
+        guard case .observed(_,let samples)=second else {return XCTFail("Reuse both previously verified boundary observations")}
+        XCTAssertEqual(samples.count,2)
+    }
+
 }

@@ -5,6 +5,7 @@ final class SettingsFlowTests:XCTestCase {
         let app=XCUIApplication();app.launch()
         let entry=app.buttons["openSettings"]
         XCTAssertTrue(entry.waitForExistence(timeout:10))
+        let settingsSize=entry.frame.size
         entry.tap()
         let about=app.buttons["aboutDuck"]
         XCTAssertTrue(about.waitForExistence(timeout:5))
@@ -15,9 +16,12 @@ final class SettingsFlowTests:XCTestCase {
         XCTAssertTrue(app.staticTexts["Fancam Duck"].exists)
         XCTAssertFalse(app.descendants(matching:.any).matching(identifier:"sourceRepository").firstMatch.exists)
         XCTAssertFalse(app.descendants(matching:.any).matching(identifier:"sourceLicense").firstMatch.exists)
-        XCTAssertTrue(app.staticTexts["本机处理 · 原片不上传"].isHittable)
+        XCTAssertTrue(app.staticTexts["将群舞变成你的个人直拍"].waitForExistence(timeout:5))
         let shot=XCTAttachment(screenshot:app.screenshot());shot.name="about-duck";shot.lifetime = .keepAlways;add(shot)
-        app.navigationBars.buttons["设置"].tap()
+        let back=app.navigationBars.buttons["设置"]
+        XCTAssertEqual(settingsSize.width,back.frame.width,accuracy:1)
+        XCTAssertEqual(settingsSize.height,back.frame.height,accuracy:1)
+        back.tap()
         XCTAssertTrue(app.buttons["rateDuck"].waitForExistence(timeout:5))
         app.buttons["closeSettings"].tap()
         XCTAssertTrue(entry.waitForExistence(timeout:5))

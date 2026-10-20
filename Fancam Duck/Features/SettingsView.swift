@@ -56,9 +56,9 @@ private struct AboutDuckView:View {
                         .accessibilityIdentifier("appVersion")
                 }
                 VStack(spacing:12) {
-                    Text("选择舞者，让镜头跟上动作。")
+                    Text("这一次，你是主角")
                         .font(.body).multilineTextAlignment(.center)
-                    Text("本机处理 · 原片不上传")
+                    Text("将群舞变成你的个人直拍")
                         .font(.caption).foregroundStyle(.secondary)
                 }.padding(.top,8)
             }.padding(.horizontal,24).padding(.vertical,32).frame(maxWidth:420)

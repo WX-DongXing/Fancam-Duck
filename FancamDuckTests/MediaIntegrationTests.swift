@@ -33,7 +33,28 @@ final class MediaIntegrationTests: XCTestCase {
         XCTAssertEqual(metadata.height, 192, accuracy: 0.01)
     }
 
-    private func makeVideo(rotated: Bool = false) async throws -> URL {
+    func testDeferredRecoveryDeliversMovingVideoFramesAfterManualConfirmation() async throws {
+        let source=try await makeVideo(animated:true)
+        defer {try? FileManager.default.removeItem(at:source)}
+        let pipeline=CoreMLTrackingPipeline()
+        var project=VideoProject(title:"Synthetic missing person",metadata:try await MediaService.shared.metadata(url:source),settings:EditSettings())
+        project.settings.end=0.8
+        project.target = .init(x:0.25,y:0.15,width:0.3,height:0.7)
+        let first=try await pipeline.analyze(source:source,project:project) {_ in}
+        let issue=try XCTUnwrap(first.issue)
+        XCTAssertTrue(issue.requiresManualSelection)
+        project.targetTime=issue.time
+        let frames=RecoveryPreviewFrames()
+        let resumed=try await pipeline.analyze(source:source,project:project) {await frames.record($0)}
+        let previews=await frames.previews
+        XCTAssertGreaterThan(previews.count,1,"Manual recovery must update the video, not only the target rectangle")
+        XCTAssertGreaterThan(Set(previews.map(\.1)).count,1,"The synthetic video changes color over time")
+        XCTAssertEqual(previews.map(\.0),previews.map(\.0).sorted())
+        XCTAssertTrue(previews.allSatisfy {$0.0>issue.time})
+        XCTAssertNotNil(resumed.issue,"A video without people must still block; display references cannot become confirmed tracks")
+    }
+
+    private func makeVideo(rotated: Bool = false, animated:Bool=false) async throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mov")
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 192, AVVideoHeightKey: 108])
@@ -56,7 +77,7 @@ final class MediaIntegrationTests: XCTestCase {
             let stride = CVPixelBufferGetBytesPerRow(buffer)
             for y in 0..<108 { for x in 0..<192 {
                 let p = base.advanced(by: y * stride + x * 4)
-                p[0] = 50; p[1] = 150; p[2] = 30; p[3] = 255
+                p[0] = animated ? UInt8(20+index*6) : 50; p[1] = 150; p[2] = 30; p[3] = 255
             }}
             CVPixelBufferUnlockBaseAddress(buffer, [])
             XCTAssertTrue(adaptor.append(buffer, withPresentationTime: CMTime(value: Int64(index), timescale: 30)))
@@ -166,5 +187,14 @@ final class AudioSyncTests: XCTestCase {
         XCTAssertEqual(audioRange.start.seconds, overlap.start.seconds - selectedRange.start.seconds, accuracy: 1024.0 / 44100)
         XCTAssertEqual(audioRange.duration.seconds, overlap.duration.seconds, accuracy: 1024.0 / 44100)
         XCTAssertEqual(videoRange.duration.seconds, 0.8, accuracy: 0.04)
+    }
+}
+
+private actor RecoveryPreviewFrames {
+    var previews:[(Double,Data)]=[]
+    func record(_ update:TrackingUpdate) {
+        guard update.message?.contains("回补") == true,let image=update.preview,
+              let data=image.dataProvider?.data else {return}
+        previews.append((update.sample.time,data as Data))
     }
 }

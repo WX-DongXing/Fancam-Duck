@@ -15,26 +15,38 @@ struct NativeSegmentedControl<Selection: Hashable>: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> UISegmentedControl {
-        let control=UISegmentedControl(items:options.map(label))
-        applySymbols(to:control)
+        let control=UISegmentedControl()
         control.addTarget(context.coordinator,action:#selector(Coordinator.changed(_:)),for:.valueChanged)
         control.setContentHuggingPriority(.defaultLow,for:.horizontal)
         return control
     }
 
     func updateUIView(_ control: UISegmentedControl, context: Context) {
-        context.coordinator.parent=self
-        let titles=options.map(label)
-        if control.numberOfSegments != titles.count || (symbol == nil && titles.indices.contains(where:{control.titleForSegment(at:$0) != titles[$0]})) {
+        updateControl(control,coordinator:context.coordinator)
+    }
+
+    func updateControl(_ control:UISegmentedControl,coordinator:Coordinator) {
+        coordinator.parent=self
+        let titles=options.map(label),symbols=symbol.map {renderer in options.map(renderer)}
+        let font=UIFont.preferredFont(forTextStyle:.subheadline)
+        if coordinator.renderedOptions != options || coordinator.renderedTitles != titles ||
+            coordinator.renderedSymbols != symbols || coordinator.renderedScale != displayScale ||
+            (symbol != nil && coordinator.renderedFont != font) {
             control.removeAllSegments()
             for (index,title) in titles.enumerated() {control.insertSegment(withTitle:title,at:index,animated:false)}
             applySymbols(to:control)
+            coordinator.renderedOptions=options;coordinator.renderedTitles=titles
+            coordinator.renderedSymbols=symbols;coordinator.renderedScale=displayScale
         }
-        control.selectedSegmentIndex=options.firstIndex(of:selection) ?? UISegmentedControl.noSegment
-        control.isEnabled=isEnabled
-        control.accessibilityLabel=title
-        let font=UIFont.preferredFont(forTextStyle:.subheadline)
-        control.setTitleTextAttributes([.font:font],for:.normal)
+        let selected=options.firstIndex(of:selection) ?? UISegmentedControl.noSegment
+        // Repeated writes restart UIKit's selection feedback during unrelated model updates.
+        if control.selectedSegmentIndex != selected {control.selectedSegmentIndex=selected}
+        if control.isEnabled != isEnabled {control.isEnabled=isEnabled}
+        if control.accessibilityLabel != title {control.accessibilityLabel=title}
+        if coordinator.renderedFont != font {
+            control.setTitleTextAttributes([.font:font],for:.normal)
+            coordinator.renderedFont=font
+        }
     }
 
     private func applySymbols(to control:UISegmentedControl) {
@@ -66,12 +78,17 @@ struct NativeSegmentedControl<Selection: Hashable>: UIViewRepresentable {
 
     final class Coordinator: NSObject {
         var parent: NativeSegmentedControl
+        var renderedOptions:[Selection]?
+        var renderedTitles:[String]?
+        var renderedSymbols:[String]?
+        var renderedScale:CGFloat?
+        var renderedFont:UIFont?
         init(_ parent: NativeSegmentedControl) {self.parent=parent}
         @objc func changed(_ control: UISegmentedControl) {
             guard parent.options.indices.contains(control.selectedSegmentIndex) else {return}
             parent.selection=parent.options[control.selectedSegmentIndex]
-            // A model may reject a change during a gesture; keep native and model selection aligned.
-            control.selectedSegmentIndex=parent.options.firstIndex(of:parent.selection) ?? UISegmentedControl.noSegment
+            // SwiftUI reconciles an accepted/rejected value on the next render. Reading
+            // this render's binding here can still return the old selection and undo the tap.
         }
     }
 }

@@ -62,7 +62,7 @@ struct EditorView: View {
                     else {
                         VStack(spacing:0) {
                             if isBlocked || model.manualSelection {
-                                recoveryDock.frame(height:180,alignment:.bottom)
+                                recoveryDock.frame(height:model.manualSelection ? 244 : 180,alignment:.bottom)
                             } else {
                                 editorTimeline
                                 if let tool=displayedTool,!isProcessing {
@@ -79,7 +79,6 @@ struct EditorView: View {
             #endif
         }
         .animation(reduceMotion ? nil : .smooth(duration:0.28),value:workspaceState)
-        .animation(reduceMotion ? nil : .smooth(duration:0.28),value:activeTool)
         .background { StudioBackground() }.foregroundStyle(.white).preferredColorScheme(.dark)
         .sheet(isPresented:$savingFile) {if let url=model.outputURL {SaveVideoPicker(url:url)}}
         .onChange(of:model.hasCompletedTracking) {_,complete in
@@ -150,7 +149,7 @@ struct EditorView: View {
     private var desktopInspector:some View {
         VStack(alignment:.leading,spacing:18) {
             if isBlocked || model.manualSelection {
-                Text("确认主角").font(.headline)
+                Text("确认主角 · \(model.currentTime.videoTime)").font(.headline)
             } else if isCompleted {
                 Text("视频已生成").font(.headline)
                 DesktopFact(title:"视频时长",value:((model.project?.settings.end ?? 0)-(model.project?.settings.start ?? 0)).videoTime)
@@ -166,7 +165,7 @@ struct EditorView: View {
                 }
             }
             Spacer(minLength:0)
-            if isBlocked || model.manualSelection {recoveryDock.frame(height:180)}
+            if isBlocked || model.manualSelection {recoveryDock.frame(height:model.manualSelection ? 244 : 180)}
             else if isCompleted {completedActions}
             else if isProcessing {
                 HStack(spacing:10) {
@@ -195,11 +194,11 @@ struct EditorView: View {
             Spacer()
             Group {
                 if isBlocked {
-                    Text("需要确认人物").font(.system(size: 12, weight: .medium))
+                    Text("确认人物 · \(model.currentTime.videoTime)").font(.system(size: 12, weight: .medium))
                         .padding(.horizontal, 14).padding(.vertical, 7).background(Color.acAccent, in: Capsule()).foregroundStyle(.black)
                         .accessibilityIdentifier("processingStatus").accessibilityLabel(model.statusText).accessibilityValue(model.currentTime.videoTime)
                 } else if isProcessing {
-                    Text("人物分析").font(.system(size:15,weight:.medium))
+                    Text(model.phase.progress>=0.9 ? "补全片段" : "人物分析").font(.system(size:15,weight:.medium))
                         .accessibilityIdentifier("processingStatus").accessibilityLabel(model.statusText).accessibilityValue(model.currentTime.videoTime)
                 } else {
                     Text(model.hasCompletedTracking || isCompleted ? "视频工作台" : "人物分析").font(.system(size: 15, weight: .medium))
@@ -274,7 +273,7 @@ struct EditorView: View {
             .animation(reduceMotion ? nil : .smooth(duration:0.32),value:model.project?.settings.aspectRatio)
     }
     private var sourceHint: String {
-        if model.manualSelection { return model.detectionNotice ?? "拖动框体移动 · 拖四边中点调整" }
+        if model.manualSelection { return model.detectionNotice ?? "拖动框体或方向微调 · 按住圆心偏移移动" }
         if let activity=model.editorActivityText {return activity}
         if model.phase == .editing,model.hasCompletedTracking,let project=model.project,
            project.settings.redaction.enabled,project.redactionPlan?.covers(project) != true {
@@ -290,11 +289,12 @@ struct EditorView: View {
     @ViewBuilder private var recoveryDock: some View {
         if model.manualSelection {
             VStack(spacing: 12) {
-                Spacer()
-                HStack {
-                    StudioTextButton(title:"取消",minWidth:64,fillsWidth:false) { model.manualSelection = false; drawnBox = nil }
-                    Spacer()
-                    StudioTextButton(title:"重画",minWidth:64,fillsWidth:false) { drawnBox = nil }
+                HStack(spacing:6) {
+                    StudioTextButton(title:"取消",minWidth:44,fillsWidth:false) { model.manualSelection = false; drawnBox = nil }
+                    Spacer(minLength:0)
+                    ManualPositionControls(box:$drawnBox)
+                    Spacer(minLength:0)
+                    StudioTextButton(title:"重画",minWidth:44,fillsWidth:false) { drawnBox = nil }
                 }
                 StudioAction(title: "确认人物区域", disabled: drawnBox == nil) {
                     guard let box = drawnBox else { return }
@@ -384,7 +384,7 @@ struct EditorView: View {
                     }
                 } label: {
                     HStack(spacing:6) {
-                        Text(isProcessing ? (model.generatingVideo ? "正在生成" : isPaused ? "继续分析" : "正在分析") : startTitle)
+                        Text(isProcessing ? (model.generatingVideo ? "正在生成" : isPaused ? "继续分析" : model.phase.progress>=0.9 ? "补全片段" : "正在分析") : startTitle)
                             .font(.subheadline.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5)
                         if isProcessing {
                             Image(systemName:isPaused ? "play.fill" : "pause.fill").font(.system(size:12))
@@ -407,7 +407,7 @@ struct EditorView: View {
                 }.buttonStyle(.plain).contentShape(Capsule())
                     .modifier(StudioGlassSurface(shape:Capsule(),selected:isProcessing || canStart))
                     .disabled(isProcessing ? !isPaused : !canStart)
-                    .accessibilityLabel(isProcessing ? (model.generatingVideo ? "正在生成视频" : isPaused ? "继续分析" : "正在分析人物") : startTitle)
+                    .accessibilityLabel(isProcessing ? (model.generatingVideo ? "正在生成视频" : isPaused ? "继续分析" : model.phase.progress>=0.9 ? "正在补全未完成片段" : "正在分析人物") : startTitle)
                     .accessibilityValue(isProcessing ? processingPercent : "")
                     .accessibilityHint(isProcessing ? (isPaused ? "点按继续分析" : "请使用旁边的重新选择或取消操作") : "按当前工作台状态继续")
                     .accessibilityIdentifier("primaryAction")
@@ -449,7 +449,7 @@ struct EditorView: View {
                 Spacer(minLength:0)
             }.padding(.horizontal,18).padding(.top,20)
             if isBlocked || model.manualSelection {
-                recoveryDock.frame(height:180)
+                recoveryDock.frame(height:model.manualSelection ? 244 : 180)
             } else if isProcessing {
                 Text(model.generatingVideo ? "正在生成视频" : isPaused ? "分析已暂停" : "正在分析人物").font(.subheadline).padding(.horizontal,18)
             } else if isCompleted {completedActions}
@@ -470,7 +470,7 @@ struct EditorView: View {
     }
 
     private var processingPercent:String {
-        min(1,max(0,model.phase.progress)).formatted(.percent.precision(.fractionLength(0)))
+        min(isProcessing ? 0.99 : 1,max(0,model.phase.progress)).formatted(.percent.precision(.fractionLength(0)))
     }
     private var canStart: Bool { !timelineTrimming && model.canConfirm }
     private var startTitle: String {
@@ -489,13 +489,11 @@ struct EditorView: View {
     private func selectTool(_ tool: WorkspaceTool) {
         guard model.hasCompletedTracking,!model.compositionAdjusting else { return }
         guard activeTool != tool else {return}
-        finishTool(commit: true)
         model.pausePreview(refresh: false)
-        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
-            if tool == .composition || tool == .motion { model.beginComposition(); guard model.compositionEditing else { return } }
-            if tool == .redaction {redactionStrengthEditing=false;model.beginRedaction()}
-            activeTool = tool;lastSettingsTool=tool
-        }
+        finishTool(commit: true)
+        if tool == .composition || tool == .motion {model.beginComposition();guard model.compositionEditing else {return}}
+        if tool == .redaction {redactionStrengthEditing=false;model.beginRedaction()}
+        activeTool=tool;lastSettingsTool=tool
     }
     private func finishTool(commit: Bool) {
         guard let tool = activeTool else { return }
@@ -504,7 +502,7 @@ struct EditorView: View {
         case .composition, .motion: model.finishComposition(commit: commit,refreshDetections:false)
         case .redaction: model.finishRedaction(commit:commit)
         }
-        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { activeTool = nil }
+        activeTool = nil
     }
     private func beginManual() {
         guard model.controlsEnabled else { return }
@@ -626,7 +624,7 @@ struct EditorView: View {
                 }
             }.frame(height:44)
         }.padding(12)
-            .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24)))
+            .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24),interactive:false))
             .accessibilityElement(children:.contain)
     }
     private var fullRedactionPanel: some View {
@@ -664,7 +662,7 @@ struct EditorView: View {
                 }.font(panelFont)
             }.buttonStyle(.plain)
         }.padding(panelInset)
-            .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24)))
+            .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24),interactive:false))
     }
     private var motionPanel: some View {
         VStack(alignment:.leading,spacing:12) {
@@ -676,7 +674,7 @@ struct EditorView: View {
             Text(motionDescription)
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
         }.padding(panelInset)
-            .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24)))
+            .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24),interactive:false))
     }
     private var motionDescription:String {
         switch model.project?.settings.followSpeed ?? .gentle {
@@ -709,7 +707,7 @@ struct EditorView: View {
                 Spacer(minLength: 0)
             }
         }.padding(panelInset)
-            .modifier(StudioGlassSurface(shape: RoundedRectangle(cornerRadius: 24)))
+            .modifier(StudioGlassSurface(shape: RoundedRectangle(cornerRadius: 24), interactive: false))
     }
     private var compositionControlsDisabled: Bool { timelineTrimming || model.compositionAdjusting }
     private func compositionControl(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
