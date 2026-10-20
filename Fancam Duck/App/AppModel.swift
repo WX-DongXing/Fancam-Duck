@@ -122,7 +122,7 @@ final class AppModel {
     }
     var isDemo: Bool { project?.isDemo == true }
     var canConfirm: Bool {
-        guard !isReviewing,!restoringTracking,!detecting,!importingRedactionImage,!isPlaying,!manualSelection,!compositionBusy,!compositionAdjusting,let project,
+        guard !isReviewing,!restoringTracking,!detecting,!importingRedactionImage,!isPlaying,!manualSelection,(!compositionBusy || hasCompletedTracking),!compositionAdjusting,let project,
               (hasCompletedTracking || hasReusableOutput || (project.targetTime>=project.settings.start && project.targetTime<=project.settings.end)) else { return false }
         return ProcessingGate.canContinue(phase: phase, target: project.target, explicitlySelected: targetExplicitlySelected)
     }
@@ -130,7 +130,7 @@ final class AppModel {
     var settingsEnabled: Bool { phase == .editing && !restoringTracking }
     var editorActivityText: String? {
         if restoringTracking {return "正在恢复项目 · 设置稍后可用"}
-        if compositionBusy {return "正在准备构图预览 · 可取消"}
+        if compositionBusy && !hasCompletedTracking {return "正在准备构图预览 · 可取消"}
         if importingRedactionImage {return "正在准备遮挡图片"}
         if detecting {return project?.target == nil ? "正在识别人物 · 请稍候" : "正在识别当前帧 · 可调整设置"}
         return nil
@@ -604,7 +604,7 @@ final class AppModel {
         } else { seek(to:currentTime) }
     }
     func updateRange(start: Double? = nil, end: Double? = nil, previewTime: Double? = nil) {
-        guard settingsEnabled,!compositionBusy,!compositionAdjusting,
+        guard settingsEnabled,!compositionAdjusting,
               start?.isFinite != false,end?.isFinite != false,previewTime?.isFinite != false,
               let project else { return }
         pausePreview(refresh:false)
@@ -902,7 +902,7 @@ extension AppModel {
         return [.init(time:project.targetTime,body:target,protection:observation.flatMap {$0.body.iou(target)>0.7 ? $0.protectionBody : nil},focusX:observation?.focusX)]
     }
     func beginComposition() {
-        guard settingsEnabled,project?.target != nil else { return }
+        guard settingsEnabled,project?.target != nil,!compositionEditing else { return }
         // Composition uses the selected anchor, not the pending frame's candidates.
         detectionID=UUID();detectionTask?.cancel();detecting=false
         pausePreview(refresh:false);selectedTool=nil;manualSelection=false
@@ -960,9 +960,11 @@ extension AppModel {
         }
     }
     func beginCompositionGesture() {
-        guard compositionEditing,!compositionBusy else {return}
-        pausePreview(refresh:false);compositionGestureSettings=project?.settings;compositionAdjusting=true;compositionNotice=nil
-        compositionAutomatic=CropPlan.rect(at:currentTime,in:compositionAutomaticFrames)
+        guard compositionEditing,settingsEnabled,compositionCrop != nil,compositionAutomatic != nil else {return}
+        pausePreview(refresh:false)
+        // A new edit supersedes the pending calculation instead of locking the canvas.
+        compositionTask?.cancel();compositionID=UUID();compositionBusy=false
+        compositionGestureSettings=project?.settings;compositionAdjusting=true;compositionNotice=nil
     }
     func applyCompositionCrop(_ proposed:CGRect) {
         guard compositionEditing,let project,let automatic=compositionAutomatic,proposed.width.isFinite,proposed.height.isFinite,proposed.height>0 else {return}
@@ -998,14 +1000,15 @@ extension AppModel {
         compositionGestureSettings=nil;compositionAdjusting=false;refreshComposition();persist()
     }
     func compositionZoom(_ factor:Double) {
-        guard !compositionBusy,let crop=compositionCrop else {return}
+        guard let crop=compositionCrop else {return}
         beginCompositionGesture()
+        guard compositionAdjusting else {return}
         applyCompositionCrop(CompositionGeometry.transformed(crop,scale:factor,translation:.zero,anchor:.init(x:0.5,y:0.5),viewport:.init(width:1,height:1)))
         endCompositionGesture()
     }
     func compositionMove(x:Double,y:Double) {
-        guard !compositionBusy,let crop=compositionCrop else {return}
-        beginCompositionGesture();applyCompositionCrop(crop.offsetBy(dx:-x*crop.width,dy:-y*crop.height));endCompositionGesture()
+        guard let crop=compositionCrop else {return}
+        beginCompositionGesture();guard compositionAdjusting else {return};applyCompositionCrop(crop.offsetBy(dx:-x*crop.width,dy:-y*crop.height));endCompositionGesture()
     }
     func setCompositionAspect(_ aspect: OutputAspectRatio) {
         // A newer selection supersedes the pending preview through compositionID/cancellation.
@@ -1017,6 +1020,9 @@ extension AppModel {
         let sizes=OutputResolution.available(for:project.metadata,aspect:aspect)
         // Preserve the selected quality budget where possible, without upscaling the source.
         self.project?.settings.resolution=sizes.last(where: {max($0.width,$0.height)<=max(project.settings.resolution.width,project.settings.resolution.height)}) ?? sizes.first ?? project.settings.resolution
+        if let automatic=compositionAutomatic {
+            compositionAutomatic=CompositionGeometry.reframed(automatic,source:project.metadata.size,aspect:aspect)
+        }
         if let crop=compositionCrop {
             let reframed=CompositionGeometry.reframed(crop,source:project.metadata.size,aspect:aspect)
             compositionCrop=reframed
@@ -1025,10 +1031,11 @@ extension AppModel {
         refreshComposition();persist()
     }
     func centerComposition(horizontal:Bool) {
-        guard compositionEditing,!compositionBusy,!compositionAdjusting,
+        guard compositionEditing,!compositionAdjusting,
               let project,let crop=compositionCrop,
               let reference=compositionSamples.min(by:{abs($0.time-currentTime)<abs($1.time-currentTime)}) else {return}
         beginCompositionGesture()
+        guard compositionAdjusting else {return}
         // Center the dancer on the chosen axis; retain the other axis and current zoom.
         let x=horizontal ? reference.body.center.x*project.metadata.width-crop.width/2 : crop.minX
         let y=horizontal ? crop.minY : reference.body.center.y*project.metadata.height-crop.height/2
@@ -1036,7 +1043,7 @@ extension AppModel {
         endCompositionGesture()
     }
     func resetComposition(centerOnly:Bool=false) {
-        guard let currentProject=project,!compositionBusy else {return}
+        guard compositionEditing,!compositionAdjusting,let currentProject=project else {return}
         let settings=currentProject.settings
         compositionUndo.append(settings);project?.settings.compositionX=0;project?.settings.compositionY=0
         project?.settings.horizontalOffset=0
@@ -1046,7 +1053,7 @@ extension AppModel {
         refreshComposition()
     }
     func undoComposition() {
-        guard !compositionBusy,let before=compositionUndo.popLast() else {return}
+        guard compositionEditing,!compositionAdjusting,let before=compositionUndo.popLast() else {return}
         project?.settings=before;refreshComposition()
     }
     func setFollowSpeed(_ speed: EditSettings.FollowSpeed) {
@@ -1063,7 +1070,7 @@ extension AppModel {
         project?.settings.protectFullBody=enabled;persist()
     }
     func toggleCompositionProtection() {
-        guard let settings=project?.settings,!compositionBusy else {return}
+        guard compositionEditing,!compositionAdjusting,let settings=project?.settings else {return}
         compositionUndo.append(settings);project?.settings.protectFullBody.toggle()
         if let crop=compositionCrop,let project,let reference=compositionSamples.min(by:{abs($0.time-currentTime)<abs($1.time-currentTime)}) {
             saveCompositionAnchor(CompositionGeometry.constrain(crop,source:project.metadata.size,samples:compositionSamples,reference:reference,protect:project.settings.protectFullBody,aspect:project.settings.aspectRatio))
@@ -1071,7 +1078,18 @@ extension AppModel {
         refreshComposition()
     }
     private func toggleCompositionPlayback() {
-        guard hasCompletedTracking,!compositionBusy else {return}
+        guard hasCompletedTracking else {return}
+        if compositionBusy,let task=compositionTask,let project {
+            let id=compositionID,settings=project.settings
+            previewTask?.cancel()
+            previewTask=Task { [weak self] in
+                await task.value
+                guard let self,!Task.isCancelled,self.compositionID==id,self.project?.id==project.id,
+                      self.project?.settings==settings,self.settingsEnabled,self.compositionEditing,!self.compositionBusy else {return}
+                self.toggleCompositionPlayback()
+            }
+            return
+        }
         if isPlaying {pausePreview(refresh:false);return}
         if let project,currentTime>=project.settings.end-0.05 {seek(to:project.settings.start)}
         isPlaying=true;previewPlayer?.play()
@@ -1091,19 +1109,21 @@ extension AppModel {
 
 extension AppModel {
     func beginRedaction() {
-        guard settingsEnabled,let project,project.target != nil else {return}
+        guard settingsEnabled,let project,project.target != nil,!redactionEditing else {return}
+        let retainedComposition=compositionEditing
         pausePreview(refresh:false)
         if !hasCompletedTracking,abs(currentTime-project.targetTime)>0.05 {seek(to:project.targetTime)}
         if hasCompletedTracking {beginComposition()}
         redactionEditing=true;redactionSnapshot=project.settings.redaction;redactionPlanSnapshot=project.redactionPlan
-        refreshRedactionPreview()
+        if !retainedComposition {refreshRedactionPreview()}
     }
-    func finishRedaction(commit:Bool) {
+    func finishRedaction(commit:Bool,keepComposition:Bool=false) {
         if !commit,let snapshot=redactionSnapshot {project?.settings.redaction=snapshot;project?.redactionPlan=redactionPlanSnapshot}
         redactionImageID=UUID();importingRedactionImage=false
         redactionEditing=false;redactionSnapshot=nil;redactionPlanSnapshot=nil
-        if compositionEditing {finishComposition(commit:true,refreshDetections:false)}
-        refreshRedactionPreview();persist()
+        if compositionEditing && !keepComposition {finishComposition(commit:true,refreshDetections:false)}
+        if !commit {refreshRedactionPreview()}
+        persist()
     }
     private func redactionSubject(at box:NormalizedRect) -> UUID? {
         guard let project else {return nil}
@@ -1166,6 +1186,8 @@ extension AppModel {
     /// Pause-frame settings preview uses the same GPU compositor. Playback is enabled only after
     /// a complete identity-checked plan exists; fixed seed rectangles are never played as tracking.
     func refreshRedactionPreview() {
+        // Rebuild the moving preview only when its mask settings change, not when tabs switch.
+        if hasCompletedTracking,compositionEditing,!compositionAdjusting {refreshComposition()}
         redactionPreviewTask?.cancel();let id=UUID();redactionPreviewID=id
         guard let project,!isDemo,!restoringTracking,let item=player?.currentItem else {return}
         guard project.settings.redaction.enabled,(hasCompletedTracking || redactionEditing) else {

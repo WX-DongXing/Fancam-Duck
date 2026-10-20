@@ -30,9 +30,8 @@ struct CompositionVideoViewport: View {
                     .overlay(Color.black.opacity(0.12))
                     .frame(width:canvas.width,height:canvas.height)
                     .mask {
-                        Path {path in
-                            path.addRect(CGRect(origin:.zero,size:canvas));path.addRect(window)
-                        }.fill(style:FillStyle(eoFill:true))
+                        CompositionWindowShape(window:window,inverted:true)
+                            .fill(style:FillStyle(eoFill:true))
                     }.allowsHitTesting(false).accessibilityHidden(true)
                 if model.compositionAdjusting {
                     Path { path in
@@ -46,7 +45,7 @@ struct CompositionVideoViewport: View {
                         .frame(width:viewport.width,height:viewport.height)
                         .offset(x:viewportOrigin.x,y:viewportOrigin.y).allowsHitTesting(false)
                 }
-                CompositionGestureSurface(enabled:model.compositionEditing && model.settingsEnabled && !model.redactionEditing && !model.compositionBusy && !model.isPlaying,
+                CompositionGestureSurface(enabled:model.compositionEditing && model.settingsEnabled && !model.redactionEditing && model.compositionCrop != nil && !model.isPlaying,
                     viewport:window, crop:{model.compositionCrop ?? .zero},begin:{model.beginCompositionGesture()},
                     change:{model.applyCompositionCrop($0)},end:{model.endCompositionGesture(cancelled:$0)},
                     value:"\(model.project?.settings.compositionScale ?? 1),\(model.project?.settings.compositionX ?? 0),\(model.project?.settings.compositionY ?? 0)")
@@ -60,9 +59,8 @@ struct CompositionVideoViewport: View {
             .contentShape(Rectangle()).clipped()
             .overlay {
                 if composition {
-                    Rectangle().stroke(.white.opacity(0.5),lineWidth:1)
-                        .frame(width:viewport.width,height:viewport.height)
-                        .position(x:window.midX,y:window.midY).allowsHitTesting(false)
+                    CompositionWindowShape(window:window)
+                        .stroke(.white.opacity(0.5),lineWidth:1).allowsHitTesting(false)
                 }
             }
     }
@@ -73,6 +71,23 @@ struct CompositionVideoViewport: View {
             else if let player = model.player { PlayerSurface(player: player) }
             else { Color.black }
         }.allowsHitTesting(false).accessibilityHidden(true)
+    }
+}
+
+/// Both the clear material window and its outline interpolate the same four coordinates.
+/// A plain Path captures the final rectangle immediately, even inside an animated transaction.
+struct CompositionWindowShape:Shape {
+    var window:CGRect
+    var inverted=false
+    var animatableData:AnimatablePair<AnimatablePair<CGFloat,CGFloat>,AnimatablePair<CGFloat,CGFloat>> {
+        get {.init(.init(window.origin.x,window.origin.y),.init(window.width,window.height))}
+        set {window = .init(x:newValue.first.first,y:newValue.first.second,width:newValue.second.first,height:newValue.second.second)}
+    }
+    func path(in rect:CGRect)->Path {
+        Path {path in
+            if inverted {path.addRect(rect)}
+            path.addRect(window)
+        }
     }
 }
 

@@ -15,6 +15,10 @@ struct EditorView: View {
     @State private var activeTool: WorkspaceTool?
     @State private var lastSettingsTool:WorkspaceTool = .composition
     @State private var timelineTrimming = false
+    @State private var selectionZoom:CGFloat = 1
+    @State private var selectionPan:CGSize = .zero
+    @GestureState private var selectionPinch:CGFloat = 1
+    @GestureState private var selectionDrag:CGSize = .zero
 
     private enum WorkspaceTool: String, CaseIterable {
         case composition = "构图", motion = "运镜", redaction = "打码"
@@ -68,14 +72,17 @@ struct EditorView: View {
                                 editorTimeline
                                 if let tool=displayedTool,!isProcessing {
                                     inlineSettings(tool)
-                                        .frame(height:tool == .redaction ? min(184,geometry.size.height*0.30) : min(settingsHeight,208,geometry.size.height*0.38))
-                                        .transition(.opacity.combined(with:.move(edge:.bottom)))
+                                        .frame(height:tool == .redaction ? min(184,geometry.size.height*0.30) : tool == .motion ? min(settingsHeight*104/154,140,geometry.size.height*0.30) : min(settingsHeight,208,geometry.size.height*0.38),alignment:.top)
+                                        .clipped()
+                                        .transition(.opacity)
                                 }
                                 bottomToolbar.padding(.top,12).padding(.bottom,8)
                             }
                         }
                     }
                 }
+                // Animate the common layout so the panel, timeline and video resize together.
+                .animation(settingsPanelAnimation,value:displayedTool)
             }.frame(width: geometry.size.width, height: geometry.size.height)
             #endif
         }
@@ -109,6 +116,10 @@ struct EditorView: View {
         .onReceive(NotificationCenter.default.publisher(for:.AVPlayerItemDidPlayToEndTime)) {notification in
             if let item=notification.object as? AVPlayerItem,item === model.previewPlayer?.currentItem {generatedPlaying=false}
         }
+        .onChange(of:model.project?.id) {_,_ in resetSelectionZoom()}
+        .onChange(of:showsComposition) {_,_ in resetSelectionZoom()}
+        .onChange(of:isProcessing) {_,processing in if processing {resetSelectionZoom()}}
+        .onChange(of:model.manualSelection) {_,manual in if manual {resetSelectionZoom()}}
         .onDisappear { model.player?.pause();model.previewPlayer?.pause() }
     }
     #if targetEnvironment(macCatalyst)
@@ -143,6 +154,7 @@ struct EditorView: View {
                 }.frame(maxWidth:.infinity,maxHeight:.infinity)
                 Divider()
                 desktopInspector.frame(width:360).background(DesktopPalette.panel)
+                    .animation(settingsPanelAnimation,value:displayedTool)
             }
         }.background(DesktopPalette.background)
             .accessibilityElement(children:.contain).accessibilityIdentifier("desktopWorkspace")
@@ -157,9 +169,11 @@ struct EditorView: View {
                 DesktopFact(title:"分辨率",value:model.project?.settings.resolution.label ?? "")
             } else if !isProcessing {
                 if model.hasCompletedTracking {
-                    if displayedTool == .composition {desktopCompositionSettings}
-                    else if displayedTool == .motion {motionPanel}
-                    else if displayedTool == .redaction {desktopRedactionSettings}
+                    if let tool=displayedTool {
+                        settingsPanel(tool)
+                            .frame(height:tool == .redaction ? 188 : tool == .motion ? 104 : 154,alignment:.top)
+                            .clipped()
+                    }
                 } else {Text(model.project?.target == nil ? "请在画面中选择主角" : "主角已选择").font(.subheadline)}
                 if let activity=model.editorActivityText {
                     HStack(spacing:8) {ProgressView().controlSize(.small);Text(activity).font(.caption).foregroundStyle(.secondary)}
@@ -183,8 +197,6 @@ struct EditorView: View {
             }
         }.padding(20).frame(maxHeight:.infinity,alignment:.top)
     }
-    private var desktopCompositionSettings:some View {compositionPanel}
-    private var desktopRedactionSettings:some View {redactionPanel}
     #endif
     private func returnToHome() {
         model.goHome()
@@ -216,13 +228,25 @@ struct EditorView: View {
         (model.compositionEditing || model.hasCompletedTracking && !isBlocked)
             && !timelineTrimming && model.compositionCrop != nil
     }
+    private var selectionZoomEnabled:Bool {
+        !showsComposition && !isCompleted && !isProcessing && !model.manualSelection && !timelineTrimming
+    }
+    private func resetSelectionZoom() {selectionZoom=1;selectionPan = .zero}
+    private func clampedSelectionPan(_ value:CGSize,rect:CGRect,scale:CGFloat)->CGSize {
+        let x=rect.width*(scale-1)/2,y=rect.height*(scale-1)/2
+        return CGSize(width:min(x,max(-x,value.width)),height:min(y,max(-y,value.height)))
+    }
     private var sourceStage: some View {
         GeometryReader { geometry in
             let source = model.project?.metadata.size ?? CGSize(width: 1920, height: 1080)
             let inset:CGFloat=showsComposition ? 16 : 12
             let area=CGSize(width:max(1,geometry.size.width-inset*2),height:max(1,geometry.size.height-(showsComposition ? 12 : 48)))
-            let rect=CropGeometry.aspectFit(video:(showsComposition || isCompleted) ? (model.project?.settings.aspectRatio ?? .portrait).size : source,container:area).offsetBy(dx:inset,dy:0)
+            let baseRect=CropGeometry.aspectFit(video:(showsComposition || isCompleted) ? (model.project?.settings.aspectRatio ?? .portrait).size : source,container:area).offsetBy(dx:inset,dy:0)
+            let zoom=selectionZoomEnabled ? min(4,max(1,selectionZoom*selectionPinch)) : 1
+            let pan=clampedSelectionPan(CGSize(width:selectionPan.width+selectionDrag.width,height:selectionPan.height+selectionDrag.height),rect:baseRect,scale:zoom)
+            let rect=CGRect(x:baseRect.midX-baseRect.width*zoom/2+pan.width,y:baseRect.midY-baseRect.height*zoom/2+pan.height,width:baseRect.width*zoom,height:baseRect.height*zoom)
             ZStack(alignment: .bottom) {
+                ZStack {
                 Group {
                     if isCompleted,let player=model.previewPlayer {
                         PlayerSurface(player:player).frame(width:rect.width,height:rect.height)
@@ -253,7 +277,7 @@ struct EditorView: View {
                     }
                 }
                 if let box = activeBox, !isCompleted, !showsComposition && !model.manualSelection && !model.isPlaying {
-                    TargetBox(label: boxLabel, status: boxLabel, warning: isBlocked && model.redactionIssue == nil, dashed: isProcessing && model.trackedSample?.estimated == true, badgeInside: rect.minY + rect.height * box.y < 34)
+                    TargetBox(label: boxLabel, status: isBlocked ? "待确认主角" : isProcessing ? "正在跟随主角" : "主角已选中", warning: isBlocked && model.redactionIssue == nil, dashed: isProcessing && model.trackedSample?.estimated == true, badgeInside: rect.minY + rect.height * box.y < 34)
                         .frame(width: rect.width * box.width, height: rect.height * box.height)
                         .position(x: rect.minX + rect.width * box.center.x, y: rect.minY + rect.height * box.center.y)
                         .allowsHitTesting(false)
@@ -262,12 +286,43 @@ struct EditorView: View {
                     ManualBoxOverlay(box: $drawnBox).frame(width: rect.width, height: rect.height)
                         .position(x: rect.midX, y: rect.midY)
                 }
+                }
+                .frame(width:geometry.size.width,height:geometry.size.height)
+                .contentShape(Rectangle())
+                .simultaneousGesture(MagnifyGesture()
+                    .updating($selectionPinch) {value,state,_ in state=value.magnification}
+                    .onEnded {value in
+                        selectionZoom=min(4,max(1,selectionZoom*value.magnification))
+                        selectionPan=clampedSelectionPan(selectionPan,rect:baseRect,scale:selectionZoom)
+                    },including:selectionZoomEnabled && !model.isPlaying ? .all : .none)
+                .simultaneousGesture(DragGesture(minimumDistance:10)
+                    .updating($selectionDrag) {value,state,_ in state=value.translation}
+                    .onEnded {value in selectionPan=clampedSelectionPan(CGSize(width:selectionPan.width+value.translation.width,height:selectionPan.height+value.translation.height),rect:baseRect,scale:selectionZoom)},
+                    including:selectionZoomEnabled && selectionZoom>1 && !model.isPlaying ? .all : .none)
+                .accessibilityElement(children:.contain)
+                .accessibilityIdentifier("analysisZoomCanvas")
+                .accessibilityValue(String(format:"%.2f",Double(zoom)))
+                .accessibilityAction(named:"放大人物画面") {if selectionZoomEnabled {selectionZoom=min(4,selectionZoom*1.5)}}
                 if !isProcessing && !isCompleted && !model.compositionEditing {
                     HStack(spacing: 8) {
                         if model.detecting || model.restoringTracking { ProgressView().tint(.white) }
                         Text(sourceHint).font(.system(size: 11)).foregroundStyle(.white.opacity(0.65)).lineLimit(2)
-                    }.padding(.horizontal, 20).frame(height: 44).allowsHitTesting(false)
+                    }.padding(.horizontal, 20).frame(height: 44).padding(.bottom,58).allowsHitTesting(false)
                 }
+                playbackControl
+                    .position(x:geometry.size.width/2,y:max(22,geometry.size.height-36))
+                ZStack {
+                    if selectionZoomEnabled && zoom>1.001 {
+                        StudioIcon(symbol:"arrow.counterclockwise",label:"重置视频大小") {
+                            withAnimation(reduceMotion ? nil : .smooth(duration:0.22)) {resetSelectionZoom()}
+                        }
+                        .accessibilityIdentifier("resetAnalysisZoom")
+                        .transition(reduceMotion ? .identity : .opacity.combined(with:.offset(x:6)))
+                    }
+                }
+                .frame(width:44,height:44)
+                .animation(reduceMotion ? nil : .easeOut(duration:0.16),value:selectionZoomEnabled && zoom>1.001)
+                .position(x:geometry.size.width/2+76,y:max(22,geometry.size.height-36))
             }
         }.clipped()
             .animation(reduceMotion ? nil : .smooth(duration:0.32),value:showsComposition)
@@ -336,12 +391,9 @@ struct EditorView: View {
         }
     }
 
-    private var playbackRow: some View {
-        HStack {
-            Text(model.currentTime.videoTime).foregroundStyle(.white)
-                + Text(" / " + (model.project?.metadata.duration ?? 0).videoTime).foregroundStyle(.white.opacity(0.45))
-            Spacer()
-            Button {
+    private var playbackControl:some View {
+        StudioIcon(symbol:(isCompleted ? generatedPlaying : model.isPlaying) ? "pause.fill" : "play.fill",
+                   label:(isCompleted ? generatedPlaying : model.isPlaying) ? "暂停预览" : "播放预览") {
                 if isCompleted {
                     generatedPlaying.toggle()
                     if generatedPlaying {
@@ -350,12 +402,15 @@ struct EditorView: View {
                     } else {model.previewPlayer?.pause()}
                 }
                 else {model.togglePreview()}
-            } label: {
-                Image(systemName: (isCompleted ? generatedPlaying : model.isPlaying) ? "pause.fill" : "play.fill")
-                    .font(.system(size: 22)).frame(width: 44, height: 44).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityLabel((isCompleted ? generatedPlaying : model.isPlaying) ? "暂停预览" : "播放预览")
-                .accessibilityIdentifier("editorPlayback").keyboardShortcut(.space,modifiers:[])
-                .disabled(isProcessing || model.isReviewing || timelineTrimming || (!isCompleted && model.hasCompletedTracking && model.project?.settings.redaction.enabled == true && model.project?.redactionPlan?.covers(model.project!) != true) || model.compositionEditing && !model.hasCompletedTracking || model.compositionBusy)
+        }
+        .accessibilityIdentifier("editorPlayback").keyboardShortcut(.space,modifiers:[])
+        .disabled(isProcessing || model.isReviewing || model.manualSelection || timelineTrimming || (!isCompleted && model.hasCompletedTracking && model.project?.settings.redaction.enabled == true && model.project?.redactionPlan?.covers(model.project!) != true) || model.compositionEditing && !model.hasCompletedTracking)
+    }
+
+    private var playbackRow: some View {
+        HStack {
+            Text(model.currentTime.videoTime).foregroundStyle(.white)
+                + Text(" / " + (model.project?.metadata.duration ?? 0).videoTime).foregroundStyle(.white.opacity(0.45))
             Spacer()
             Text(model.project?.settings.aspectRatio.rawValue ?? "16:9").foregroundStyle(.white.opacity(0.45)).frame(width: 60, alignment: .trailing)
         }.font(.system(.caption, design: .monospaced)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.65)
@@ -474,7 +529,8 @@ struct EditorView: View {
                 Text(model.generatingVideo ? "正在生成视频" : isPaused ? "分析已暂停" : "正在分析人物").font(.subheadline).padding(.horizontal,18)
             } else if isCompleted {completedActions}
             else if let tool=displayedTool {
-                inlineSettings(tool).frame(height:tool == .composition ? 154 : tool == .redaction ? 184 : 104)
+                inlineSettings(tool).frame(height:tool == .composition ? 154 : tool == .redaction ? 184 : 104,alignment:.top)
+                    .clipped()
             } else {
                 VStack(alignment:.leading,spacing:12) {
                     Text(model.project?.target == nil ? "在原片中轻点主角" : "主角已选中")
@@ -497,7 +553,7 @@ struct EditorView: View {
         if !model.hasCompletedTracking {return model.detecting ? "正在识别人物…" : "分析所选片段"}
 
         if model.restoringTracking {return "正在恢复项目…"}
-        if model.compositionBusy {return "正在准备预览…"}
+        if model.compositionBusy && !model.hasCompletedTracking {return "正在准备预览…"}
         if model.importingRedactionImage {return "正在准备图片…"}
         if model.detecting {return "正在识别人物…"}
         if model.isPlaying {return "请先暂停预览"}
@@ -510,7 +566,7 @@ struct EditorView: View {
         guard model.hasCompletedTracking,!model.compositionAdjusting else { return }
         guard activeTool != tool else {return}
         model.pausePreview(refresh: false)
-        finishTool(commit: true)
+        if model.redactionEditing && tool != .redaction {model.finishRedaction(commit:true,keepComposition:true)}
         if tool == .composition || tool == .motion {model.beginComposition();guard model.compositionEditing else {return}}
         if tool == .redaction {redactionStrengthEditing=false;model.beginRedaction()}
         activeTool=tool;lastSettingsTool=tool
@@ -535,18 +591,27 @@ struct EditorView: View {
         }
     }
 
-    @ViewBuilder private func inlineSettings(_ tool: WorkspaceTool) -> some View {
-        Group {
-            if tool == .composition {
-                compositionPanel
-            } else if tool == .motion {
-                motionPanel
-            } else if tool == .redaction {
-                redactionPanel
+    private var settingsPanelAnimation:Animation? {reduceMotion ? nil : .smooth(duration:0.24,extraBounce:0)}
+    private func inlineSettings(_ tool:WorkspaceTool)->some View {
+        settingsPanel(tool).padding(.horizontal,18)
+            .accessibilityElement(children:.contain).accessibilityIdentifier("adjustmentPanel")
+    }
+    private func settingsPanel(_ tool:WorkspaceTool)->some View {
+        // The explicit outer frame alone owns height. Outgoing controls in the overlay
+        // cannot retain their old intrinsic height or stretch the incoming controls.
+        Color.clear.overlay(alignment:.top) {
+            VStack(spacing:0) {
+                switch tool {
+                case .composition: compositionPanel
+                case .motion: motionPanel
+                case .redaction: redactionPanel
+                }
             }
-
-        }.dynamicTypeSize(...DynamicTypeSize.xxxLarge).padding(.horizontal, 18)
-            .accessibilityElement(children: .contain).accessibilityIdentifier("adjustmentPanel")
+            .frame(maxWidth:.infinity)
+            .id(tool)
+            .transition(reduceMotion ? .identity : .opacity.combined(with:.offset(y:6)))
+            .zIndex(1)
+        }.dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
     // Shared control sizing and spacing for phone, wide layouts and Mac Catalyst.
     private let panelSpacing:CGFloat = 0
@@ -718,8 +783,6 @@ struct EditorView: View {
                 compositionControl("水平居中", symbol: "align.horizontal.center") { model.centerComposition(horizontal: true) }
                 compositionControl("垂直居中", symbol: "align.vertical.center") { model.centerComposition(horizontal: false) }
             }.disabled(compositionControlsDisabled)
-                // Keep the control appearance stable while the asynchronous preview catches up.
-                .allowsHitTesting(!model.compositionBusy)
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
                 Text(model.editorActivityText ?? model.compositionNotice ?? "拖动位置 · 双指缩放")
@@ -767,18 +830,22 @@ struct TargetBox:View {
     private var tint:Color { warning ? .orange : .acAccent }
     var body:some View {
         GeometryReader { geometry in
-            let radius=min(8,max(2,geometry.size.width*0.12))
-            RoundedRectangle(cornerRadius:radius)
-                .stroke(tint,style:StrokeStyle(lineWidth:2,lineCap:.round,dash:dashed ? [4,3] : []))
-                .overlay(alignment:.top) {
-                    Text(status)
-                        .font(.system(size:11,weight:.medium))
-                        .lineLimit(1).fixedSize(horizontal:true,vertical:false)
-                        .padding(.horizontal,12).frame(height:26)
-                        .foregroundStyle(Color.acOnAccent)
-                        .background(tint,in:RoundedRectangle(cornerRadius:7))
-                        .fixedSize(horizontal:true,vertical:false)
-                        .offset(y: badgeInside ? 8 : -34)
+            Rectangle()
+                .stroke(tint.opacity(0.5),style:StrokeStyle(lineWidth:1,dash:dashed ? [4,3] : []))
+                .overlay {
+                    CandidateCorners().stroke(tint,style:StrokeStyle(lineWidth:3,lineCap:.square,lineJoin:.miter))
+                }
+                .overlay(alignment:.topLeading) {
+                    HStack(spacing:4) {
+                        Image(systemName:warning ? "exclamationmark" : "sparkle").font(.system(size:10,weight:.semibold))
+                        Text(status).font(.system(size:10,weight:.medium))
+                            .lineLimit(1).minimumScaleFactor(0.7)
+                    }
+                    .padding(.horizontal,8).frame(height:24)
+                    .foregroundStyle(Color.acOnAccent)
+                    .background(tint,in:RoundedRectangle(cornerRadius:4))
+                    .frame(maxWidth:geometry.size.width,alignment:.leading)
+                    .offset(y:badgeInside ? 6 : -30)
                 }
         }
         .accessibilityElement(children:.ignore)

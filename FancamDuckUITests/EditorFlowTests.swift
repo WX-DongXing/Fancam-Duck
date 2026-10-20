@@ -12,6 +12,29 @@ final class EditorFlowTests: XCTestCase {
     @MainActor private func ready(_ button: XCUIElement) {
         expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: button); waitForExpectations(timeout: 12)
     }
+    @MainActor func testAnalysisZoomKeepsSelectionAlignedAndResets() throws {
+        let app=launch()
+        let person=app.buttons["dancer1"]
+        let initial=person.frame
+        let canvas=app.descendants(matching:.any).matching(identifier:"analysisZoomCanvas").firstMatch
+        XCTAssertTrue(canvas.exists)
+        XCTAssertFalse(app.buttons["resetAnalysisZoom"].exists)
+        canvas.pinch(withScale:2,velocity:1)
+        let reset=app.buttons["resetAnalysisZoom"]
+        XCTAssertTrue(reset.waitForExistence(timeout:3))
+        XCTAssertGreaterThan(person.frame.width,initial.width*1.4)
+        person.tap()
+        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"selectedTargetFrame").firstMatch.exists)
+        let play=app.buttons["editorPlayback"]
+        XCTAssertEqual(reset.frame.midY,play.frame.midY,accuracy:1)
+        XCTAssertGreaterThan(reset.frame.minX,play.frame.maxX)
+        reset.tap()
+        XCTAssertTrue(person.waitForExistence(timeout:3))
+        XCTAssertEqual(person.frame.width,initial.width,accuracy:2)
+        XCTAssertFalse(reset.exists)
+        XCTAssertTrue(app.buttons["primaryAction"].isEnabled)
+        capture(app,"analysis-zoom-reset")
+    }
     @MainActor func testReselectAnalysisRequiresNewPersonSelection() throws {
         let app=launch();app.buttons["dancer1"].tap();app.buttons["primaryAction"].tap()
         let reselect=app.buttons["重新选择"]
