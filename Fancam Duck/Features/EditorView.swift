@@ -240,9 +240,6 @@ struct EditorView: View {
         let candidates=people.map {OverlapPerson(id:$0.id,number:$0.number,body:$0.box)}
         return OverlapSelection.candidates(candidates)
     }
-    private var showsOverlapThumbnails:Bool {
-        selectionZoomEnabled && !model.isPlaying && !model.detecting && !overlappingPeople.isEmpty
-    }
     private var selectionZoomEnabled:Bool {
         !showsComposition && !isCompleted && !isProcessing && !model.manualSelection && !timelineTrimming
     }
@@ -254,6 +251,8 @@ struct EditorView: View {
     private var sourceStage: some View {
         GeometryReader { geometry in
             let source = model.project?.metadata.size ?? CGSize(width: 1920, height: 1080)
+            let overlapCandidates=selectionZoomEnabled && !model.isPlaying && !model.detecting ? overlappingPeople : []
+            let showsOverlapThumbnails = !overlapCandidates.isEmpty
             let inset:CGFloat=showsComposition ? 16 : 12
             let area=CGSize(width:max(1,geometry.size.width-inset*2),height:max(1,geometry.size.height-(showsOverlapThumbnails ? 140 : showsComposition ? 12 : 48)))
             let baseRect=CropGeometry.aspectFit(video:(showsComposition || isCompleted) ? (model.project?.settings.aspectRatio ?? .portrait).size : source,container:area).offsetBy(dx:inset,dy:0)
@@ -280,19 +279,19 @@ struct EditorView: View {
                         let number = person.number, box = person.box
                         Button { model.selectTarget(box) } label: {
                             CandidateCorners()
-                                .stroke(model.redactionEditing && model.redactionSelected(box) ? Color.acAccent : .white.opacity(0.85), style: StrokeStyle(lineWidth:model.redactionEditing && model.redactionSelected(box) ? 2.5 : 1.5,lineCap:.round))
+                                .stroke(.white.opacity(0.85),style:StrokeStyle(lineWidth:1.5,lineCap:.round))
                                 .opacity(activeBox.map {$0.iou(box)>0.8} == true ? 0 : 1)
                                 .frame(width:rect.width*box.width,height:rect.height*box.height)
                                 .frame(minWidth:44,minHeight:44).contentShape(Rectangle())
                         }.buttonStyle(.plain)
                             .position(x: rect.minX + rect.width * box.center.x, y: rect.minY + rect.height * box.center.y)
-                            .disabled((model.redactionEditing || model.redactionIssue != nil) && !model.canRedactPerson(box))
-                            .accessibilityLabel(model.redactionEditing && !model.canRedactPerson(box) ? "主角，不参与打码" : model.redactionEditing ? (model.redactionSelected(box) ? "移除打码人物 \(number+1)" : "打码人物 \(number+1)") : (model.isDemo ? "选择舞者 \(number + 1)" : "选择人物 \(number + 1)"))
+                            .disabled(model.redactionIssue != nil && !model.canRedactPerson(box))
+                            .accessibilityLabel(model.isDemo ? "选择舞者 \(number+1)" : "选择人物 \(number+1)")
                             .accessibilityIdentifier(model.isDemo ? "dancer\(number)" : "person\(number)")
                     }
                 }
                 if let box = activeBox, !isCompleted, !showsComposition && !model.manualSelection && !model.isPlaying {
-                    TargetBox(label: boxLabel, warning: isBlocked && model.redactionIssue == nil, dashed: isProcessing && model.trackedSample?.estimated == true, badgeInside: rect.minY + rect.height * box.y < 34)
+                    TargetBox(label:"主角", warning: isBlocked && model.redactionIssue == nil, dashed: isProcessing && model.trackedSample?.estimated == true, badgeInside: rect.minY + rect.height * box.y < 34)
                         .frame(width: rect.width * box.width, height: rect.height * box.height)
                         .position(x: rect.minX + rect.width * box.center.x, y: rect.minY + rect.height * box.center.y)
                         .allowsHitTesting(false)
@@ -328,7 +327,7 @@ struct EditorView: View {
                     }.padding(.horizontal, 20).frame(height: 44).padding(.bottom,58).allowsHitTesting(false)
                 }
                 if showsOverlapThumbnails,let project=model.project {
-                    OverlappingPeoplePicker(people:overlappingPeople,projectID:project.id,
+                    OverlappingPeoplePicker(people:overlapCandidates,projectID:project.id,
                         source:(model.player?.currentItem?.asset as? AVURLAsset)?.url,
                         sourceSize:source,time:model.currentTime,demo:model.isDemo,
                         preview:model.processingPreview,selected:activeBox,onSelect:{model.selectTarget($0)})
@@ -614,7 +613,6 @@ struct EditorView: View {
         if !model.hasCompletedTracking {return model.detecting ? "正在识别人物…" : "分析所选片段"}
 
         if model.restoringTracking {return "正在恢复项目…"}
-        if model.compositionBusy && !model.hasCompletedTracking {return "正在准备预览…"}
         if model.importingRedactionImage {return "正在准备图片…"}
         if model.detecting {return "正在识别人物…"}
         if model.isPlaying {return "请先暂停预览"}
@@ -879,7 +877,6 @@ struct EditorView: View {
         return model.project?.target
     }
     private var isPaused: Bool { if case .paused = model.phase { return true }; return false }
-    private var boxLabel: String { "主角" }
 }
 
 struct TargetBox:View {

@@ -12,7 +12,6 @@ final class AppModel {
     var targetExplicitlySelected = false
     var currentTime: Double = 0
     var manualSelection = false
-    var selectedTool: EditorTool?
     var thumbnails: [UIImage] = []
     var player: AVPlayer?
     var observations: [PersonObservation] = []
@@ -58,9 +57,8 @@ final class AppModel {
         guard let project,let recipe=lastGeneratedRecipe,recipe.projectID==project.id else {return false}
         return recipe != GenerationRecipe(project)
     }
-    private var outputSettings:EditSettings?
     var hasReusableOutput:Bool {
-        guard let project,let outputURL,outputSettings==project.settings,lastGeneratedRecipe==GenerationRecipe(project) else {return false}
+        guard let project,let outputURL,lastGeneratedRecipe==GenerationRecipe(project) else {return false}
         return FileManager.default.fileExists(atPath:outputURL.path)
     }
     private var compositionAutomaticSettings:EditSettings?
@@ -170,7 +168,6 @@ final class AppModel {
         thumbnails = []
         player = nil
         targetExplicitlySelected = false
-        selectedTool = nil
         manualSelection = false
         outputURL = nil
         savedToPhotos = false
@@ -231,10 +228,9 @@ final class AppModel {
         phase = .editing
         currentTime = project.target == nil ? project.settings.start : min(project.settings.end,max(project.settings.start,project.targetTime))
         manualSelection = false
-        selectedTool = nil
         targetExplicitlySelected = false
         thumbnails = []
-        outputURL = nil;outputSettings=nil
+        outputURL = nil
         savedToPhotos = false
         if let url = store.sourceURL(for: project) {
             player = AVPlayer(url: url)
@@ -257,14 +253,14 @@ final class AppModel {
                 if let people,let source=store.sourceURL(for:project) {await self.pipeline.restorePeople(people,source:source)}
                 guard !Task.isCancelled,self.restorationID==restoreID,self.project?.id==project.id else {return}
                 self.restoringTracking=false;self.analyzedPeople=people ?? [:]
-                if let output {self.outputURL=output.url;self.outputSettings=project.settings;self.savedToPhotos=output.savedToPhotos;self.lastGeneratedRecipe=GenerationRecipe(project)}
+                if let output {self.outputURL=output.url;self.savedToPhotos=output.savedToPhotos;self.lastGeneratedRecipe=GenerationRecipe(project)}
                 if let cached {
                     self.targetSamples=cached;self.hasCompletedTracking=true
                     if let current=self.project {
                         let conflicts=RedactionPolicy.conflicts(project:current,samples:cached)
                         if !conflicts.isEmpty {
                             self.project?.settings.redaction.subjects.removeAll {conflicts.contains($0.id)}
-                            self.project?.redactionPlan=nil;self.outputURL=nil;self.outputSettings=nil;self.savedToPhotos=false
+                            self.project?.redactionPlan=nil;self.outputURL=nil;self.savedToPhotos=false
                             self.persist()
                         }
                     }
@@ -306,7 +302,7 @@ final class AppModel {
             project?.settings.redaction.subjects.removeAll {$0.id==id};project?.redactionPlan=nil
         }
         restorationID=UUID();restorationTask?.cancel();restoringTracking=false
-        hasCompletedTracking=false;targetSamples=[];analyzedPeople=[:];outputSettings=nil;outputURL=nil;savedToPhotos=false
+        hasCompletedTracking=false;targetSamples=[];analyzedPeople=[:];outputURL=nil;savedToPhotos=false
         selectionObservation=observations.filter {$0.body.iou(rect)>0.7}.max {$0.body.iou(rect)<$1.body.iou(rect)}
         if phase.issue == nil {project?.settings.compositionAnchor=nil}
         project?.redactionPlan=nil
@@ -332,7 +328,6 @@ final class AppModel {
         }
         // Preserve the previous file until a replacement has successfully completed.
         manualSelection = false
-        selectedTool = nil
         let previousPhase = phase
         let regenerate=needsRegeneration || generateAfterAnalysis
         let stopAfterAnalysis=analysisOnly
@@ -435,7 +430,7 @@ final class AppModel {
                     await self.persistenceTask?.value
                     let output=try await self.store.saveOutput(project:renderProject,url:generated)
                     guard !Task.isCancelled,self.isCurrent(id,projectID:project.id) else {return}
-                    self.outputURL=output;self.outputSettings=renderProject.settings;self.savedToPhotos=false
+                    self.outputURL=output;self.savedToPhotos=false
                     self.lastGeneratedRecipe=GenerationRecipe(renderProject)
                     self.exportPoster=nil;self.previewPlayer=AVPlayer(url:output)
                     self.generatingVideo=false;self.phase = .completed(output);self.route = self.generateAfterAnalysis ? .editor : .export;self.persist();return
@@ -444,7 +439,6 @@ final class AppModel {
                 let poster=await self.poster(for:item)
                 guard !Task.isCancelled,self.isCurrent(id,projectID:project.id) else { return }
                 self.exportPoster=poster;self.previewPlayer=AVPlayer(playerItem:item)
-                self.lastGeneratedRecipe=GenerationRecipe(renderProject)
                 self.phase = .readyToExport;self.route = .export
             } catch {
                 guard !Task.isCancelled,self.isCurrent(id,projectID:project.id) else { return }
@@ -505,8 +499,8 @@ final class AppModel {
         project?.target=nil;project?.redactionPlan=nil
         project?.settings.compositionAnchor=nil
         compositionCrop=nil;compositionAutomatic=nil
-        targetExplicitlySelected=false;manualSelection=false;selectedTool=nil
-        outputURL=nil;outputSettings=nil;lastGeneratedRecipe=nil;savedToPhotos=false
+        targetExplicitlySelected=false;manualSelection=false
+        outputURL=nil;lastGeneratedRecipe=nil;savedToPhotos=false
         processingMessage=nil;errorMessage=nil
         phase = .editing;route = .editor
         seek(to:project?.settings.start ?? 0)
@@ -535,7 +529,7 @@ final class AppModel {
         guard let project else { return }
         if currentTime >= project.settings.end-0.05 { seek(to:project.settings.start) }
         detectionID=UUID();detectionTask?.cancel();detecting=false;observations=[]
-        isPlaying=true; player?.play(); selectedTool=nil
+        isPlaying=true; player?.play()
         previewTask=Task { [weak self] in
             while !Task.isCancelled {
                 do { try await Task.sleep(for:.milliseconds(100)) } catch { return }
@@ -552,7 +546,7 @@ final class AppModel {
             isPlaying=false;previewTask?.cancel();previewPlayer?.pause();player?.pause()
             if wasPlaying,let project,hasCompletedTracking,let time=previewPlayer?.currentTime().seconds,time.isFinite {
                 currentTime=min(project.settings.end,max(project.settings.start,project.settings.start+time))
-                compositionCrop=CropPlan.rect(at:currentTime,in:compositionFrames)
+                synchronizeCompositionPosition()
                 player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
             }
             return
@@ -573,7 +567,7 @@ final class AppModel {
         if compositionEditing {
             guard hasCompletedTracking,time.isFinite else { return }
             currentTime=min(project.settings.end,max(project.settings.start,time))
-            compositionCrop=CropPlan.rect(at:currentTime,in:compositionFrames)
+            synchronizeCompositionPosition()
             player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
             previewPlayer?.seek(to:CMTime(seconds:currentTime-project.settings.start,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
             return
@@ -591,7 +585,7 @@ final class AppModel {
             pausePreview(refresh:false)
             let limits=bounds ?? project.settings.start...project.settings.end
             currentTime=min(limits.upperBound,max(limits.lowerBound,time))
-            compositionCrop=CropPlan.rect(at:currentTime,in:compositionFrames)
+            synchronizeCompositionPosition()
             player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
             previewPlayer?.seek(to:CMTime(seconds:max(0,currentTime-project.settings.start),preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
             return
@@ -747,7 +741,7 @@ final class AppModel {
                 guard !Task.isCancelled,self.isCurrent(id,projectID:project.id) else {return}
                 let output=try await self.store.saveOutput(project:project,url:renderedOutput)
                 guard !Task.isCancelled,self.isCurrent(id,projectID:project.id) else {return}
-                self.outputURL=output;self.outputSettings=project.settings;self.lastGeneratedRecipe=GenerationRecipe(project);self.exportPoster=nil;self.exportProgress=1
+                self.outputURL=output;self.lastGeneratedRecipe=GenerationRecipe(project);self.exportPoster=nil;self.exportProgress=1
                 #if DEBUG
                 let temporary=FileManager.default.temporaryDirectory
                 try? JSONEncoder().encode(project).write(to:temporary.appendingPathComponent("FancamDuck-export-project.json"),options:.atomic)
@@ -894,7 +888,10 @@ final class AppModel {
         pausePreview(refresh:false);operationID=UUID();detectionID=UUID();importID=UUID();importing=false
         detectionTask?.cancel();detecting=false;observations=[]
         processingPreview=nil;trackedSample=nil
-        if !preserveAnalysis {targetSamples=[];hasCompletedTracking=false;selectionObservation=nil;analyzedPeople=[:]}
+        if !preserveAnalysis {
+            targetSamples=[];hasCompletedTracking=false;selectionObservation=nil;analyzedPeople=[:]
+            compositionCrop=nil;compositionAutomatic=nil
+        }
         previewPlayer?.pause();previewPlayer=nil;exportPoster=nil
         thumbnailTask?.cancel();player?.pause()
         let previous=processingTask,projectID=project?.id,pipeline=self.pipeline
@@ -905,10 +902,6 @@ final class AppModel {
             if let projectID { await pipeline.discard(projectID:projectID) }
         }
     }
-}
-
-enum EditorTool: String, CaseIterable {
-    case resolution, size, speed, position
 }
 
 extension AppModel {
@@ -925,9 +918,11 @@ extension AppModel {
         guard settingsEnabled,project?.target != nil,!compositionEditing else { return }
         // Composition uses the selected anchor, not the pending frame's candidates.
         detectionID=UUID();detectionTask?.cancel();detecting=false
-        pausePreview(refresh:false);selectedTool=nil;manualSelection=false
+        pausePreview(refresh:false);manualSelection=false
         compositionSnapshot=project?.settings;compositionUndo=[];compositionEditing=true;compositionNotice=nil
-        compositionCrop=hasCompletedTracking ? CropPlan.rect(at:currentTime,in:compositionFrames) : nil;compositionAutomatic=nil;compositionFrames=[];compositionAutomaticFrames=[];compositionAutomaticSettings=nil
+        if !hasCompletedTracking {compositionCrop=nil}
+        else if let crop=CropPlan.rect(at:currentTime,in:compositionFrames) {compositionCrop=crop}
+        compositionAutomatic=nil;compositionFrames=[];compositionAutomaticFrames=[];compositionAutomaticSettings=nil
         if !hasCompletedTracking { currentTime=project?.settings.compositionAnchor?.time ?? project?.targetTime ?? currentTime }
         player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
         refreshComposition()
@@ -956,8 +951,7 @@ extension AppModel {
             }.value
             guard let self,!Task.isCancelled,self.compositionEditing,self.compositionID==id,self.project?.id==project.id else { return }
             self.compositionFrames=computed.0;self.compositionAutomaticFrames=computed.1;self.compositionAutomaticSettings=automatic
-            self.compositionCrop=CropPlan.rect(at:self.currentTime,in:computed.0)
-            self.compositionAutomatic=CropPlan.rect(at:self.currentTime,in:computed.1)
+            self.synchronizeCompositionPosition()
 
             do {
                 if self.hasCompletedTracking,project.settings.redaction.enabled,project.redactionPlan?.covers(project) != true {
@@ -1097,6 +1091,10 @@ extension AppModel {
         }
         refreshComposition()
     }
+    private func synchronizeCompositionPosition() {
+        compositionCrop=CropPlan.rect(at:currentTime,in:compositionFrames)
+        compositionAutomatic=CropPlan.rect(at:currentTime,in:compositionAutomaticFrames)
+    }
     private func toggleCompositionPlayback() {
         guard hasCompletedTracking else {return}
         if compositionBusy,let task=compositionTask,let project {
@@ -1111,16 +1109,23 @@ extension AppModel {
             return
         }
         if isPlaying {pausePreview(refresh:false);return}
+        guard isDemo || (previewPlayer?.currentItem != nil && previewPlayer?.currentItem?.status != .failed) else {
+            compositionNotice="预览暂不可用，请稍后重试";return
+        }
         if let project,currentTime>=project.settings.end-0.05 {seek(to:project.settings.start)}
         isPlaying=true;previewPlayer?.play()
         previewTask=Task { [weak self] in
             while !Task.isCancelled {
                 do {try await Task.sleep(for:.milliseconds(80))} catch {return}
                 guard let self,self.compositionEditing,self.isPlaying,let project=self.project else {return}
-                if let time=self.previewPlayer?.currentTime().seconds,time.isFinite {
-                    self.currentTime=project.settings.start+time
-                    self.compositionCrop=CropPlan.rect(at:self.currentTime,in:self.compositionFrames)
+                if self.isDemo {self.currentTime=min(project.settings.end,self.currentTime+0.08)}
+                else if let player=self.previewPlayer,player.currentItem != nil,
+                        player.currentItem?.status != .failed,player.currentTime().seconds.isFinite {
+                    self.currentTime=min(project.settings.end,max(project.settings.start,project.settings.start+player.currentTime().seconds))
+                } else {
+                    self.pausePreview(refresh:false);self.compositionNotice="预览暂不可用，请稍后重试";return
                 }
+                self.synchronizeCompositionPosition()
                 if self.currentTime>=project.settings.end-0.02 {self.pausePreview(refresh:false);return}
             }
         }
@@ -1324,6 +1329,7 @@ extension AppModel {
         guard canRetryReviewDetection,let frame=currentReviewFrame else {return}
         analysisReview?.detected.remove(frame.id)
         analysisReview?.people.removeValue(forKey:frame.id)
+        analysisReview?.failureMessages?.removeValue(forKey:frame.id)
         analyzedPeople.removeValue(forKey:frame.id)
         detectionNotice=nil
         selectReviewFrame(at:frame.time)
@@ -1338,7 +1344,8 @@ extension AppModel {
         let key=frame.id
         observations=analysisReview?.detected.contains(key) == true ? analysisReview?.people[key]?.primary ?? [] : []
         detecting=reviewTasks[key] != nil
-        detectionNotice=observations.isEmpty && analysisReview?.detected.contains(key) == true ? "未找到候选人物，可重新识别或手动框选" : nil
+        detectionNotice=frame.body == nil ? (analysisReview?.failureMessages?[key] ??
+            (observations.isEmpty && analysisReview?.detected.contains(key) == true ? "未找到候选人物，可重新识别或手动框选" : nil)) : nil
         guard frame.body == nil,analysisReview?.detected.contains(key) != true,reviewTasks[key] == nil,
               let source=store.sourceURL(for:project) else {return}
         detecting=true;detectionNotice=nil
@@ -1348,6 +1355,7 @@ extension AppModel {
                 let found=try await pipeline.detections(source:source,time:frame.time,region:nil)
                 guard let self,!Task.isCancelled,self.reviewID==token,self.project?.id==project.id,self.isReviewing else {return}
                 self.analysisReview?.people[key] = .init(primary:found,relaxed:[])
+                self.analysisReview?.failureMessages?.removeValue(forKey:key)
                 self.analysisReview?.detected.insert(key)
                 self.analyzedPeople[key] = .init(primary:found,relaxed:[])
                 self.reviewTasks[key]=nil
@@ -1361,7 +1369,10 @@ extension AppModel {
                 // Failures are cached until the user explicitly retries this point.
                 self.analysisReview?.detected.insert(key);self.reviewTasks[key]=nil
                 self.analysisReview?.people[key] = .init(primary:[],relaxed:[])
-                if abs(self.currentTime-frame.time)<0.001 {self.detecting=false;self.observations=[];self.detectionNotice="识别失败：\(error.localizedDescription) 可重新识别或手动框选。"}
+                let message="识别失败：\(error.localizedDescription) 可重新识别或手动框选。"
+                var failures=self.analysisReview?.failureMessages ?? [:];failures[key]=message
+                self.analysisReview?.failureMessages=failures
+                if abs(self.currentTime-frame.time)<0.001 {self.detecting=false;self.observations=[];self.detectionNotice=message}
                 self.persist()
             }
         }

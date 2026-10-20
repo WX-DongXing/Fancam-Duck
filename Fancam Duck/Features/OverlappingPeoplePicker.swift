@@ -35,6 +35,7 @@ struct OverlappingPeoplePicker:View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var frame:CGImage?
     @State private var loaded:Request?
+    @State private var failed:Request?
     private struct Request:Hashable {let project:UUID;let source:URL?;let time:Double;let active:Bool;let hasPreview:Bool}
     private var request:Request {.init(project:projectID,source:source,time:time,active:scenePhase == .active,hasPreview:preview != nil)}
     var body:some View {
@@ -45,7 +46,7 @@ struct OverlappingPeoplePicker:View {
             .accessibilityElement(children:.contain).accessibilityIdentifier("overlappingPeoplePicker")
             .task(id:request) {
                 let key=request
-                frame=nil;loaded=nil
+                frame=nil;loaded=nil;failed=nil
                 guard key.active,!demo,preview == nil,let source=key.source else {return}
                 let generator=AVAssetImageGenerator(asset:AVURLAsset(url:source))
                 generator.appliesPreferredTrackTransform=true
@@ -53,10 +54,15 @@ struct OverlappingPeoplePicker:View {
                 generator.requestedTimeToleranceBefore = .zero
                 generator.requestedTimeToleranceAfter = .zero
                 do {
-                    let result=try await generator.image(at:CMTime(seconds:key.time,preferredTimescale:60000))
+                    let result=try await withTaskCancellationHandler {
+                        try await generator.image(at:CMTime(seconds:key.time,preferredTimescale:60000))
+                    } onCancel: {generator.cancelAllCGImageGeneration()}
                     guard !Task.isCancelled else {return}
                     frame=result.image;loaded=key
-                } catch { /* The candidate remains selectable while the frame is unavailable. */ }
+                } catch {
+                    guard !Task.isCancelled else {return}
+                    failed=key
+                }
             }
     }
     private var thumbnails:some View {
@@ -80,14 +86,21 @@ struct OverlappingPeoplePicker:View {
         GeometryReader {geometry in
             let crop=body.cgRect.insetBy(dx:-body.width*0.12,dy:-body.height*0.08).intersection(CGRect(x:0,y:0,width:1,height:1))
             let scale=max(geometry.size.width/max(1,sourceSize.width*crop.width),geometry.size.height/max(1,sourceSize.height*crop.height))
-            Group {
-                if demo {DemoStage(time:time,target:nil)}
-                else if let image=preview ?? (loaded == request ? frame : nil) {Image(decorative:image,scale:1).resizable()}
-                else {Color.black.overlay {ProgressView().tint(.white)}}
-            }
-            .frame(width:sourceSize.width*scale,height:sourceSize.height*scale)
-            .position(x:geometry.size.width/2+(0.5-crop.midX)*sourceSize.width*scale,
-                      y:(0.5-crop.minY)*sourceSize.height*scale)
+            let image=preview ?? (loaded == request ? frame : nil)
+            ZStack {
+                Color.black
+                if demo || image != nil {
+                    Group {
+                        if demo {DemoStage(time:time,target:nil)}
+                        else if let image {Image(decorative:image,scale:1).resizable()}
+                    }
+                    .frame(width:sourceSize.width*scale,height:sourceSize.height*scale)
+                    .position(x:geometry.size.width/2+(0.5-crop.midX)*sourceSize.width*scale,
+                              y:(0.5-crop.minY)*sourceSize.height*scale)
+                } else if failed == request || source == nil {
+                    Image(systemName:"person.crop.rectangle").font(.title3).foregroundStyle(.secondary)
+                } else {ProgressView().tint(.white)}
+            }.frame(width:geometry.size.width,height:geometry.size.height)
         }.allowsHitTesting(false).accessibilityHidden(true)
     }
 }
