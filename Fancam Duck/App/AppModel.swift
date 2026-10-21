@@ -993,10 +993,15 @@ extension AppModel {
         let cachedAutomatic=compositionAutomaticSettings==automatic ? compositionAutomaticFrames : []
         compositionBusy=true
         compositionTask=Task { [weak self] in
-            let computed=await Task.detached(priority:.userInitiated) {
+            let calculation=Task.detached(priority:.userInitiated) {
                 (CropPlan.renderFrames(CropPlan.make(samples:samples,source:source,settings:settings),frameRate:project.metadata.frameRate,preserving:settings.compositionAnchor?.time),
                  cachedAutomatic.isEmpty ? CropPlan.renderFrames(CropPlan.make(samples:samples,source:source,settings:automatic),frameRate:project.metadata.frameRate) : cachedAutomatic)
-            }.value
+            }
+            let computed=await withTaskCancellationHandler {
+                await calculation.value
+            } onCancel: {
+                calculation.cancel()
+            }
             guard let self,!Task.isCancelled,self.compositionEditing,self.compositionID==id,self.project?.id==project.id else { return }
             self.compositionFrames=computed.0;self.compositionAutomaticFrames=computed.1;self.compositionAutomaticSettings=automatic
             self.synchronizeCompositionPosition()
@@ -1265,7 +1270,9 @@ extension AppModel {
     }
     func setRedactionRegion(_ region:RedactionSettings.Region) {
         guard settingsEnabled,project?.settings.redaction.region != region else {return}
-        project?.settings.redaction.region=region;project?.redactionPlan=nil
+        project?.settings.redaction.region=region
+        project?.settings.redaction.strength=RedactionSettings.defaultStrength(for:region)
+        project?.redactionPlan=nil
         if region == .person,project?.settings.redaction.style == .image {project?.settings.redaction.style = .frosted}
         refreshRedactionPreview();persist()
     }

@@ -5,6 +5,7 @@ struct CropPlan {
     /// A steady lens: constant zoom and vertical framing; only pan when the dancer needs room.
     /// Solve a bounded camera path with velocity and acceleration penalties, independently of detections.
     static func make(samples:[TargetSample],source:CGSize,settings:EditSettings) -> [Frame] {
+        guard !Task.isCancelled else {return []}
         var unique:[Int:TargetSample]=[:]
         for s in samples where s.time.isFinite && s.body.isValid { unique[Int((s.time*10000).rounded())]=s }
         let sorted=unique.values.sorted { $0.time<$1.time }
@@ -52,6 +53,7 @@ struct CropPlan {
         let velocity:Double=settings.followSpeed == .gentle ? 100 : settings.followSpeed == .standard ? 50 : 18
         let acceleration:Double=settings.followSpeed == .gentle ? 1200 : settings.followSpeed == .standard ? 500 : 150
         let x=solve(times:sorted.map(\.time),preferred:preferred,lower:lower,upper:upper,velocity:velocity,acceleration:acceleration,jerk:settings.followSpeed == .gentle ? 6000 : settings.followSpeed == .standard ? 3000 : 600)
+        guard x.count==sorted.count else {return []}
         return sorted.indices.map { i in Frame(time:sorted[i].time,rect:CGRect(x:x[i]*source.width-width/2,y:cy-height/2,width:width,height:height)) }
     }
     /// Preserve the chosen lens and reference-frame placement even when later poses
@@ -85,6 +87,7 @@ struct CropPlan {
                     velocity:gentle ? 100 : standard ? 50 : 18,
                     acceleration:gentle ? 1200 : standard ? 500 : 150,
                     jerk:gentle ? 6000 : standard ? 3000 : 600)
+        guard x.count==samples.count else {return []}
         return samples.indices.map {.init(time:samples[$0].time,rect:.init(x:x[$0]*source.width-width/2,y:cy-height/2,width:width,height:height))}
     }
     static func clipped(_ frames:[Frame],start:Double,end:Double) -> [Frame] {
@@ -134,6 +137,7 @@ struct CropPlan {
         var z=preferred.indices.map { min(upper[$0],max(lower[$0],preferred[$0])) }
         var dual=Array(repeating:0.0,count:n),x=dual,y=dual
         for _ in 0..<600 {
+            if Task.isCancelled {return []}
             for i in 0..<n {
                 var rhs=preferred[i]+rho*(z[i]-dual[i])
                 if i>0 { for k in max(0,i-3)..<i { rhs-=factor[i*band+i-k]*y[k] } }
@@ -158,6 +162,7 @@ struct CropPlan {
     /// Monotone cubic interpolation at rendered frame times removes 10Hz velocity
     /// corners without overshooting adjacent positions or the source boundaries.
     static func renderFrames(_ plan:[Frame],frameRate:Double,preserving time:Double?=nil) -> [Frame] {
+        guard !Task.isCancelled else {return []}
         guard plan.count>2,frameRate.isFinite,frameRate>0 else { return plan }
         let times=plan.map(\.time),centers=plan.map {Double($0.rect.midX)}
         let slopes=(1..<plan.count).map {(centers[$0]-centers[$0-1])/(times[$0]-times[$0-1])}
@@ -178,6 +183,7 @@ struct CropPlan {
             renderTimes.append(time);renderTimes.sort()
         }
         for time in renderTimes {
+            if Task.isCancelled {return []}
             while index+1<plan.count-1 && times[index+1]<time { index+=1 }
             let dt=times[index+1]-times[index],u=min(1,max(0,(time-times[index])/dt))
             let a=centers[index],b=centers[index+1],u2=u*u,u3=u2*u

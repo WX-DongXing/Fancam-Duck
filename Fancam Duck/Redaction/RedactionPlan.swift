@@ -16,14 +16,15 @@ struct RedactionSettings: Codable, Equatable, Sendable {
     var imageData: Data?
     var subjects: [RedactionSubject] = []
     var region: Region = .face
-    static let defaultStrength=0.1
+    static let defaultStrength=0.8
+    static func defaultStrength(for region:Region) -> Double {region == .face ? 0.8 : 0.3}
     static func displayStrength(_ value:Double) -> Int {Int((min(1,max(0,value))*100).rounded())}
     static func renderStrength(_ value:Double) -> Double {min(1,max(0,value))*0.3}
     var strength: Double = RedactionSettings.defaultStrength
     var allOthers = false
     var enabled: Bool { allOthers || !subjects.isEmpty }
-    init(subjects:[RedactionSubject]=[],region:Region = .face,strength:Double=RedactionSettings.defaultStrength,style:Style = .frosted,imageData:Data?=nil,allOthers:Bool=false) {
-        self.subjects=subjects;self.region=region;self.strength=strength;self.style=style;self.imageData=imageData;self.allOthers=allOthers
+    init(subjects:[RedactionSubject]=[],region:Region = .face,strength:Double?=nil,style:Style = .frosted,imageData:Data?=nil,allOthers:Bool=false) {
+        self.subjects=subjects;self.region=region;self.strength=strength ?? Self.defaultStrength(for:region);self.style=style;self.imageData=imageData;self.allOthers=allOthers
     }
     private enum CodingKeys:String,CodingKey {case subjects,region,strength,style,imageData,allOthers}
     init(from decoder:Decoder) throws {
@@ -31,7 +32,7 @@ struct RedactionSettings: Codable, Equatable, Sendable {
         allOthers=try values.decodeIfPresent(Bool.self,forKey:.allOthers) ?? false
         subjects=try values.decodeIfPresent([RedactionSubject].self,forKey:.subjects) ?? []
         region=try values.decodeIfPresent(Region.self,forKey:.region) ?? .face
-        strength=try values.decodeIfPresent(Double.self,forKey:.strength) ?? Self.defaultStrength
+        strength=try values.decodeIfPresent(Double.self,forKey:.strength) ?? Self.defaultStrength(for:region)
         style=try values.decodeIfPresent(Style.self,forKey:.style) ?? .frosted
         imageData=try values.decodeIfPresent(Data.self,forKey:.imageData)
     }
@@ -94,17 +95,24 @@ struct RedactionPlan: Codable, Equatable, Sendable {
         }
     }
     static func rectangle(at time: Double, frames: [RedactionFrame]) -> NormalizedRect? {
+        interpolate(at:time,frames:frames,timeKey:\.time,rectKey:\.rect)
+    }
+    static func rectangle(at time:Double,samples:[TargetSample]) -> NormalizedRect? {
+        interpolate(at:time,frames:samples,timeKey:\.time,rectKey:\.body)
+    }
+    private static func interpolate<Frame>(at time:Double,frames:[Frame],timeKey:KeyPath<Frame,Double>,rectKey:KeyPath<Frame,NormalizedRect>) -> NormalizedRect? {
         guard time.isFinite, let first = frames.first, let last = frames.last else { return nil }
-        if time <= first.time { return first.rect }
-        if time >= last.time { return last.rect }
+        if time <= first[keyPath:timeKey] { return first[keyPath:rectKey] }
+        if time >= last[keyPath:timeKey] { return last[keyPath:rectKey] }
         var low = 0, high = frames.count - 1
         while low + 1 < high {
             let middle = (low + high) / 2
-            if frames[middle].time <= time { low = middle } else { high = middle }
+            if frames[middle][keyPath:timeKey] <= time { low = middle } else { high = middle }
         }
-        let a = frames[low], b = frames[high], u = (time-a.time)/(b.time-a.time)
-        return .init(x:a.rect.x+(b.rect.x-a.rect.x)*u, y:a.rect.y+(b.rect.y-a.rect.y)*u,
-                     width:a.rect.width+(b.rect.width-a.rect.width)*u, height:a.rect.height+(b.rect.height-a.rect.height)*u)
+        let a=frames[low][keyPath:rectKey],b=frames[high][keyPath:rectKey]
+        let start=frames[low][keyPath:timeKey],end=frames[high][keyPath:timeKey],u=(time-start)/(end-start)
+        return .init(x:a.x+(b.x-a.x)*u, y:a.y+(b.y-a.y)*u,
+                     width:a.width+(b.width-a.width)*u, height:a.height+(b.height-a.height)*u)
     }
 }
 struct RedactionIssue: Sendable {
@@ -185,7 +193,7 @@ enum RedactionMotion {
 enum RedactionPolicy {
     static func primaryBody(project:VideoProject,time:Double,samples:[TargetSample]) -> NormalizedRect? {
         if let first=samples.first,let last=samples.last,time>=first.time-0.001,time<=last.time+0.001 {
-            return RedactionPlan.rectangle(at:time,frames:samples.map {.init(time:$0.time,rect:$0.body)})
+            return RedactionPlan.rectangle(at:time,samples:samples)
         }
         return abs(time-project.targetTime)<0.06 ? project.target : nil
     }

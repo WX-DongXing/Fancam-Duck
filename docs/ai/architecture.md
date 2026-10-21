@@ -29,7 +29,7 @@ editing（已分析）→ processing（准备打码／生成）→ completed（�
 
 图示为主要业务路径，不是所有方法的调用表。`ProcessingGate.canContinue` 校验目标与明确选择；`AppModel.canConfirm` 还校验检测、恢复、构图手势等忙状态。新工作台通过 `advanceWorkflow` 区分首次分析与已有分析后的生成。首次分析完成留在 editor；生成实际 MP4 后使用 completed 状态，仍留在 editor，导出仅保存文件。`readyToExport` 与独立 export 路由保留给现有兼容调用，不作为新工作台的首次分析完成态。
 
-`togglePreview` 和普通 `scrub` 仅在 editing 允许。`seek` 仍用于阻塞纠正中的明确帧检查。不能为了禁用普通时间轴把全部纠正寻帧也禁掉。
+`togglePreview` 用于 editing 的原片／构图播放；工作台成片播放由 EditorView 控制。普通 `scrub` 在 editing 寻帧原片，completed／readyToExport 寻帧成片并减去片段起点；处理和身份阻塞期间仍禁用普通拖动。`seek` 保留阻塞纠正中的明确帧检查，不能连同普通拖动一起禁用。
 
 编辑期候选检测不应阻止已有主角的构图、打码设置。进入构图或手动框选会使旧候选检测失效；检测任务退出时仅清理同项目、同 detectionID 的忙碌状态，避免旧任务清掉新任务状态。项目恢复、构图预览准备期间通过 `editorActivityText` 和主按钮说明等待原因。构图取消不随面板计算禁用；处理／导出／身份阻塞的业务限制保持独立。
 

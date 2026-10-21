@@ -56,6 +56,34 @@ final class MediaIntegrationTests: XCTestCase {
         XCTAssertGreaterThan(Set(previews.map(\.1)).count,1)
     }
 
+    @MainActor func testRedactedPreviewReusesCameraFramesAndExportsTrimmedSyntheticVideo() async throws {
+        let source=try await makeVideo(animated:true)
+        defer {try? FileManager.default.removeItem(at:source)}
+        let metadata=try await MediaService.shared.metadata(url:source)
+        var project=VideoProject(title:"Synthetic camera reuse",metadata:metadata,settings:EditSettings())
+        project.settings.start=0.1;project.settings.end=0.9
+        project.settings.resolution = .init(width:54,height:96)
+        let samples=(0...6).map {TargetSample(time:Double($0)/6,body:.init(x:0.2+Double($0)*0.04,y:0.15,width:0.2,height:0.7))}
+        project.target=samples[0].body;project.targetTime=0
+        project.settings.redaction = .init(allOthers:true)
+        project.redactionPlan = .init(subjects:[],region:.face,start:0,end:1,tracks:[],
+            automaticTimes:samples.map(\.time),automaticPrimary:.init(time:0,body:samples[0].body))
+        let expected=CropPlan.renderFrames(CropPlan.make(samples:samples,source:metadata.size,settings:project.settings),frameRate:metadata.frameRate)
+        let exporter=VideoExporter()
+        let preview=try await exporter.preview(source:source,project:project,samples:samples)
+        let video=try XCTUnwrap(preview.videoComposition)
+        let instruction=try XCTUnwrap(video.instructions.first as? RedactionInstruction)
+        XCTAssertEqual(instruction.crops.map(\.time),expected.map(\.time))
+        XCTAssertEqual(instruction.crops.map(\.rect),expected.map(\.rect))
+        XCTAssertEqual(instruction.sourceStart,0.1,accuracy:0.0001)
+        XCTAssertEqual(instruction.timeRange.duration.seconds,0.8,accuracy:0.0001)
+        let output=try await exporter.exportMovingCrop(source:source,project:project,samples:samples)
+        defer {try? FileManager.default.removeItem(at:output)}
+        let result=try await MediaService.shared.metadata(url:output)
+        XCTAssertEqual(result.width,54);XCTAssertEqual(result.height,96)
+        XCTAssertEqual(result.duration,0.8,accuracy:1/30)
+    }
+
     private func makeVideo(rotated: Bool = false, animated:Bool=false) async throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mov")
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)

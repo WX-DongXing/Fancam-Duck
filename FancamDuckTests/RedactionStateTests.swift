@@ -30,6 +30,16 @@ private actor RedactionReviewPipeline: TargetTracking {
 }
 
 @MainActor final class RedactionStateTests: XCTestCase {
+    func testChangingRegionAppliesItsDefaultWithoutOverwritingUnchangedRegion() {
+        let model=AppModel();model.startDemo();defer {model.goHome()}
+        XCTAssertEqual(model.project?.settings.redaction.strength,0.8)
+        model.setRedactionRegion(.person)
+        XCTAssertEqual(model.project?.settings.redaction.strength,0.3)
+        model.setRedactionStrength(0.45);model.setRedactionRegion(.person)
+        XCTAssertEqual(model.project?.settings.redaction.strength,0.45)
+        model.setRedactionRegion(.face)
+        XCTAssertEqual(model.project?.settings.redaction.strength,0.8)
+    }
     func testLegacyMaskProjectUpgradesToAllOthersAndProcessesWithoutReselecting() async throws {
         let directory=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer {try? FileManager.default.removeItem(at:directory)}

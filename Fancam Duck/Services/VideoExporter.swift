@@ -28,6 +28,7 @@ actor VideoExporter:VideoExporting {
         return item
     }
     private func composition(source: URL, project: VideoProject, samples: [TargetSample]) async throws -> (AVMutableComposition, AVMutableVideoComposition, AVMutableAudioMix?) {
+        try Task.checkCancellation()
         guard let target = project.target, target.isValid else { throw MediaError.noVideo }
         if project.settings.redaction.enabled {
             guard RedactionPolicy.conflicts(project:project,samples:samples).isEmpty else {throw RedactionError.primaryTarget}
@@ -79,19 +80,31 @@ actor VideoExporter:VideoExporting {
         let renderTransform = transform
             .concatenating(CGAffineTransform(translationX: -uprightBounds.minX - crop.minX, y: -uprightBounds.minY - crop.minY))
             .concatenating(CGAffineTransform(scaleX: scaleX, y: scaleY))
-        let instruction = AVMutableVideoCompositionInstruction()
-        instruction.timeRange = CMTimeRange(start: .zero, duration: interval.duration)
-        let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
-        layer.setTransform(renderTransform, at: .zero)
         let sourceRate=Double(try await video.load(.nominalFrameRate))
         let rate=sourceRate.isFinite && sourceRate>0 ? min(60,sourceRate) : 30
+        // Solve once. The custom compositor consumes these frames directly and does not
+        // use AVFoundation layer ramps, so avoid constructing the discarded composition.
+        let frames = samples.isEmpty ? [CropPlan.Frame(time:start,rect:crop)] : CropPlan.renderFrames(
+            CropPlan.make(samples:samples,source:uprightBounds.size,settings:project.settings),
+            frameRate:rate,preserving:project.settings.compositionAnchor?.time)
+        try Task.checkCancellation()
+        let plan=CropPlan.clipped(frames,start:start,end:end)
+        #if DEBUG
+        if !samples.isEmpty,let data=try? JSONEncoder().encode(plan) {try? data.write(to:FileManager.default.temporaryDirectory.appendingPathComponent("FancamDuck-last-camera.json"),options:.atomic)}
+        #endif
+        let range=CMTimeRange(start:.zero,duration:interval.duration)
+        let renderSize=CGSize(width:output.width,height:output.height)
+        if project.settings.redaction.enabled,let redaction=project.redactionPlan {
+            let normalized=transform.concatenating(.init(translationX:-uprightBounds.minX,y:-uprightBounds.minY))
+            let rendered=RedactionRenderer.composition(trackID:videoTrack.trackID,range:range,transform:normalized,
+                source:uprightBounds.size,output:renderSize,start:start,crops:frames,plan:redaction,strength:project.settings.redaction.strength,rate:rate,style:project.settings.redaction.style,imageData:project.settings.redaction.imageData)
+            return (composition,rendered,audioMix)
+        }
+        let instruction = AVMutableVideoCompositionInstruction()
+        instruction.timeRange = range
+        let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
+        layer.setTransform(renderTransform, at: .zero)
         if !samples.isEmpty {
-            let path = CropPlan.make(samples:samples,source:uprightBounds.size,settings:project.settings)
-            let fullPlan = CropPlan.renderFrames(path,frameRate:rate,preserving:project.settings.compositionAnchor?.time)
-            let plan = CropPlan.clipped(fullPlan,start:start,end:end)
-            #if DEBUG
-            if let data=try? JSONEncoder().encode(plan) { try? data.write(to:FileManager.default.temporaryDirectory.appendingPathComponent("FancamDuck-last-camera.json"),options:.atomic) }
-            #endif
             func transformFor(_ crop: CGRect) -> CGAffineTransform {
                 transform.concatenating(CGAffineTransform(translationX: -uprightBounds.minX-crop.minX, y: -uprightBounds.minY-crop.minY))
                     .concatenating(CGAffineTransform(scaleX: Double(output.width)/crop.width, y: Double(output.height)/crop.height))
@@ -111,13 +124,6 @@ actor VideoExporter:VideoExporting {
         videoComposition.instructions = [instruction]
         videoComposition.renderSize = CGSize(width: output.width, height: output.height)
         videoComposition.frameDuration=CMTime(seconds:1/rate,preferredTimescale:60000)
-        if project.settings.redaction.enabled, let plan=project.redactionPlan {
-            let normalized=transform.concatenating(.init(translationX:-uprightBounds.minX,y:-uprightBounds.minY))
-            let crops = samples.isEmpty ? [CropPlan.Frame(time:start,rect:crop)] : CropPlan.renderFrames(CropPlan.make(samples:samples,source:uprightBounds.size,settings:project.settings),frameRate:rate,preserving:project.settings.compositionAnchor?.time)
-            let rendered=RedactionRenderer.composition(trackID:videoTrack.trackID,range:instruction.timeRange,transform:normalized,
-                source:uprightBounds.size,output:videoComposition.renderSize,start:start,crops:crops,plan:plan,strength:project.settings.redaction.strength,rate:rate,style:project.settings.redaction.style,imageData:project.settings.redaction.imageData)
-            return (composition,rendered,audioMix)
-        }
         return (composition, videoComposition, audioMix)
     }
     nonisolated static func validateTrajectory(_ samples:[TargetSample],project:VideoProject) throws {

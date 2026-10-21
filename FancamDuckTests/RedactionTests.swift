@@ -296,10 +296,18 @@ final class RedactionTests: XCTestCase {
             XCTAssertEqual(RedactionSettings.displayStrength(Double(level)/100),level)
         }
     }
+    func testRegionDefaultsAndMissingStrengthDecodeUseFace80AndBody30() throws {
+        XCTAssertEqual(RedactionSettings().strength,0.8)
+        XCTAssertEqual(RedactionSettings(region:.person).strength,0.3)
+        let decoder=JSONDecoder()
+        XCTAssertEqual(try decoder.decode(RedactionSettings.self,from:Data("{}".utf8)).strength,0.8)
+        XCTAssertEqual(try decoder.decode(RedactionSettings.self,from:Data("{\"region\":\"整个人物\"}".utf8)).strength,0.3)
+        XCTAssertEqual(try decoder.decode(RedactionSettings.self,from:Data("{\"region\":\"整个人物\",\"strength\":0.41}".utf8)).strength,0.41)
+    }
     func testStrengthScaleMatchesPreviousThirtyPercentAtMaximum() {
         XCTAssertEqual(RedactionSettings.renderStrength(0),0)
         XCTAssertEqual(RedactionSettings.renderStrength(1),0.3,accuracy:0.000001)
-        XCTAssertEqual(RedactionSettings.renderStrength(RedactionSettings.defaultStrength),0.03,accuracy:0.000001)
+        XCTAssertEqual(RedactionSettings.renderStrength(RedactionSettings.defaultStrength),0.24,accuracy:0.000001)
         XCTAssertEqual(RedactionSettings.renderStrength(-1),0)
         XCTAssertEqual(RedactionSettings.renderStrength(2),0.3)
     }
@@ -330,9 +338,9 @@ final class RedactionTests: XCTestCase {
         XCTAssertLessThan(try change(CGRect(x:32,y:60,width:1,height:8)),40,"The outer transition must remain subtle instead of forming an obvious hard patch")
         XCTAssertGreaterThan(try change(CGRect(x:40,y:60,width:2,height:8)),60,"Coverage must reach the face sides instead of shrinking to a small central patch")
         XCTAssertGreaterThan(try change(CGRect(x:60,y:60,width:8,height:8)),60,"The centre must retain substantial detail removal")
-        XCTAssertEqual(RedactionSettings().strength,0.1)
+        XCTAssertEqual(RedactionSettings().strength,0.8)
         let restored=try JSONDecoder().decode(RedactionSettings.self,from:Data("{}".utf8))
-        XCTAssertEqual(restored.strength,0.1)
+        XCTAssertEqual(restored.strength,0.8)
         let custom=RedactionSettings(strength:0.9)
         XCTAssertEqual(try JSONDecoder().decode(RedactionSettings.self,from:JSONEncoder().encode(custom)).strength,0.9)
     }
@@ -371,6 +379,69 @@ final class RedactionTests: XCTestCase {
         XCTAssertGreaterThan(pixel[0],240);XCTAssertLessThan(pixel[1],10);XCTAssertEqual(pixel[3],255)
         let empty=renderer.image {_ in}
         XCTAssertThrowsError(try RedactionImage.prepare(try XCTUnwrap(empty.pngData())))
+    }
+    @MainActor func testLocalDeviceGeneratedRedactionActuallyChangesPixels() async throws {
+        guard let path=ProcessInfo.processInfo.environment["FANCAM_DUCK_REDACTION_DEVICE_ROOT"] else {throw XCTSkip("Local device project validation is opt-in")}
+        let root=URL(fileURLWithPath:path),store=ProjectStore(directory:root)
+        let projects=try await store.projects()
+        var project=try XCTUnwrap(projects.first {$0.settings.redaction.enabled && $0.sourceFileName != nil && $0.progressState == "已分析 · 可预览"})
+        let stored=try await store.analysis(for:project)
+        let analysis=try XCTUnwrap(stored)
+        let source=try XCTUnwrap(store.sourceURL(for:project))
+        let samples=analysis.samples
+        project.settings.end=min(project.settings.end,project.settings.start+1)
+        project.settings.resolution = .init(width:Int((320*project.settings.aspectRatio.value/2).rounded())*2,height:320)
+        let people=try XCTUnwrap(analysis.people)
+        let frames=people.sorted {$0.key<$1.key}.map {(Double($0.key)/10000,$0.value)}
+        project.redactionPlan=try AutomaticRedaction.build(frames:frames,project:project,samples:samples)
+        let plan=try XCTUnwrap(project.redactionPlan)
+        XCTAssertTrue(plan.covers(project));XCTAssertGreaterThan(plan.tracks.count,0)
+        let exporter=VideoExporter()
+        let masked=try await exporter.exportMovingCrop(source:source,project:project,samples:samples)
+        defer {try? FileManager.default.removeItem(at:masked)}
+        project.settings.redaction.allOthers=false;project.settings.redaction.subjects=[]
+        let clear=try await exporter.exportMovingCrop(source:source,project:project,samples:samples)
+        defer {try? FileManager.default.removeItem(at:clear)}
+        let left=AVAssetImageGenerator(asset:AVURLAsset(url:masked)),right=AVAssetImageGenerator(asset:AVURLAsset(url:clear))
+        left.requestedTimeToleranceBefore = .zero;left.requestedTimeToleranceAfter = .zero
+        right.requestedTimeToleranceBefore = .zero;right.requestedTimeToleranceAfter = .zero
+        let a=try await left.image(at:CMTime(seconds:0.5,preferredTimescale:600)).image
+        let b=try await right.image(at:CMTime(seconds:0.5,preferredTimescale:600)).image
+        let difference=Self.meanDifference(a,b)
+        print("DEVICE_REDACTION tracks=\(plan.tracks.count) boxes=\(plan.rectangles(at:project.settings.start+0.5).count) pixelDifference=\(difference)")
+        XCTAssertGreaterThan(difference,0.1,"Enabled masks must visibly change a generated video frame")
+        // Exercise the same restored-project -> generate -> completed route used by the app.
+        let folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let isolated=ProjectStore(directory:folder)
+        defer {try? FileManager.default.removeItem(at:folder)}
+        try await isolated.prepare()
+        let imported=try await isolated.importFile(source)
+        project.sourceFileName=imported.lastPathComponent
+        // Seed the older unmasked output, matching the state found on the device.
+        try await isolated.save(project)
+        _ = try await isolated.saveOutput(project:project,url:clear)
+        project.settings.redaction.allOthers=true;project.redactionPlan=nil
+        try await isolated.save(project)
+        try await isolated.saveTrajectory(project:project,samples:samples,people:people)
+        let model=AppModel(store:isolated)
+        model.open(project)
+        for _ in 0..<1000 {if !model.restoringTracking && !model.detecting {break};try await Task.sleep(for:.milliseconds(10))}
+        XCTAssertTrue(model.hasCompletedTracking)
+        XCTAssertFalse(model.hasReusableOutput,"The old unmasked output must not satisfy the enabled mask recipe")
+        model.advanceWorkflow()
+        for _ in 0..<3000 {if case .completed = model.phase {break};if model.errorMessage != nil {break};try await Task.sleep(for:.milliseconds(10))}
+        XCTAssertNil(model.errorMessage)
+        guard case .completed = model.phase else {model.goHome();return XCTFail("Device workflow did not finish")}
+        XCTAssertTrue(model.project?.settings.redaction.enabled == true)
+        XCTAssertGreaterThan(model.project?.redactionPlan?.tracks.count ?? 0,0)
+        let generated=AVAssetImageGenerator(asset:AVURLAsset(url:try XCTUnwrap(model.outputURL)))
+        generated.requestedTimeToleranceBefore = .zero;generated.requestedTimeToleranceAfter = .zero
+        let workflowFrame=try await generated.image(at:CMTime(seconds:0.5,preferredTimescale:600)).image
+        let workflowDifference=Self.meanDifference(workflowFrame,b)
+        print("DEVICE_REDACTION_WORKFLOW pixelDifference=\(workflowDifference)")
+        XCTAssertGreaterThan(workflowDifference,0.1)
+        model.goHome()
+
     }
     private static func meanDifference(_ a:CGImage,_ b:CGImage) -> Double {
         let context=CIContext(),bounds=CGRect(x:0,y:0,width:a.width,height:a.height)
