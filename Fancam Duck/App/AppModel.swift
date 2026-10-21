@@ -134,9 +134,13 @@ final class AppModel {
         return ProcessingGate.canContinue(phase: phase, target: project.target, explicitlySelected: targetExplicitlySelected)
     }
     var controlsEnabled: Bool { phase.canEditTarget }
+    // Persisted status only selects the opening UI; validated trajectories still gate playback/export.
+    var showsPreviewSettings:Bool {
+        hasCompletedTracking || restoringTracking && ["已分析 · 可预览","已生成 · 待保存","已保存到相册"].contains(project?.progressState ?? "")
+    }
     var settingsEnabled: Bool { phase == .editing && !restoringTracking }
     var editorActivityText: String? {
-        if restoringTracking {return "正在恢复项目 · 设置稍后可用"}
+        if restoringTracking {return showsPreviewSettings ? nil : "正在打开项目"}
         if compositionBusy && !hasCompletedTracking {return "正在准备构图预览 · 可取消"}
         if detecting {return project?.target == nil ? "正在识别人物 · 请稍候" : "正在识别当前帧 · 可调整设置"}
         return nil
@@ -144,7 +148,7 @@ final class AppModel {
     var statusText: String {
         switch phase {
         case .editing:
-            if restoringTracking {return "正在恢复已分析结果"}
+            if restoringTracking {return showsPreviewSettings ? "预览" : "正在打开项目"}
             if let detectionNotice {return detectionNotice}
             return project?.target == nil ? (isDemo ? "轻点视频中的舞者" : (detecting ? "正在识别人物" : "轻点视频中的人物 · 可框选辅助识别")) : "已选择目标 · 确认后开始处理"
         case .processing: if let processingMessage {return processingMessage};return trackedSample?.estimated == true ? "短暂遮挡 · 正在自动找回" : "正在跟随目标舞者"
@@ -283,13 +287,16 @@ final class AppModel {
                         }
                     }
                     if let anchor=project.settings.compositionAnchor {
-                        self.seek(to:min(project.settings.end,max(project.settings.start,anchor.time)))
+                        self.currentTime=min(project.settings.end,max(project.settings.start,anchor.time))
+                        self.player?.seek(to:CMTime(seconds:self.currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero,completionHandler:{_ in})
                     }
+                    self.refreshRedactionPreview()
+                    return
                 }
-                else if output == nil && (project.targetTime<project.settings.start || project.targetTime>project.settings.end) {
+                if output == nil && (project.targetTime<project.settings.start || project.targetTime>project.settings.end) {
                     self.project?.target=nil;self.project?.settings.compositionAnchor=nil;self.targetExplicitlySelected=false
                 }
-                if let review,cached == nil {
+                if let review {
                     self.analysisReview=review;self.targetSamples=review.samples;self.analyzedPeople=review.people
                     if review.pending.isEmpty {self.completeReview()}
                     else {self.selectReviewFrame(at:review.pending[0].time)}
@@ -304,7 +311,7 @@ final class AppModel {
             guard !restoringTracking,rect.isValid,rect.width>0.015,rect.height>0.03 else {return}
             reviewSelection=rect;targetExplicitlySelected=true;return
         }
-        guard controlsEnabled, rect.isValid, rect.width > 0.015, rect.height > 0.03 else { return }
+        guard !restoringTracking,controlsEnabled, rect.isValid, rect.width > 0.015, rect.height > 0.03 else { return }
         if let issue=redactionIssue {
             guard canRedactPerson(rect) else {detectionNotice="主角不参与打码";return}
             if let index=project?.settings.redaction.subjects.firstIndex(where:{$0.id==issue.subjectID}) {
@@ -541,7 +548,7 @@ final class AppModel {
         else { confirmProcessing() }
     }
     func togglePreview() {
-        guard phase == .editing else {return}
+        guard !restoringTracking,phase == .editing else {return}
         if compositionEditing {toggleCompositionPlayback();return}
         if let project,hasCompletedTracking,project.settings.redaction.enabled,project.redactionPlan?.covers(project) != true {
             detectionNotice="确认处理后可播放完整打码效果";return
@@ -610,6 +617,7 @@ final class AppModel {
         if controlsEnabled, !isDemo { detectPeople() }
     }
     func scrub(to time:Double, within bounds:ClosedRange<Double>? = nil, sourceOnly:Bool = false) {
+        guard !restoringTracking else {return}
         if canScrubGeneratedPreview {scrubGeneratedPreview(to:time,exact:false);return}
         guard phase == .editing else {return}
         if compositionEditing && !hasCompletedTracking && !sourceOnly {return}
@@ -728,21 +736,25 @@ final class AppModel {
     }
     func persist() {
         guard var project,!project.isDemo else { return }
-        switch phase {
-        case .completed:project.progressState=savedToPhotos ? "已保存到相册" : "已生成 · 待保存"
-        case .blocked:project.progressState="待纠正"
-        case .processing,.paused:project.progressState="处理中断"
-        default:project.progressState=hasCompletedTracking ? "已分析 · 可预览" : (project.target == nil ? "待选人" : "待处理")
+        // Opening/closing a project must not downgrade its persisted analysis status.
+        if !restoringTracking {
+            switch phase {
+            case .completed:project.progressState=savedToPhotos ? "已保存到相册" : "已生成 · 待保存"
+            case .blocked:project.progressState="待纠正"
+            case .processing,.paused:project.progressState="处理中断"
+            default:project.progressState=hasCompletedTracking ? "已分析 · 可预览" : (project.target == nil ? "待选人" : "待处理")
+            }
         }
         project.updatedAt=Date();self.project=project
         let review=analysisReview
+        let preserveReview=restoringTracking
         let previous=persistenceTask
         persistenceTask=Task {
             await previous?.value
             do {
                 try await store.save(project)
                 if let review {try await store.saveReview(review,project:project)}
-                else {try await store.removeReview(project.id)}
+                else if !preserveReview {try await store.removeReview(project.id)}
                 await loadProjects()
             }
             catch { errorMessage="自动保存失败：\(error.localizedDescription)" }

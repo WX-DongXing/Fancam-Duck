@@ -2,6 +2,52 @@ import XCTest
 @testable import FancamDuck
 
 final class LivePreviewTests:XCTestCase {
+    @MainActor func testAnalyzedHistoryShowsPreviewWhileRestoringWithoutGrantingPlayback() {
+        let model=AppModel();model.startDemo();defer {model.goHome()}
+        model.project?.progressState="已分析 · 可预览"
+        model.restoringTracking=true
+        XCTAssertTrue(model.showsPreviewSettings)
+        XCTAssertFalse(model.hasCompletedTracking)
+        XCTAssertFalse(model.settingsEnabled)
+        XCTAssertNil(model.editorActivityText)
+        XCTAssertEqual(model.statusText,"预览")
+        model.togglePreview()
+        XCTAssertFalse(model.isPlaying)
+        model.restoringTracking=false
+        XCTAssertFalse(model.showsPreviewSettings,"Invalid or missing cached analysis must fall back to selection")
+        model.project?.progressState="待纠正";model.restoringTracking=true
+        XCTAssertFalse(model.showsPreviewSettings)
+    }
+    @MainActor func testEarlyExitPreservesHistoryStatusAndPendingReviewFile() async throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer {try? FileManager.default.removeItem(at:root)}
+        let store=ProjectStore(directory:root)
+        try await store.prepare()
+        let model=AppModel(store:store);model.startDemo()
+        model.project?.isDemo=false
+        model.project?.progressState="已分析 · 可预览"
+        let project=try XCTUnwrap(model.project)
+        let reviewURL=root.appendingPathComponent("review-\(project.id).json")
+        let pending=Data("pending review sentinel".utf8)
+        try pending.write(to:reviewURL)
+        model.restoringTracking=true
+        let time=model.currentTime, target=model.project?.target
+        model.scrub(to:20)
+        model.selectTarget(.init(x:0.1,y:0.1,width:0.3,height:0.6))
+        XCTAssertEqual(model.currentTime,time)
+        XCTAssertEqual(model.project?.target,target)
+        model.goHome()
+        XCTAssertEqual(model.project?.progressState,"已分析 · 可预览")
+        for _ in 0..<200 {
+            if model.projects.contains(where:{$0.id==project.id}) {break}
+            try await Task.sleep(for:.milliseconds(10))
+        }
+        let saved=try await store.projects()
+        XCTAssertEqual(saved.first?.progressState,"已分析 · 可预览")
+        XCTAssertEqual(try Data(contentsOf:reviewURL),pending)
+        XCTAssertEqual(model.route,.home)
+        XCTAssertFalse(model.restoringTracking)
+    }
     @MainActor private func ready(_ model:AppModel) async throws {
         for _ in 0..<500 {if !model.compositionBusy {return};try await Task.sleep(for:.milliseconds(10))}
         XCTFail("Preview did not become ready")

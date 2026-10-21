@@ -11,6 +11,8 @@ struct EditorView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var floatingControlsHeight:CGFloat=200
+    @State private var previewPanelExpanded=true
     @State private var settingsPanelHeights:[WorkspaceTool:CGFloat]=[:]
     @State private var activeTool: WorkspaceTool?
     @State private var lastSettingsTool:WorkspaceTool = .composition
@@ -37,10 +39,10 @@ struct EditorView: View {
         if model.generatingVideo {return "generating"}
         if isPaused {return "paused"}
         if isProcessing {return "analyzing"}
-        return model.hasCompletedTracking ? "settings" : "selection"
+        return model.showsPreviewSettings ? "settings" : "selection"
     }
     private var isCompleted:Bool {if case .completed = model.phase {return true};return false}
-    private var availableTools:[WorkspaceTool] {model.hasCompletedTracking ? [.composition,.motion,.redaction] : []}
+    private var availableTools:[WorkspaceTool] {model.showsPreviewSettings ? [.composition,.motion,.redaction] : []}
     private var isProcessing: Bool {
         switch model.phase { case .processing, .paused: true; default: false }
     }
@@ -71,6 +73,15 @@ struct EditorView: View {
                     }
                 } controls: {
                     if usesExpandedWorkspace {expandedControls}
+                    else if floatsPreviewControls {
+                        VStack(spacing:10) {
+                            editorTimeline
+                                .opacity(previewPanelExpanded ? 0 : 1)
+                                .allowsHitTesting(!previewPanelExpanded)
+                                .accessibilityHidden(previewPanelExpanded)
+                            bottomToolbar.padding(.bottom,8)
+                        }
+                    }
                     else {
                         VStack(spacing:0) {
                             if isBlocked || model.manualSelection {
@@ -90,7 +101,14 @@ struct EditorView: View {
                         }
                     }
                 }
-                // Animate the common layout so the panel, timeline and video resize together.
+                .overlay(alignment:.bottom) {
+                    if floatsPreviewControls && previewPanelExpanded {
+                        floatingPreviewControls(available:geometry.size.height)
+                            .padding(.bottom,76)
+                            .transition(.opacity.combined(with:.offset(y:16)))
+                    }
+                }
+                .animation(settingsPanelAnimation,value:previewPanelExpanded)
                 .animation(settingsPanelAnimation,value:displayedTool)
             }.frame(width: geometry.size.width, height: geometry.size.height)
             #endif
@@ -130,7 +148,7 @@ struct EditorView: View {
             await model.openExportPreview()
             openingExport=false
         }
-        .onChange(of:model.project?.id) {_,_ in openingExport=false;resumeTimelinePlayback=false;resetSelectionZoom()}
+        .onChange(of:model.project?.id) {_,_ in openingExport=false;resumeTimelinePlayback=false;previewPanelExpanded=true;resetSelectionZoom()}
         .onChange(of:showsComposition) {_,_ in resetSelectionZoom()}
         .onChange(of:isProcessing) {_,processing in if processing {resetSelectionZoom()}}
         .onChange(of:model.manualSelection) {_,manual in if manual {resetSelectionZoom()}}
@@ -145,10 +163,10 @@ struct EditorView: View {
                 Rectangle().fill(DesktopPalette.border).frame(width:1,height:24)
                 VStack(alignment:.leading,spacing:3) {
                     Text(model.project?.title ?? "视频编辑").font(.system(size:14,weight:.semibold)).lineLimit(1)
-                    Text(model.hasCompletedTracking ? "FANCAM DUCK  /  预览" : "FANCAM DUCK  /  人物分析").font(.system(size:9,weight:.medium,design:.monospaced)).foregroundStyle(.secondary)
+                    Text(model.showsPreviewSettings ? "FANCAM DUCK  /  预览" : "FANCAM DUCK  /  人物分析").font(.system(size:9,weight:.medium,design:.monospaced)).foregroundStyle(.secondary)
                 }
                 Spacer(minLength:8)
-                if model.hasCompletedTracking && !isProcessing && !isCompleted {exportPreviewButton}
+                if model.showsPreviewSettings && !isProcessing && !isCompleted {exportPreviewButton}
             }.padding(.horizontal,20).frame(height:64).background(DesktopPalette.panel).zIndex(100)
             Divider()
             HStack(spacing:0) {
@@ -182,7 +200,7 @@ struct EditorView: View {
                 DesktopFact(title:"视频时长",value:((model.project?.settings.end ?? 0)-(model.project?.settings.start ?? 0)).videoTime)
                 DesktopFact(title:"分辨率",value:model.project?.settings.resolution.label ?? "")
             } else if !isProcessing {
-                if model.hasCompletedTracking {
+                if model.showsPreviewSettings {
                     if let tool=displayedTool {
                         settingsPanel(tool)
                             .fixedSize(horizontal:false,vertical:true)
@@ -205,7 +223,7 @@ struct EditorView: View {
                 }
             } else {
                 HStack(spacing:12) {
-                    if model.hasCompletedTracking {toolSelector}
+                    if model.showsPreviewSettings {toolSelector}
                     else {processingAction.frame(maxWidth:.infinity)}
                 }
             }
@@ -218,7 +236,7 @@ struct EditorView: View {
     private var header: some View {
         HStack {
             StudioIcon(symbol: "chevron.left", label: "返回项目首页") { returnToHome() }
-                .frame(width:model.hasCompletedTracking ? 72 : 44,alignment:.leading)
+                .frame(width:model.showsPreviewSettings ? 72 : 44,alignment:.leading)
             Spacer()
             Group {
                 if isBlocked {
@@ -229,11 +247,11 @@ struct EditorView: View {
                     Text(model.phase.progress>=0.9 ? "补全片段" : "人物分析").font(.system(size:15,weight:.medium))
                         .accessibilityIdentifier("processingStatus").accessibilityLabel(model.statusText).accessibilityValue(model.currentTime.videoTime)
                 } else {
-                    Text(model.hasCompletedTracking || isCompleted ? "预览" : "人物分析").font(.system(size: 15, weight: .medium))
+                    Text(model.showsPreviewSettings || isCompleted ? "预览" : "人物分析").font(.system(size: 15, weight: .medium))
                 }
             }
             Spacer()
-            if model.hasCompletedTracking && !isProcessing && !isCompleted {
+            if model.showsPreviewSettings && !isProcessing && !isCompleted {
                 exportPreviewButton
             } else {
                 Color.clear.frame(width:44,height:44).accessibilityHidden(true)
@@ -241,7 +259,7 @@ struct EditorView: View {
         }.padding(.horizontal, 18).frame(height: 52)
     }
     private var showsComposition: Bool {
-        (model.compositionEditing || model.hasCompletedTracking && !isBlocked)
+        (model.compositionEditing || model.showsPreviewSettings && !isBlocked)
             && model.compositionCrop != nil
     }
     private var overlappingPeople:[OverlapPerson] {
@@ -282,7 +300,7 @@ struct EditorView: View {
                     .accessibilityElement(children:showsComposition ? .contain : .ignore)
                     .accessibilityLabel(isCompleted ? "成片预览" : showsComposition ? "构图预览" : "原片画面")
                             .accessibilityIdentifier(showsComposition ? "compositionViewport" : "sourceVideoSurface")
-                if !model.redactionEditing && !model.compositionEditing && model.controlsEnabled && (!model.hasCompletedTracking || isBlocked) && !isCompleted && !model.manualSelection && !model.isPlaying && !timelineTrimming {
+                if !model.redactionEditing && !model.compositionEditing && model.controlsEnabled && (!model.showsPreviewSettings || isBlocked) && !isCompleted && !model.manualSelection && !model.isPlaying && !timelineTrimming {
                     ForEach(people, id: \.id) { person in
                         let number = person.number, box = person.box
                         Button { model.selectTarget(box) } label: {
@@ -330,7 +348,7 @@ struct EditorView: View {
                 .accessibilityAction(named:"放大人物画面") {if selectionZoomEnabled {selectionZoom=min(4,selectionZoom*1.5)}}
                 if !isProcessing && !isCompleted && !model.compositionEditing && !showsOverlapThumbnails {
                     HStack(spacing: 8) {
-                        if model.detecting || model.restoringTracking { ProgressView().tint(.white) }
+                        if model.detecting || model.restoringTracking && !model.showsPreviewSettings { ProgressView().tint(.white) }
                         Text(sourceHint).font(.system(size: 11)).foregroundStyle(.white.opacity(0.65)).lineLimit(2)
                     }.padding(.horizontal, 20).frame(height: 44).padding(.bottom,58).allowsHitTesting(false)
                 }
@@ -342,7 +360,7 @@ struct EditorView: View {
                         .frame(width:max(1,geometry.size.width-36),height:60)
                         .position(x:geometry.size.width/2,y:max(30,geometry.size.height-100))
                 }
-                if model.hasCompletedTracking && !isProcessing && !isCompleted {
+                if model.showsPreviewSettings && !isProcessing && !isCompleted {
                     HStack(spacing:28) {
                         StudioIcon(symbol:"gobackward.5",label:"后退 5 秒") {model.skipPreview(by:-5)}
                             .accessibilityIdentifier("previewBackward")
@@ -350,14 +368,14 @@ struct EditorView: View {
                         StudioIcon(symbol:"goforward.5",label:"前进 5 秒") {model.skipPreview(by:5)}
                             .accessibilityIdentifier("previewForward")
                     }.disabled(timelineTrimming || model.compositionAdjusting)
-                        .position(x:geometry.size.width/2,y:max(22,geometry.size.height-36))
+                        .position(x:geometry.size.width/2,y:max(22,geometry.size.height-(floatsPreviewControls && previewPanelExpanded ? max(36,floatingControlsHeight-80) : 36)))
                 } else {playbackControl
                     .position(x:geometry.size.width/2,y:max(22,geometry.size.height-36))}
-                if model.hasCompletedTracking && model.compositionBusy {
+                if model.showsPreviewSettings && model.compositionBusy {
                     HStack(spacing:6) {ProgressView().controlSize(.mini);Text("正在更新预览")}
                         .font(.caption2).padding(.horizontal,10).padding(.vertical,6)
                         .background(.ultraThinMaterial,in:Capsule()).allowsHitTesting(false)
-                        .position(x:geometry.size.width/2,y:max(22,geometry.size.height-82))
+                        .position(x:geometry.size.width/2,y:max(22,geometry.size.height-(floatsPreviewControls && previewPanelExpanded ? max(82,floatingControlsHeight-34) : 82)))
                 }
                 ZStack {
                     if selectionZoomEnabled && zoom>1.001 {
@@ -377,9 +395,10 @@ struct EditorView: View {
             .animation(reduceMotion ? nil : .smooth(duration:0.32),value:model.project?.settings.aspectRatio)
     }
     private var sourceHint: String {
+        if model.restoringTracking && model.showsPreviewSettings {return ""}
         if model.manualSelection { return model.detectionNotice ?? "拖动框体或方向微调 · 按住圆心偏移移动" }
         if let activity=model.editorActivityText {return activity}
-        if model.phase == .editing,model.hasCompletedTracking,let project=model.project,
+        if model.phase == .editing,model.showsPreviewSettings,let project=model.project,
            project.settings.redaction.enabled,project.redactionPlan?.covers(project) != true {
             return "打码已更改 · 重新生成后可播放"
         }
@@ -487,7 +506,7 @@ struct EditorView: View {
                 else {model.togglePreview()}
         }
         .accessibilityIdentifier("editorPlayback").keyboardShortcut(.space,modifiers:[])
-        .disabled(isProcessing || model.isReviewing || model.manualSelection || timelineTrimming || (!isCompleted && !model.compositionEditing && model.hasCompletedTracking && model.project?.settings.redaction.enabled == true && model.project?.redactionPlan?.covers(model.project!) != true) || model.compositionEditing && !model.hasCompletedTracking)
+        .disabled(model.restoringTracking || isProcessing || model.isReviewing || model.manualSelection || timelineTrimming || (!isCompleted && !model.compositionEditing && model.showsPreviewSettings && model.project?.settings.redaction.enabled == true && model.project?.redactionPlan?.covers(model.project!) != true) || model.compositionEditing && !model.hasCompletedTracking)
     }
 
     private var playbackRow: some View {
@@ -503,12 +522,90 @@ struct EditorView: View {
 
     // Ending an editing session must not clear the selected settings tab.
     private var displayedTool:WorkspaceTool? {
-        model.hasCompletedTracking && model.phase == .editing ? (activeTool ?? lastSettingsTool) : activeTool
+        model.showsPreviewSettings && model.phase == .editing ? (activeTool ?? lastSettingsTool) : activeTool
+    }
+    private var floatsPreviewControls:Bool {
+        #if targetEnvironment(macCatalyst)
+        false
+        #else
+        !usesExpandedWorkspace && model.showsPreviewSettings && model.phase == .editing && !isBlocked && !model.manualSelection
+        #endif
+    }
+    private func floatingPreviewControls(available:CGFloat)->some View {
+        VStack(spacing:0) {
+            Button {
+                withAnimation(settingsPanelAnimation) {previewPanelExpanded=false}
+            } label: {
+                Capsule().fill(.secondary).frame(width:36,height:4)
+                    .frame(maxWidth:.infinity).frame(height:28).contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityLabel("收起设置")
+                .accessibilityIdentifier("previewPanelClose")
+                .gesture(DragGesture(minimumDistance:15).onEnded {value in
+                    if abs(value.translation.height)>abs(value.translation.width) {
+                        withAnimation(settingsPanelAnimation) {previewPanelExpanded=value.translation.height<0}
+                    }
+                })
+            if previewPanelExpanded,let tool=displayedTool {
+                settingsContent(tool)
+                    .padding(.horizontal,12).padding(.bottom,12)
+                    .fixedSize(horizontal:false,vertical:true)
+                    .accessibilityElement(children:.contain).accessibilityIdentifier("adjustmentPanel")
+                    .disabled(model.restoringTracking)
+                    .id(tool)
+                    .transition(.opacity.combined(with:.offset(y:8)))
+            }
+        }
+        .background(.regularMaterial,in:RoundedRectangle(cornerRadius:24))
+        .overlay {RoundedRectangle(cornerRadius:24).strokeBorder(.white.opacity(0.1))}
+        .padding(.horizontal,18).padding(.bottom,6)
+        .onGeometryChange(for:CGFloat.self) {$0.size.height} action: {height in
+            if abs(floatingControlsHeight-height)>0.5 {floatingControlsHeight=height}
+        }
+        .animation(settingsPanelAnimation,value:previewPanelExpanded)
+        .animation(settingsPanelAnimation,value:displayedTool)
+        .accessibilityElement(children:.contain).accessibilityIdentifier("floatingPreviewControls")
+    }
+    @ViewBuilder private func settingsContent(_ tool:WorkspaceTool)->some View {
+        switch tool {
+        case .composition:compositionPanel
+        case .motion:motionPanel
+        case .redaction:redactionPanel
+        }
+    }
+    private var floatingToolButtons:some View {
+        HStack(spacing:8) {
+            ForEach(availableTools,id:\.self) {tool in
+                let opened=previewPanelExpanded && displayedTool==tool
+                Button {
+                    let close=previewPanelExpanded && displayedTool==tool
+                    selectTool(tool)
+                    withAnimation(settingsPanelAnimation) {previewPanelExpanded = !close}
+                } label: {
+                    VStack(spacing:4) {
+                        Image(systemName:tool.symbol)
+                            .font(.system(size:20,weight:.medium)).frame(height:24)
+                        Text(tool.rawValue).font(.caption.weight(.medium))
+                    }
+                        .frame(maxWidth:.infinity).frame(height:bottomControlHeight)
+                        .foregroundStyle(opened ? Color.acAccent : .white)
+                        .background(opened ? .white.opacity(0.09) : .clear,in:Capsule())
+                        .contentShape(Rectangle())
+                }.buttonStyle(.plain)
+                    .accessibilityLabel(tool.rawValue)
+                    .accessibilityValue(opened ? "已打开" : "已关闭")
+                    .accessibilityAddTraits(opened ? .isSelected : [])
+                    .accessibilityIdentifier("previewTool-"+tool.rawValue)
+            }
+        }
+        .padding(4)
+        .modifier(StudioGlassSurface(shape:Capsule(),interactive:false))
+        .accessibilityElement(children:.contain).accessibilityIdentifier("editorToolbar")
+        .disabled(!model.settingsEnabled || timelineTrimming || model.compositionAdjusting)
     }
     private let bottomControlHeight:CGFloat = 56
     private var toolSelector:some View {
         NativeSegmentedControl(title:"编辑工具",options:availableTools,selection:Binding(
-            get:{displayedTool ?? .composition},set:{selectTool($0)}
+            get:{displayedTool ?? .composition},set:{selectTool($0);previewPanelExpanded=true}
         ),label:{$0.rawValue},symbol:{$0.symbol},height:bottomControlHeight)
         .frame(height:bottomControlHeight)
         .accessibilityIdentifier("editorToolbar")
@@ -517,8 +614,8 @@ struct EditorView: View {
     private var bottomToolbar: some View {
         StudioGlassGroup(spacing: 12) {
             HStack(spacing: 12) {
-                if model.hasCompletedTracking && !isProcessing && !isCompleted {
-                    toolSelector
+                if model.showsPreviewSettings && !isProcessing && !isCompleted {
+                    if floatsPreviewControls {floatingToolButtons} else {toolSelector}
                 }
                 if isProcessing {
                     StudioTextButton(title:model.generatingVideo ? "取消生成" : "重新选择",height:56) {
@@ -528,7 +625,7 @@ struct EditorView: View {
                         .buttonStyle(.plain).modifier(StudioGlassSurface(shape:Capsule()))
                 }
                 if isCompleted {completedActions}
-                else if !model.hasCompletedTracking || isProcessing {processingAction}
+                else if !model.showsPreviewSettings || isProcessing {processingAction}
             }
         }.dynamicTypeSize(...DynamicTypeSize.xxxLarge).padding(.horizontal, 18).frame(height: 58)
     }
@@ -555,7 +652,7 @@ struct EditorView: View {
                             Image(systemName:"arrow.right").font(.system(size:16,weight:.medium))
                         }
                     }.padding(.horizontal,14)
-                        .frame(maxWidth:isProcessing || usesExpandedWorkspace || !model.hasCompletedTracking ? .infinity : nil).frame(width:isProcessing || usesExpandedWorkspace || !model.hasCompletedTracking ? nil : 132,height:bottomControlHeight)
+                        .frame(maxWidth:isProcessing || usesExpandedWorkspace || !model.showsPreviewSettings ? .infinity : nil).frame(width:isProcessing || usesExpandedWorkspace || !model.showsPreviewSettings ? nil : 132,height:bottomControlHeight)
                         .background {
                             if isProcessing {
                                 ProcessingButtonFill(progress:min(1,max(0,model.phase.progress)),paused:isPaused)
@@ -656,7 +753,7 @@ struct EditorView: View {
     }
     private var canStart: Bool { !timelineTrimming && model.canConfirm }
     private var startTitle: String {
-        if !model.hasCompletedTracking {return model.detecting ? "正在识别人物…" : "分析所选片段"}
+        if !model.showsPreviewSettings {return model.detecting ? "正在识别人物…" : "分析所选片段"}
 
         if model.restoringTracking {return "正在恢复项目…"}
         if model.detecting {return "正在识别人物…"}
@@ -703,11 +800,7 @@ struct EditorView: View {
         // cannot retain their old intrinsic height or stretch the incoming controls.
         Color.clear.overlay(alignment:.top) {
             VStack(spacing:0) {
-                switch tool {
-                case .composition: compositionPanel
-                case .motion: motionPanel
-                case .redaction: redactionPanel
-                }
+                settingsContent(tool)
             }
             .padding(panelInset)
             .fixedSize(horizontal:false,vertical:true)
@@ -723,6 +816,7 @@ struct EditorView: View {
             .transition(reduceMotion ? .identity : .opacity.combined(with:.offset(y:6)))
             .zIndex(1)
         }.dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .disabled(model.restoringTracking)
     }
     private func settingsPanelHeight(_ tool:WorkspaceTool,available:CGFloat)->CGFloat {
         let fallback:CGFloat=tool == .composition ? 164 : tool == .motion ? 104 : 152
