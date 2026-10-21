@@ -58,10 +58,11 @@ extension VideoSeekCoalescerTests {
         let model=AppModel();model.startDemo();defer {model.project?.isDemo=true;model.goHome()}
         let body=DemoStage.body(index:1,time:0)
         model.selectTarget(body);model.hasCompletedTracking=true
-        model.targetSamples=[.init(time:0,body:body),.init(time:58.2,body:body)]
+        model.targetSamples=[.init(time:0,body:.init(x:0.1,y:0.1,width:0.15,height:0.7)),.init(time:58.2,body:.init(x:0.7,y:0.1,width:0.15,height:0.7))]
         model.beginComposition()
         for _ in 0..<400 {if !model.compositionBusy {break};try await Task.sleep(for:.milliseconds(10))}
         XCTAssertFalse(model.compositionBusy)
+        let openingCrop=try XCTUnwrap(model.compositionCrop)
         model.project?.isDemo=false
         let source=ScrubRecordingPlayer(playerItem:AVPlayerItem(url:URL(fileURLWithPath:"/nonexistent-scrub-fixture.mp4")))
         let preview=ScrubRecordingPlayer()
@@ -84,7 +85,7 @@ extension VideoSeekCoalescerTests {
         source.complete(1)
         await Task.yield()
         XCTAssertTrue(model.compositionEditing)
-        XCTAssertNotNil(model.compositionCrop)
+        XCTAssertGreaterThan(try XCTUnwrap(model.compositionCrop).minX,openingCrop.minX+100,"Camera framing must follow the decoded timeline position")
         model.scrub(to:31)
         XCTAssertEqual(source.requests.count,3)
         model.project?.isDemo=true

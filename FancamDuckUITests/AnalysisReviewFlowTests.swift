@@ -18,6 +18,8 @@ final class AnalysisReviewFlowTests:XCTestCase {
         app.buttons["确认人物区域"].tap()
         XCTAssertTrue(app.segmentedControls["editorToolbar"].waitForExistence(timeout:10))
         XCTAssertTrue(app.segmentedControls["editorToolbar"].buttons["构图"].isSelected)
+        XCTAssertTrue(app.staticTexts["预览设置"].exists)
+        XCTAssertFalse(app.staticTexts["视频工作台"].exists)
         XCTAssertFalse(app.buttons["confirmReviewFrame"].exists)
         XCTAssertEqual(app.scrollViews.count,0)
     }

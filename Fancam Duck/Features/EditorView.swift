@@ -138,7 +138,7 @@ struct EditorView: View {
                 Rectangle().fill(DesktopPalette.border).frame(width:1,height:24)
                 VStack(alignment:.leading,spacing:3) {
                     Text(model.project?.title ?? "视频编辑").font(.system(size:14,weight:.semibold)).lineLimit(1)
-                    Text(model.hasCompletedTracking ? "FANCAM DUCK  /  视频工作台" : "FANCAM DUCK  /  人物分析").font(.system(size:9,weight:.medium,design:.monospaced)).foregroundStyle(.secondary)
+                    Text(model.hasCompletedTracking ? "FANCAM DUCK  /  预览设置" : "FANCAM DUCK  /  人物分析").font(.system(size:9,weight:.medium,design:.monospaced)).foregroundStyle(.secondary)
                 }
                 Spacer(minLength:8)
 
@@ -221,7 +221,7 @@ struct EditorView: View {
                     Text(model.phase.progress>=0.9 ? "补全片段" : "人物分析").font(.system(size:15,weight:.medium))
                         .accessibilityIdentifier("processingStatus").accessibilityLabel(model.statusText).accessibilityValue(model.currentTime.videoTime)
                 } else {
-                    Text(model.hasCompletedTracking || isCompleted ? "视频工作台" : "人物分析").font(.system(size: 15, weight: .medium))
+                    Text(model.hasCompletedTracking || isCompleted ? "预览设置" : "人物分析").font(.system(size: 15, weight: .medium))
                 }
             }
             Spacer()

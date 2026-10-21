@@ -1308,9 +1308,14 @@ extension AppModel {
             if !isPlaying {player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)}
             return
         }
-        let plan:RedactionPlan
+        let cachedFrames=analyzedPeople.sorted {$0.key<$1.key}.map {(Double($0.key)/10000,$0.value)}
+        let samples=targetSamples
+        let plan:RedactionPlan?
         if let existing=project.redactionPlan,existing.covers(project),hasCompletedTracking {plan=existing}
-        else {
+        else if hasCompletedTracking,project.settings.redaction.allOthers,!cachedFrames.isEmpty {
+            // A fixed opening-frame mask cannot preview another timeline position.
+            plan=nil
+        } else {
             var tracks:[RedactionTrack]=[]
             if project.settings.redaction.allOthers,let primary=redactionPrimaryBody {
                 tracks=AutomaticRedaction.candidates(observations,primary:primary).map { observation in
@@ -1329,13 +1334,21 @@ extension AppModel {
         redactionPreviewTask=Task { [weak self,weak item] in
             do {
                 try await Task.sleep(for:.milliseconds(50))
+                let previewPlan:RedactionPlan
+                if let plan {previewPlan=plan}
+                else {
+                    let calculation=Task.detached(priority:.userInitiated) {
+                        try AutomaticRedaction.build(frames:cachedFrames,project:project,samples:samples)
+                    }
+                    previewPlan=try await withTaskCancellationHandler {try await calculation.value} onCancel:{calculation.cancel()}
+                }
                 guard let track=try await item?.asset.loadTracks(withMediaType:.video).first else {return}
                 let transform=try await track.load(.preferredTransform),natural=try await track.load(.naturalSize)
                 let bounds=CGRect(origin:.zero,size:natural).applying(transform).standardized
                 let upright=transform.concatenating(.init(translationX:-bounds.minX,y:-bounds.minY))
                 let previewScale=min(1,1280/max(bounds.width,bounds.height))
                 let previewSize=CGSize(width:floor(bounds.width*previewScale/2)*2,height:floor(bounds.height*previewScale/2)*2)
-                let composition=RedactionRenderer.composition(trackID:track.trackID,range:CMTimeRange(start:.zero,duration:CMTime(seconds:project.metadata.duration,preferredTimescale:600)),transform:upright,source:bounds.size,output:previewSize,start:0,crops:[],plan:plan,strength:project.settings.redaction.strength,rate:project.metadata.frameRate,style:project.settings.redaction.style,imageData:project.settings.redaction.imageData)
+                let composition=RedactionRenderer.composition(trackID:track.trackID,range:CMTimeRange(start:.zero,duration:CMTime(seconds:project.metadata.duration,preferredTimescale:600)),transform:upright,source:bounds.size,output:previewSize,start:0,crops:[],plan:previewPlan,strength:project.settings.redaction.strength,rate:project.metadata.frameRate,style:project.settings.redaction.style,imageData:project.settings.redaction.imageData)
                 guard let self,!Task.isCancelled,self.redactionPreviewID==id,self.project?.id==project.id else {return}
                 item?.videoComposition=composition
                 // AVPlayer can retain its paused source frame after a compositor change.

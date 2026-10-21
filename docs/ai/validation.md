@@ -367,3 +367,10 @@ iPhone 17 Pro／iOS 26.3.1 实际打开原有 37.9 秒已分析项目，检查�
 设备成片打码核查（2026-10-21）：用户反馈 iPhone 生成后无打码。读取原项目的隔离副本发现，已保存旧成片的配方为关闭打码，而当前项目已开启全身毛玻璃、强度 41。新增 opt-in `testLocalDeviceGeneratedRedactionActuallyChangesPixels`，通过 `TEST_RUNNER_FANCAM_DUCK_REDACTION_DEVICE_ROOT` 指定仅含本地项目／原片／轨迹缓存的临时副本；不提交素材。复用该项目缓存建立 15 条非主角轨迹，在原片前 1 秒、4:3／240×320 下实际导出；0.5 秒画面与关闭打码的对照平均 RGB 像素差约 6.02。完整恢复项目→生成→completed 链路得到相同差异，预置的旧未打码成片未被新配方复用。RedactionTests 24 项：22 通过、2 因其他私人素材缺失跳过、0 失败。此结果验证该项目片段与低分辨率生成链路，未覆盖全长 4K 原片的全部时刻；没有复现新生成成片漏打码。Device Hub 画面可读取，但坐标点击不可用，未通过窗口替用户覆盖生成原项目成片。
 
 打码范围默认强度（2026-10-21）：人脸默认 80、全身默认 30；切换范围应用对应默认值，同一范围重复选择保留手动值。新建和缺失 strength 的旧数据按 region 补默认，已保存显式强度保持原值。RedactionTests／RedactionStateTests 共 31 项：26 通过、5 因本地素材或设备副本未配置跳过、0 失败；Mac Catalyst Debug 构建、diff 检查通过。未做额外真实视频效果对比。
+
+
+## 预览设置标题与时间轴遮挡同步（2026-10-21）
+
+`MediaIntegrationTests.testPausedRedactionPreviewFollowsCachedPeopleAtTheSelectedTime` 使用临时合成视频、移动主角及旁人观测缓存，先复现旧预览在 0.1／0.9 秒的遮挡横坐标差为 0；修改后验证同一 compositor 配方按源时间移动遮挡、主角不被覆盖、寻帧位置正确且预览计划不写入项目。增强的 `VideoSeekCoalescerTests` 用移动主角验证精确寻帧后的运镜框随时刻移动，并继续覆盖快速拖动合并及切项目后的晚到回调。人物分析完成后的手机／Mac 标题统一为“预览设置”。
+
+iPhone 18 Pro／iOS 27.0：设置连续修改、合成视频打码、遮挡与时间轴回归共 32 项中 29 项通过、3 项真实视频用例因未配置本地片段跳过；另 1 项 AnalysisReviewFlowTests 界面回归通过，验证确认结束后显示“预览设置”。xcodebuild 正常返回 TEST SUCCEEDED，Mac Catalyst 构建通过，git diff --check 通过。本轮未以私人原片或真实设备播放验收，也未实际操作 Mac 窗口。

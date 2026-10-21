@@ -84,6 +84,46 @@ final class MediaIntegrationTests: XCTestCase {
         XCTAssertEqual(result.duration,0.8,accuracy:1/30)
     }
 
+    @MainActor func testPausedRedactionPreviewFollowsCachedPeopleAtTheSelectedTime() async throws {
+        let source=try await makeVideo()
+        defer {try? FileManager.default.removeItem(at:source)}
+        var project=VideoProject(title:"Moving masks",metadata:try await MediaService.shared.metadata(url:source),settings:EditSettings())
+        project.settings.end=1
+        project.settings.redaction = .init(region:.person,allOthers:true)
+        let samples=(0...6).map {index in TargetSample(time:Double(index)/6,body:.init(x:0.1+Double(index)/60,y:0.1,width:0.15,height:0.8))}
+        project.target=samples[0].body
+        let batches=Dictionary(uniqueKeysWithValues:samples.map {sample in
+            (Int((sample.time*10000).rounded()),DetectionBatch(primary:[
+                PersonObservation(id:1,body:sample.body,confidence:0.9,embedding:[1,0]),
+                PersonObservation(id:2,body:.init(x:0.7-sample.time*0.2,y:0.1,width:0.15,height:0.8),confidence:0.9,embedding:[0,1])],relaxed:[]))
+        })
+        let directory=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer {try? FileManager.default.removeItem(at:directory)}
+        let store=ProjectStore(directory:directory)
+        try await store.prepare()
+        project.sourceFileName=try await store.importFile(source).lastPathComponent
+        try await store.save(project)
+        try await store.saveTrajectory(project:project,samples:samples,people:batches)
+        let model=AppModel(store:store)
+        defer {model.goHome()}
+        model.open(project)
+        for _ in 0..<400 {if !model.restoringTracking {break};try await Task.sleep(for:.milliseconds(10))}
+        XCTAssertTrue(model.hasCompletedTracking)
+        let item=try XCTUnwrap(model.player?.currentItem)
+        model.detectPeople()
+        for _ in 0..<400 {if (item.videoComposition?.instructions.first as? RedactionInstruction)?.plan.tracks.isEmpty == false || model.errorMessage != nil {break};try await Task.sleep(for:.milliseconds(10))}
+        XCTAssertNil(model.errorMessage)
+        let instruction=try XCTUnwrap(item.videoComposition?.instructions.first as? RedactionInstruction)
+        let early=try XCTUnwrap(instruction.plan.rectangles(at:0.1).first)
+        model.scrub(to:0.9);model.finishScrubbing()
+        let late=try XCTUnwrap(instruction.plan.rectangles(at:0.9).first)
+        XCTAssertGreaterThan(early.x-late.x,0.1,"Masks must move with cached bystanders instead of keeping the opening frame")
+        XCTAssertLessThan(late.iou(samples.last!.body),0.1,"The moving primary must remain unmasked")
+        XCTAssertEqual(model.currentTime,0.9,accuracy:0.001)
+        XCTAssertNil(model.project?.redactionPlan,"A settings preview must not mark an unvalidated export plan complete")
+        XCTAssertTrue(item.videoComposition?.customVideoCompositorClass == RedactionCompositor.self)
+    }
+
     private func makeVideo(rotated: Bool = false, animated:Bool=false) async throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mov")
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
