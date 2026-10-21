@@ -134,7 +134,7 @@ actor CoreMLTrackingPipeline: TargetTracking {
                 // Keep previously verified appearances for the look-ahead in both directions.
                 state.gallery=leg.manual ? Array(state.knownIdentities.prefix(1))+Array(state.knownIdentities.suffix(15)) : [chosen.embedding]
                 state.cursor = leg.start; state.seeded = true
-                let seed=TargetSample(time:leg.start,body:chosen.body,protection:chosen.protectionBody,trackID:state.targetID,focusX:chosen.focusX)
+                let seed=TargetSample(time:leg.start,body:chosen.body,protection:chosen.protectionBody,trackID:state.targetID,focusX:chosen.focusX,keypoints:chosen.keypoints)
                 state.samples.removeAll {abs($0.time-leg.start)<0.001}
                 state.samples.append(seed);state.deferred.resolve(leg.start);state.trusted=seed;state.occlusion.reset()
             }
@@ -195,7 +195,7 @@ actor CoreMLTrackingPipeline: TargetTracking {
                         state.gallery.append(found.embedding)
                         if state.gallery.count>8 {state.gallery.remove(at:1)}
                         state.occlusion.reset();state.searching=false
-                        let sample=TargetSample(time:time,body:found.body,protection:found.protectionBody,trackID:state.targetID,focusX:found.focusX)
+                        let sample=TargetSample(time:time,body:found.body,protection:found.protectionBody,trackID:state.targetID,focusX:found.focusX,keypoints:found.keypoints)
                         state.samples.removeAll {abs($0.time-time)<0.001};state.samples.append(sample);state.deferred.resolve(time);state.trusted=sample
                         state.cursor=time;sessions[project.id]=state
                         let preview=renderPreview(image,sample:sample,force:true,state:&state,engine:engine)

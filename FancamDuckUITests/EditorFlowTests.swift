@@ -1,3 +1,4 @@
+#if !targetEnvironment(macCatalyst) && !os(macOS)
 import XCTest
 
 final class EditorFlowTests: XCTestCase {
@@ -556,3 +557,5 @@ final class EditorFlowTests: XCTestCase {
         }
     }
 }
+
+#endif

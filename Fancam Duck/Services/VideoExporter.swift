@@ -36,7 +36,8 @@ actor VideoExporter:VideoExporting {
                   project.settings.redaction.style != .image || project.settings.redaction.imageData.flatMap({RedactionImage.decode($0)}) != nil else { throw RedactionError.incomplete }
         }
         let output=project.settings.resolution
-        guard project.settings.start.isFinite,project.settings.end.isFinite,project.settings.personHeight.isFinite,
+        guard project.settings.subjectComposition?.isValid != false,
+              project.settings.start.isFinite,project.settings.end.isFinite,project.settings.personHeight.isFinite,
               project.settings.compositionScale.isFinite,project.settings.compositionScale>0,
               project.settings.compositionX.isFinite,project.settings.compositionY.isFinite,
               project.settings.personHeight>0,project.settings.horizontalOffset.isFinite,

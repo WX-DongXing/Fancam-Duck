@@ -34,6 +34,7 @@ struct TargetSample: Codable, Sendable, Equatable {
     var trackID: Int = 0
     var focusX: Double? = nil
     var estimated: Bool? = nil
+    var keypoints:[PosePoint]? = nil
 }
 struct TrackingUpdate: Sendable {
     let sample: TargetSample

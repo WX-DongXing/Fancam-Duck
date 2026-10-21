@@ -1,0 +1,7 @@
+video_id,part,group,member,performance,time_seconds,frame_height_px,head_y_px,foot_y_px,screenshot_name,notes
+BV1RT421D7tv,1,aespa,KARINA,Supernova_20240518,9.480570,412,203,569,karina-supernova-mbc-09.48.png,near_upright_step
+BV1W4411b76i,1,TWICE,JEONGYEON,FANCY_20190425,11.591315,412,237,562,jeongyeon-fancy-mnet-a.png,standing_step_dark_shoes
+BV1dP411X7Rp,1,(G)I-DLE,SHUHUA,Queencard_20230518,5.021333,412,221,558,shuhua-queencard-mnet-b.png,standing_step
+BV1ju411v7Mb,1,IVE,WONYOUNG,LOVE_DIVE_20220410,3.263109,412,207,570,wonyoung-lovedive-sbs-c.png,limb_overlap_manual_approximation
+BV1kP4y1H7cV,1,ITZY,RYUJIN,WANNABE_20200403,18.533738,412,208,575,ryujin-wannabe-kbs-f.png,motion_blur_manual_approximation
+BV1kP4y1H7cV,1,ITZY,RYUJIN,WANNABE_20200403,25.003355,412,200,574,ryujin-wannabe-kbs-g.png,same_video_crosscheck_motion_blur

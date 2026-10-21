@@ -44,7 +44,8 @@ final class CameraPlanTests:XCTestCase {
             let t=min(5.93,Double(i)*0.1),x=0.45+0.2*sin(t*0.8)
             return .init(time:t,body:.init(x:x,y:0.2,width:0.12,height:0.6))
         }
-        let plan=CropPlan.make(samples:samples,source:.init(width:1920,height:1080),settings:EditSettings())
+        var legacy=EditSettings();legacy.subjectComposition=nil
+        let plan=CropPlan.make(samples:samples,source:.init(width:1920,height:1080),settings:legacy)
         for frame in plan {
             let sample=samples.first {abs($0.time-frame.time)<0.0001}!
             XCTAssertLessThanOrEqual(frame.rect.minX,sample.body.x*1920+0.001)
@@ -59,7 +60,8 @@ final class CameraPlanTests:XCTestCase {
             let x=0.3+0.001*Double(i)+0.018*sin(Double(i)*1.8)
             return .init(time:t,body:.init(x:x,y:0.3+0.025*sin(Double(i)*1.3),width:0.11+0.025*abs(sin(Double(i))),height:0.38+0.045*sin(Double(i)*0.9)))
         }
-        let plan=CropPlan.make(samples:samples,source:.init(width:1920,height:1080),settings:EditSettings())
+        var legacy=EditSettings();legacy.subjectComposition=nil
+        let plan=CropPlan.make(samples:samples,source:.init(width:1920,height:1080),settings:legacy)
         XCTAssertEqual(plan.count,samples.count)
         XCTAssertLessThan(plan.map(\.rect.height).max()!-plan.map(\.rect.height).min()!,0.001)
         XCTAssertLessThan(plan.map(\.rect.midY).max()!-plan.map(\.rect.midY).min()!,0.001)

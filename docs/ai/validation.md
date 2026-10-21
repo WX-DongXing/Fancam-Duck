@@ -374,3 +374,7 @@ iPhone 17 Pro／iOS 26.3.1 实际打开原有 37.9 秒已分析项目，检查�
 `MediaIntegrationTests.testPausedRedactionPreviewFollowsCachedPeopleAtTheSelectedTime` 使用临时合成视频、移动主角及旁人观测缓存，先复现旧预览在 0.1／0.9 秒的遮挡横坐标差为 0；修改后验证同一 compositor 配方按源时间移动遮挡、主角不被覆盖、寻帧位置正确且预览计划不写入项目。增强的 `VideoSeekCoalescerTests` 用移动主角验证精确寻帧后的运镜框随时刻移动，并继续覆盖快速拖动合并及切项目后的晚到回调。人物分析完成后的手机／Mac 标题统一为“预览设置”。
 
 iPhone 18 Pro／iOS 27.0：设置连续修改、合成视频打码、遮挡与时间轴回归共 32 项中 29 项通过、3 项真实视频用例因未配置本地片段跳过；另 1 项 AnalysisReviewFlowTests 界面回归通过，验证确认结束后显示“预览设置”。xcodebuild 正常返回 TEST SUCCEEDED，Mac Catalyst 构建通过，git diff --check 通过。本轮未以私人原片或真实设备播放验收，也未实际操作 Mac 窗口。
+
+## 持续人物构图重构
+
+[2026-10-21 验证记录](../validation/2026-10-21-subject-composition.md)：片段级人物占比与两轴偏移、稳定尺度估计、可变尺寸镜头插值、旧项目兼容和实际编码一致性回归通过；iPhone 18 Pro 模拟器 UI 通过，Mac 实际窗口已检查。Mac 自动 UI 运行器未进入测试，未将其计为通过；未验证私人群舞视频的观感与性能。

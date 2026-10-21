@@ -130,7 +130,7 @@ final class CompositionTests:XCTestCase {
     func testReferenceBetweenAnalysisAndOutputFramesRemainsExact() throws {
         let source=CGSize(width:1920,height:1080),time=0.137
         let samples=(0...20).map {TargetSample(time:Double($0)*0.1,body:.init(x:0.4+Double($0)*0.003,y:0.2,width:0.1,height:0.5))}
-        var settings=EditSettings();settings.protectFullBody=false
+        var settings=EditSettings();settings.subjectComposition=nil;settings.protectFullBody=false
         settings.compositionAnchor = .init(time:time,crop:.init(x:0.3,y:0.2,width:0.1875,height:0.5925925925925926))
         let plan=CropPlan.renderFrames(CropPlan.make(samples:samples,source:source,settings:settings),frameRate:25,preserving:time)
         let rect=try XCTUnwrap(CropPlan.rect(at:time,in:plan))
@@ -165,7 +165,7 @@ final class CompositionTests:XCTestCase {
     }
     func testZoomAndPlacementAreSharedByStableCameraAndBounds() {
         let samples=(0...10).map {TargetSample(time:Double($0)*0.1,body:.init(x:0.4+Double($0)*0.001,y:0.3,width:0.12,height:0.35))}
-        var settings=EditSettings();settings.protectFullBody=false
+        var settings=EditSettings();settings.subjectComposition=nil;settings.protectFullBody=false
         let original=CropPlan.make(samples:samples,source:.init(width:1920,height:1080),settings:settings)
         settings.compositionScale=1.3;settings.compositionX=0.1;settings.compositionY = -0.08
         let updated=CropPlan.make(samples:samples,source:.init(width:1920,height:1080),settings:settings)

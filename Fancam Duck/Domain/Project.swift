@@ -73,7 +73,15 @@ struct CompositionAnchor: Codable, Equatable, Sendable {
     var isValid: Bool { time.isFinite && crop.isValid }
 }
 
+struct SubjectComposition: Codable, Equatable, Sendable {
+    var height:Double = 0.60
+    var x:Double = 0
+    var y:Double = 0
+    var isValid:Bool {height.isFinite && height>0 && x.isFinite && y.isFinite}
+}
+
 struct EditSettings: Codable, Equatable, Sendable {
+    var subjectComposition:SubjectComposition? = .init()
     var start: Double = 0
     var end: Double = 0
     var personHeight: Double = 0.75
@@ -88,10 +96,11 @@ struct EditSettings: Codable, Equatable, Sendable {
     var compositionX:Double = 0
     var compositionY:Double = 0
     init() {}
-    private enum CodingKeys:String,CodingKey { case redaction,aspectRatio,start,end,personHeight,horizontalOffset,followSpeed,protectFullBody,resolution,compositionScale,compositionX,compositionY,compositionAnchor }
+    private enum CodingKeys:String,CodingKey { case subjectComposition,redaction,aspectRatio,start,end,personHeight,horizontalOffset,followSpeed,protectFullBody,resolution,compositionScale,compositionX,compositionY,compositionAnchor }
     init(from decoder:Decoder) throws {
         self.init()
         let c=try decoder.container(keyedBy:CodingKeys.self)
+        subjectComposition=try c.decodeIfPresent(SubjectComposition.self,forKey:.subjectComposition)
         redaction=try c.decodeIfPresent(RedactionSettings.self,forKey:.redaction) ?? .init()
         aspectRatio=try c.decodeIfPresent(OutputAspectRatio.self,forKey:.aspectRatio) ?? .portrait
         start=try c.decodeIfPresent(Double.self,forKey:.start) ?? start

@@ -10,7 +10,7 @@ struct EditorView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ScaledMetric(relativeTo: .body) private var settingsHeight = 154
+    @ScaledMetric(relativeTo: .body) private var settingsHeight = 184
     @State private var activeTool: WorkspaceTool?
     @State private var lastSettingsTool:WorkspaceTool = .composition
     @State private var timelineTrimming = false
@@ -79,7 +79,7 @@ struct EditorView: View {
                                 editorTimeline
                                 if let tool=displayedTool,!isProcessing {
                                     inlineSettings(tool)
-                                        .frame(height:tool == .redaction ? min(184,geometry.size.height*0.30) : tool == .motion ? min(settingsHeight*104/154,140,geometry.size.height*0.30) : min(settingsHeight,208,geometry.size.height*0.38),alignment:.top)
+                                        .frame(height:tool == .redaction ? min(184,geometry.size.height*0.30) : tool == .motion ? min(settingsHeight*104/184,140,geometry.size.height*0.30) : min(settingsHeight,208,geometry.size.height*0.38),alignment:.top)
                                         .clipped()
                                         .transition(.opacity)
                                 }
@@ -666,6 +666,8 @@ struct EditorView: View {
                 case .redaction: redactionPanel
                 }
             }
+            .padding(panelInset)
+            .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24),interactive:false))
             .frame(maxWidth:.infinity)
             .id(tool)
             .transition(reduceMotion ? .identity : .opacity.combined(with:.offset(y:6)))
@@ -744,9 +746,7 @@ struct EditorView: View {
                         .accessibilityHidden(true)
                 }
             }.frame(height:44)
-        }.padding(12)
-            .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24),interactive:false))
-            .accessibilityElement(children:.contain)
+        }.accessibilityElement(children:.contain)
     }
     private var stickerChoices:some View {
         ForEach(RedactionSticker.allCases) {sticker in
@@ -770,8 +770,7 @@ struct EditorView: View {
             .disabled(compositionControlsDisabled)
             Text(motionDescription)
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
-        }.padding(panelInset)
-            .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24),interactive:false))
+        }
     }
     private var motionDescription:String {
         switch model.project?.settings.followSpeed ?? .gentle {
@@ -788,31 +787,42 @@ struct EditorView: View {
             .frame(height:48)
             .accessibilityIdentifier("compositionAspect")
             .disabled(compositionControlsDisabled)
+            HStack(spacing:0) {
+                let values=model.compositionStatusText.components(separatedBy:" · ")
+                ForEach(values.indices,id:\.self) {index in
+                    Text(values[index])
+                        .frame(maxWidth:.infinity,alignment:.center)
+                }
+            }.font(.caption.monospacedDigit()).lineLimit(1).minimumScaleFactor(0.85)
+                .transaction {$0.animation=nil;$0.disablesAnimations=true}
+                .accessibilityElement(children:.ignore)
+                .accessibilityLabel(model.compositionStatusText)
+                .accessibilityIdentifier("compositionStatus")
             HStack(spacing: 0) {
                 compositionControl("缩小", symbol: "minus.magnifyingglass") { model.compositionZoom(1 / 1.1) }
                 compositionControl("放大", symbol: "plus.magnifyingglass") { model.compositionZoom(1.1) }
                 Rectangle().fill(.white.opacity(0.12)).frame(width: 0.5, height: 28).padding(.horizontal, 4)
-                compositionControl("水平居中", symbol: "align.horizontal.center") { model.centerComposition(horizontal: true) }
-                compositionControl("垂直居中", symbol: "align.vertical.center") { model.centerComposition(horizontal: false) }
+                compositionControl("水平居中", symbol: "align.horizontal.center",selected:model.compositionCentered(horizontal:true)) { model.centerComposition(horizontal: true) }
+                compositionControl("垂直居中", symbol: "align.vertical.center",selected:model.compositionCentered(horizontal:false)) { model.centerComposition(horizontal: false) }
             }.disabled(compositionControlsDisabled)
-            HStack(spacing: 8) {
-                Spacer(minLength: 0)
-                Text(model.editorActivityText ?? model.compositionNotice ?? "拖动位置 · 双指缩放")
+            if let notice=model.editorActivityText ?? model.compositionNotice ?? model.compositionAlignmentNotice {
+                Text(notice)
                     .font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
-                Spacer(minLength: 0)
             }
-        }.padding(panelInset)
-            .modifier(StudioGlassSurface(shape: RoundedRectangle(cornerRadius: 24), interactive: false))
+        }
     }
     private var compositionControlsDisabled: Bool { timelineTrimming || model.compositionAdjusting }
-    private func compositionControl(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
+    private func compositionControl(_ title: String, symbol: String, selected:Bool=false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 5) {
                 Image(systemName: symbol).symbolRenderingMode(.monochrome).font(.system(size: 20))
                     .frame(height: 26)
+                    .foregroundStyle(selected ? Color.acAccent : Color.primary)
                 Text(title).font(.caption2).lineLimit(1).minimumScaleFactor(0.65)
             }.frame(maxWidth: .infinity).frame(height: 56).contentShape(Rectangle())
+                .foregroundStyle(Color.primary)
         }.buttonStyle(.plain).accessibilityLabel("构图" + title)
+            .accessibilityAddTraits(selected ? .isSelected : [])
     }
     private var activeBox: NormalizedRect? {
         if model.isReviewing {return model.reviewSelection}
@@ -837,6 +847,7 @@ struct TargetBox:View {
     var warning:Bool
     var dashed:Bool
     var badgeInside = false
+    var showsLabel = true
     private var tint:Color { warning ? .orange : .acAccent }
     var body:some View {
         GeometryReader { _ in
@@ -846,12 +857,14 @@ struct TargetBox:View {
                     CandidateCorners().stroke(tint,style:StrokeStyle(lineWidth:3,lineCap:.square,lineJoin:.miter))
                 }
                 .overlay(alignment:.topLeading) {
-                    Text(label).font(.system(size:10,weight:.medium))
-                    .lineLimit(1).fixedSize(horizontal:true,vertical:false)
-                    .padding(.horizontal,8).frame(height:24)
-                    .foregroundStyle(Color.acOnAccent)
-                    .background(tint,in:RoundedRectangle(cornerRadius:4))
-                    .offset(y:badgeInside ? 6 : -30)
+                    if showsLabel {
+                        Text(label).font(.system(size:10,weight:.medium))
+                            .lineLimit(1).fixedSize(horizontal:true,vertical:false)
+                            .padding(.horizontal,8).frame(height:24)
+                            .foregroundStyle(Color.acOnAccent)
+                            .background(tint,in:RoundedRectangle(cornerRadius:4))
+                            .offset(y:badgeInside ? 6 : -30)
+                    }
                 }
         }
         .accessibilityElement(children:.ignore)

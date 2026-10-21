@@ -139,7 +139,12 @@ final class DesktopVideoValidationTests: XCTestCase {
             return
         }
         let original = canvas.value as? String
-        canvas.pinch(withScale: 1.2, velocity: 1); ready(commit)
+        #if targetEnvironment(macCatalyst) || os(macOS)
+        app.buttons["构图放大"].click()
+        #else
+        canvas.pinch(withScale: 1.2, velocity: 1)
+        #endif
+        ready(commit)
         XCTAssertNotEqual(canvas.value as? String, original)
         let zoomed = canvas.value as? String
         let from = canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))

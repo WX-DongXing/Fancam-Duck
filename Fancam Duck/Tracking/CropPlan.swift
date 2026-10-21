@@ -10,6 +10,9 @@ struct CropPlan {
         for s in samples where s.time.isFinite && s.body.isValid { unique[Int((s.time*10000).rounded())]=s }
         let sorted=unique.values.sorted { $0.time<$1.time }
         guard !sorted.isEmpty,source.width>0,source.height>0 else { return [] }
+        if settings.compositionAnchor == nil,let target=settings.subjectComposition,target.isValid {
+            return following(samples:sorted,source:source,settings:settings,target:target)
+        }
         if let anchor=settings.compositionAnchor,anchor.isValid,
            anchor.time>=sorted.first!.time-0.0001,anchor.time<=sorted.last!.time+0.0001 {
             return anchored(samples:sorted,source:source,settings:settings,anchor:anchor)
@@ -56,6 +59,25 @@ struct CropPlan {
         guard x.count==sorted.count else {return []}
         return sorted.indices.map { i in Frame(time:sorted[i].time,rect:CGRect(x:x[i]*source.width-width/2,y:cy-height/2,width:width,height:height)) }
     }
+    private static func following(samples:[TargetSample],source:CGSize,settings:EditSettings,target:SubjectComposition)->[Frame] {
+        let subject=SubjectFraming.make(samples,source:source)
+        let ideal=subject.map {SubjectFraming.crop($0,source:source,aspect:settings.aspectRatio,target:target)}
+        let times=subject.map(\.time)
+        let weight:Double=settings.followSpeed == .gentle ? 30 : settings.followSpeed == .standard ? 10 : 2
+        func smooth(_ values:[Double],_ margin:[Double])->[Double] {
+            solve(times:times,preferred:values,lower:zip(values,margin).map(-),upper:zip(values,margin).map(+),velocity:weight,acceleration:weight*5,jerk:weight*10)
+        }
+        // Tight composition corridors replace the old 12% dead zone; smooth within the target.
+        let x=smooth(ideal.map {Double($0.midX/source.width)},ideal.map {Double($0.width/source.width)*0.003})
+        let y=smooth(ideal.map {Double($0.midY/source.height)},ideal.map {Double($0.height/source.height)*0.003})
+        let h=smooth(ideal.map {log(Double($0.height))},Array(repeating:0.005,count:ideal.count))
+        guard x.count==ideal.count,y.count==ideal.count,h.count==ideal.count else {return []}
+        return ideal.indices.map {i in
+            let maximum=min(source.height,source.width/settings.aspectRatio.value)
+            let height=min(maximum,max(min(120,maximum),exp(h[i]))),width=height*settings.aspectRatio.value
+            return .init(time:times[i],rect:.init(x:min(source.width-width,max(0,x[i]*source.width-width/2)),y:min(source.height-height,max(0,y[i]*source.height-height/2)),width:width,height:height))
+        }
+    }
     /// Preserve the chosen lens and reference-frame placement even when later poses
     /// change the automatic size estimate. Only horizontal following is optimized.
     private static func anchored(samples:[TargetSample],source:CGSize,settings:EditSettings,anchor:CompositionAnchor) -> [Frame] {
@@ -100,7 +122,7 @@ struct CropPlan {
         var lo=0,hi=frames.count-1
         while hi-lo>1 { let mid=(lo+hi)/2;if frames[mid].time<=time {lo=mid} else {hi=mid} }
         let a=frames[lo],b=frames[hi],u=(time-a.time)/(b.time-a.time)
-        return CGRect(x:a.rect.minX+(b.rect.minX-a.rect.minX)*u,y:a.rect.minY+(b.rect.minY-a.rect.minY)*u,width:a.rect.width,height:a.rect.height)
+        return CGRect(x:a.rect.minX+(b.rect.minX-a.rect.minX)*u,y:a.rect.minY+(b.rect.minY-a.rect.minY)*u,width:a.rect.width+(b.rect.width-a.rect.width)*u,height:a.rect.height+(b.rect.height-a.rect.height)*u)
     }
     /// Banded quadratic with velocity, acceleration and jerk costs. ADMM separates
     /// the box constraints from an O(n) Cholesky solve; factorization is reused.
@@ -165,6 +187,7 @@ struct CropPlan {
         guard !Task.isCancelled else {return []}
         guard plan.count>2,frameRate.isFinite,frameRate>0 else { return plan }
         let times=plan.map(\.time),centers=plan.map {Double($0.rect.midX)}
+        let variableSize=plan.contains {abs($0.rect.height-plan[0].rect.height)>0.00001}
         let slopes=(1..<plan.count).map {(centers[$0]-centers[$0-1])/(times[$0]-times[$0-1])}
         var tangent=Array(repeating:0.0,count:plan.count)
         tangent[0]=slopes[0];tangent[plan.count-1]=slopes.last!
@@ -188,8 +211,9 @@ struct CropPlan {
             let dt=times[index+1]-times[index],u=min(1,max(0,(time-times[index])/dt))
             let a=centers[index],b=centers[index+1],u2=u*u,u3=u2*u
             let center=(2*u3-3*u2+1)*a+(u3-2*u2+u)*dt*tangent[index]+(-2*u3+3*u2)*b+(u3-u2)*dt*tangent[index+1]
-            var rect=plan[index].rect
-            rect.origin.x=min(max(a,b),max(min(a,b),center))-rect.width/2
+            var rect=Self.rect(at:time,in:plan)!
+            // Linear rectangle interpolation preserves aspect and bounds while the lens changes.
+            if !variableSize {rect.origin.x=min(max(a,b),max(min(a,b),center))-rect.width/2}
             rendered.append(.init(time:time,rect:rect))
         }
         return rendered

@@ -87,6 +87,8 @@ final class AppModel {
     private var compositionGestureSettings:EditSettings?
     private var compositionAutomatic:CGRect?
     private var compositionFrames:[CropPlan.Frame]=[]
+    private var compositionSubjects:[SubjectFraming.Frame]=[]
+    private var compositionDisplayTime:Double=0
     private var compositionAutomaticFrames:[CropPlan.Frame]=[]
     private var compositionTask:Task<Void,Never>?
     private var compositionID=UUID()
@@ -267,7 +269,7 @@ final class AppModel {
                 self.restoringTracking=false;self.analyzedPeople=people ?? [:]
                 if let output {self.outputURL=output.url;self.savedToPhotos=output.savedToPhotos;self.lastGeneratedRecipe=GenerationRecipe(project)}
                 if let cached {
-                    self.targetSamples=cached;self.hasCompletedTracking=true
+                    self.targetSamples=SubjectFraming.withCachedPoses(cached,people:people ?? [:]);self.hasCompletedTracking=true
                     if let current=self.project {
                         let conflicts=RedactionPolicy.conflicts(project:current,samples:cached)
                         if !conflicts.isEmpty {
@@ -486,7 +488,11 @@ final class AppModel {
                 self.phase = .processing(progress: progress)
                 if progress >= 1 {
                     if self.analysisOnly {
-                        self.targetSamples=[.init(time:project.settings.start,body:project.target!),.init(time:project.settings.end,body:project.target!)]
+                        let index=max(0,min(3,Int(((project.target!.center.x*360-57)/82).rounded())))
+                        self.targetSamples=(0...Int(ceil((project.settings.end-project.settings.start)*AnalysisSampling.frequency))).map {i in
+                            let time=min(project.settings.end,project.settings.start+Double(i)/AnalysisSampling.frequency)
+                            return .init(time:time,body:DemoStage.body(index:index,time:time))
+                        }
                         self.hasCompletedTracking=true;self.analysisOnly=false;self.phase = .editing
                     } else if self.generateAfterAnalysis {self.generatingVideo=false;self.phase = .completed(nil)}
                     else {self.phase = .readyToExport;self.route = .export}
@@ -588,8 +594,7 @@ final class AppModel {
             guard hasCompletedTracking,time.isFinite else { return }
             cancelTimelineScrubbing()
             currentTime=min(project.settings.end,max(project.settings.start,time))
-            synchronizeCompositionPosition()
-            player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
+            scrubComposition(exact:true)
             previewPlayer?.seek(to:CMTime(seconds:currentTime-project.settings.start,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
             return
         }
@@ -930,7 +935,7 @@ final class AppModel {
         redactionIssue=nil;redactionPreviewID=UUID();redactionPreviewTask?.cancel()
         if compositionEditing { finishComposition(commit:true,refreshDetections:false) }
         restorationID=UUID();restorationTask?.cancel();restoringTracking=false;savingToPhotos=false;detectionNotice=nil;cancellingExport=false;exportProgress=0
-        compositionTask?.cancel();compositionID=UUID();compositionBusy=false;compositionFrames=[];compositionAutomaticFrames=[]
+        compositionTask?.cancel();compositionID=UUID();compositionBusy=false;compositionFrames=[];compositionAutomaticFrames=[];compositionSubjects=[]
         pausePreview(refresh:false);operationID=UUID();detectionID=UUID();importID=UUID();importing=false
         detectionTask?.cancel();detecting=false;observations=[]
         processingPreview=nil;trackedSample=nil
@@ -971,6 +976,7 @@ extension AppModel {
         compositionAutomatic=nil;compositionFrames=[];compositionAutomaticFrames=[];compositionAutomaticSettings=nil
         if !hasCompletedTracking { currentTime=project?.settings.compositionAnchor?.time ?? project?.targetTime ?? currentTime }
         player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
+        compositionDisplayTime=currentTime
         refreshComposition()
     }
     func finishComposition(commit:Bool,refreshDetections:Bool=true) {
@@ -989,7 +995,8 @@ extension AppModel {
         cancelTimelineScrubbing(settle:true)
         compositionTask?.cancel();let id=UUID();compositionID=id
         let samples=compositionSamples,settings=project.settings,source=project.metadata.size
-        var automatic=settings;automatic.compositionScale=1;automatic.compositionX=0;automatic.compositionY=0;automatic.compositionAnchor=nil
+        compositionSubjects=SubjectFraming.make(samples,source:source)
+        var automatic=settings;automatic.subjectComposition=settings.subjectComposition == nil ? nil : .init();automatic.compositionScale=1;automatic.compositionX=0;automatic.compositionY=0;automatic.compositionAnchor=nil
         let cachedAutomatic=compositionAutomaticSettings==automatic ? compositionAutomaticFrames : []
         compositionBusy=true
         compositionTask=Task { [weak self] in
@@ -1004,7 +1011,7 @@ extension AppModel {
             }
             guard let self,!Task.isCancelled,self.compositionEditing,self.compositionID==id,self.project?.id==project.id else { return }
             self.compositionFrames=computed.0;self.compositionAutomaticFrames=computed.1;self.compositionAutomaticSettings=automatic
-            self.synchronizeCompositionPosition()
+            self.synchronizeCompositionPosition(at:self.compositionDisplayTime)
 
             do {
                 if self.hasCompletedTracking,project.settings.redaction.enabled,project.redactionPlan?.covers(project) != true {
@@ -1027,22 +1034,61 @@ extension AppModel {
         }
     }
     func beginCompositionGesture() {
-        guard compositionEditing,settingsEnabled,compositionCrop != nil,compositionAutomatic != nil else {return}
+        guard compositionEditing,settingsEnabled,compositionCrop != nil,compositionSubject != nil else {return}
         pausePreview(refresh:false)
         // A new edit supersedes the pending calculation instead of locking the canvas.
         compositionTask?.cancel();compositionID=UUID();compositionBusy=false
         compositionGestureSettings=project?.settings;compositionAdjusting=true;compositionNotice=nil
     }
+    var compositionSubject:SubjectFraming.Frame? {SubjectFraming.frame(at:compositionDisplayTime,in:compositionSubjects)}
+    var compositionPrimaryBody:NormalizedRect? {hasCompletedTracking ? compositionSubject?.body : nil}
+    var compositionReadout:(height:Double,x:Double,y:Double)? {
+        guard let subject=compositionSubject,let crop=compositionCrop,let project,crop.height>0 else {return nil}
+        return (subject.height*project.metadata.height/crop.height,
+                (subject.center.x*project.metadata.width-crop.minX)/crop.width-0.5,
+                (subject.center.y*project.metadata.height-crop.minY)/crop.height-0.5)
+    }
+    func compositionCentered(horizontal:Bool)->Bool {
+        guard let actual=compositionReadout,let target=project?.settings.subjectComposition else {return false}
+        return abs(horizontal ? target.x : target.y)<0.00001 && abs(horizontal ? actual.x : actual.y)<=0.005
+    }
+    var compositionStatusText:String {
+        guard let value=compositionReadout else {return "人物 — · 水平 — · 垂直 —"}
+        func percent(_ value:Double)->String {abs(value*100).rounded().formatted(.number.precision(.fractionLength(0)))+"%"}
+        let x=(value.x*100).rounded()==0 || compositionCentered(horizontal:true) ? "水平 0%" : (value.x<0 ? "左 " : "右 ")+percent(value.x)
+        let y=(value.y*100).rounded()==0 || compositionCentered(horizontal:false) ? "垂直 0%" : (value.y<0 ? "上 " : "下 ")+percent(value.y)
+        return "人物 \(percent(value.height)) · \(x) · \(y)"
+    }
+    var compositionAlignmentNotice:String? {
+        guard let value=compositionReadout,let target=project?.settings.subjectComposition else {return nil}
+        if abs(value.x-target.x)>0.01 || abs(value.y-target.y)>0.01 || abs(value.height-target.height)>0.015 {
+            return "原片边缘限制 · 目标人物 \(Int((target.height*100).rounded()))% · 水平 \(Int((target.x*100).rounded()))% · 垂直 \(Int((target.y*100).rounded()))%"
+        }
+        return nil
+    }
+    private func currentSubjectTarget()->SubjectComposition? {
+        guard let actual=compositionReadout else {return nil}
+        if project?.settings.compositionAnchor == nil,let target=project?.settings.subjectComposition {return target}
+        return .init(height:actual.height,x:actual.x,y:actual.y)
+    }
+    private func displaySubjectCrop() {
+        guard let subject=compositionSubject,let project,let target=project.settings.subjectComposition else {return}
+        compositionCrop=SubjectFraming.crop(subject,source:project.metadata.size,aspect:project.settings.aspectRatio,target:target)
+    }
     func applyCompositionCrop(_ proposed:CGRect) {
-        guard compositionEditing,let project,let automatic=compositionAutomatic,proposed.width.isFinite,proposed.height.isFinite,proposed.height>0 else {return}
-        let samples=compositionSamples
-        guard let reference=samples.min(by:{abs($0.time-currentTime)<abs($1.time-currentTime)}) else {return}
-        let crop=CompositionGeometry.constrain(proposed,source:project.metadata.size,samples:samples,reference:reference,protect:false,aspect:project.settings.aspectRatio)
+        guard compositionEditing,let project,let subject=compositionSubject,
+              proposed.minX.isFinite,proposed.minY.isFinite,proposed.width.isFinite,proposed.height.isFinite,proposed.height>0 else {return}
+        let reference=TargetSample(time:compositionDisplayTime,body:subject.body)
+        let crop=CompositionGeometry.constrain(proposed,source:project.metadata.size,samples:compositionSamples,reference:reference,protect:false,aspect:project.settings.aspectRatio)
         compositionCrop=crop
-        self.project?.settings.compositionScale=automatic.height/crop.height
-        self.project?.settings.compositionX=(automatic.midX-crop.midX)/crop.width
-        self.project?.settings.compositionY=(automatic.midY-crop.midY)/crop.height
-        saveCompositionAnchor(crop)
+        let target=SubjectComposition(height:subject.height*project.metadata.height/crop.height,
+            x:(subject.center.x*project.metadata.width-crop.minX)/crop.width-0.5,
+            y:(subject.center.y*project.metadata.height-crop.minY)/crop.height-0.5)
+        self.project?.settings.subjectComposition=target
+        self.project?.settings.compositionAnchor=nil
+        self.project?.settings.compositionScale=(compositionAutomatic?.height ?? crop.height)/crop.height
+        self.project?.settings.compositionX=target.x
+        self.project?.settings.compositionY=target.y
         let constrained=abs(crop.height-proposed.height)>0.5 || abs(crop.minX-proposed.minX)>0.5 || abs(crop.minY-proposed.minY)>0.5
         compositionNotice=constrained ? "已达到画面边界" : nil
     }
@@ -1067,10 +1113,20 @@ extension AppModel {
         compositionGestureSettings=nil;compositionAdjusting=false;refreshComposition();persist()
     }
     func compositionZoom(_ factor:Double) {
-        guard let crop=compositionCrop else {return}
+        guard factor.isFinite,factor>0,let crop=compositionCrop else {return}
         beginCompositionGesture()
         guard compositionAdjusting else {return}
-        applyCompositionCrop(CompositionGeometry.transformed(crop,scale:factor,translation:.zero,anchor:.init(x:0.5,y:0.5),viewport:.init(width:1,height:1)))
+        if var target=currentSubjectTarget() {
+            target.height *= factor
+            project?.settings.subjectComposition=target;project?.settings.compositionAnchor=nil
+            displaySubjectCrop()
+            if let adjusted=compositionCrop {
+                project?.settings.compositionScale=(compositionAutomatic?.height ?? adjusted.height)/adjusted.height
+                project?.settings.compositionX=target.x;project?.settings.compositionY=target.y
+            }
+        } else {
+            applyCompositionCrop(CompositionGeometry.transformed(crop,scale:factor,translation:.zero,anchor:.init(x:0.5,y:0.5),viewport:.init(width:1,height:1)))
+        }
         endCompositionGesture()
     }
     func compositionMove(x:Double,y:Double) {
@@ -1083,6 +1139,8 @@ extension AppModel {
               let project,project.settings.aspectRatio != aspect else {return}
         pausePreview(refresh:false)
         compositionUndo.append(project.settings)
+        let target=currentSubjectTarget()
+        self.project?.settings.subjectComposition=target;self.project?.settings.compositionAnchor=nil
         self.project?.settings.aspectRatio=aspect
         let sizes=OutputResolution.available(for:project.metadata,aspect:aspect)
         // Preserve the selected quality budget where possible, without upscaling the source.
@@ -1090,34 +1148,23 @@ extension AppModel {
         if let automatic=compositionAutomatic {
             compositionAutomatic=CompositionGeometry.reframed(automatic,source:project.metadata.size,aspect:aspect)
         }
-        if let crop=compositionCrop {
-            let reframed=CompositionGeometry.reframed(crop,source:project.metadata.size,aspect:aspect)
-            compositionCrop=reframed
-            saveCompositionAnchor(reframed)
-        }
+        displaySubjectCrop()
         refreshComposition();persist()
     }
     func centerComposition(horizontal:Bool) {
-        guard compositionEditing,!compositionAdjusting,
-              let project,let crop=compositionCrop,
-              let reference=compositionSamples.min(by:{abs($0.time-currentTime)<abs($1.time-currentTime)}) else {return}
-        beginCompositionGesture()
-        guard compositionAdjusting else {return}
-        // Center the dancer on the chosen axis; retain the other axis and current zoom.
-        let x=horizontal ? reference.body.center.x*project.metadata.width-crop.width/2 : crop.minX
-        let y=horizontal ? crop.minY : reference.body.center.y*project.metadata.height-crop.height/2
-        applyCompositionCrop(CGRect(x:x,y:y,width:crop.width,height:crop.height))
-        endCompositionGesture()
+        guard compositionEditing,!compositionAdjusting,var target=currentSubjectTarget() else {return}
+        beginCompositionGesture();guard compositionAdjusting else {return}
+        if horizontal {target.x=0} else {target.y=0}
+        project?.settings.subjectComposition=target;project?.settings.compositionAnchor=nil
+        displaySubjectCrop();endCompositionGesture()
     }
     func resetComposition(centerOnly:Bool=false) {
-        guard compositionEditing,!compositionAdjusting,let currentProject=project else {return}
-        let settings=currentProject.settings
-        compositionUndo.append(settings);project?.settings.compositionX=0;project?.settings.compositionY=0
-        project?.settings.horizontalOffset=0
-        if centerOnly,let automatic=compositionAutomatic,let crop=compositionCrop {
-            saveCompositionAnchor(CGRect(x:min(currentProject.metadata.width-crop.width,max(0,automatic.midX-crop.width/2)),y:min(currentProject.metadata.height-crop.height,max(0,automatic.midY-crop.height/2)),width:crop.width,height:crop.height))
-        } else {project?.settings.compositionAnchor=nil;project?.settings.compositionScale=1;project?.settings.personHeight=0.75}
-        refreshComposition()
+        guard compositionEditing,!compositionAdjusting,let settings=project?.settings else {return}
+        compositionUndo.append(settings)
+        var target=currentSubjectTarget() ?? .init();target.x=0;target.y=0
+        if !centerOnly {target.height=SubjectComposition().height}
+        project?.settings.subjectComposition=target;project?.settings.compositionAnchor=nil
+        displaySubjectCrop();refreshComposition();persist()
     }
     func undoComposition() {
         guard compositionEditing,!compositionAdjusting,let before=compositionUndo.popLast() else {return}
@@ -1145,6 +1192,7 @@ extension AppModel {
         refreshComposition()
     }
     private func synchronizeCompositionPosition(at time:Double? = nil) {
+        compositionDisplayTime=time ?? currentTime
         compositionCrop=CropPlan.rect(at:time ?? currentTime,in:compositionFrames)
         compositionAutomatic=CropPlan.rect(at:time ?? currentTime,in:compositionAutomaticFrames)
     }
@@ -1152,8 +1200,16 @@ extension AppModel {
         let wasSeeking=timelineSeeker.isSeeking
         scrubID=UUID()
         timelineSeeker.cancel()
-        if settle && wasSeeking {
-            player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
+        if settle && wasSeeking,let player,let item=player.currentItem,let project {
+            let token=scrubID
+            player.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero) { [weak self,weak player,weak item] finished in
+                Task { @MainActor in
+                    guard finished,let self,let player,let item,self.scrubID==token,
+                          self.project?.id==project.id,self.compositionEditing,player.currentItem===item else {return}
+                    let time=player.currentTime().seconds
+                    if time.isFinite {self.synchronizeCompositionPosition(at:time)}
+                }
+            }
         }
     }
     private func scrubComposition(exact:Bool) {
@@ -1394,6 +1450,17 @@ extension AppModel {
 
 extension AppModel {
     #if DEBUG
+    func prepareCompositionDemo() {
+        startDemo()
+        let body=DemoStage.body(index:1,time:0)
+        project?.target=body;targetExplicitlySelected=true
+        targetSamples=(0...350).map {i in
+            let time=min(58.2,Double(i)/6)
+            return .init(time:time,body:DemoStage.body(index:1,time:time))
+        }
+        hasCompletedTracking=true
+        beginComposition()
+    }
     func prepareAnalysisReviewDemo() {
         startDemo()
         project?.metadata = .init(width:1920,height:1080,duration:1,frameRate:30)
@@ -1492,7 +1559,7 @@ extension AppModel {
                 if let source=store.sourceURL(for:project) {await pipeline.restorePeople(review.people,source:source)}
                 guard !Task.isCancelled,self.isCurrent(id,projectID:project.id),self.reviewID==token else {return}
                 self.reviewID=UUID();self.reviewTasks.values.forEach {$0.cancel()};self.reviewTasks=[:]
-                self.targetSamples=review.samples;self.analyzedPeople=review.people
+                self.targetSamples=SubjectFraming.withCachedPoses(review.samples,people:review.people);self.analyzedPeople=review.people
                 self.analysisReview=nil;self.reviewSelection=nil;self.hasCompletedTracking=true
                 self.restoringTracking=false;self.detecting=false;self.detectionNotice=nil;self.manualSelection=false
                 self.phase = .editing;self.route = .editor;self.generatingVideo=false;self.analysisOnly=false

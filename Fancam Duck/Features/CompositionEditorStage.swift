@@ -55,6 +55,14 @@ struct CompositionVideoViewport: View {
                     .accessibilityAction(named:"缩小") {model.compositionZoom(1/1.1)}
                     .accessibilityAction(named:"向左移动") {model.compositionMove(x:-0.03,y:0)}
                     .accessibilityAction(named:"向右移动") {model.compositionMove(x:0.03,y:0)}
+                if let body=model.compositionPrimaryBody {
+                    ZStack(alignment:.topLeading) {
+                        TargetBox(label:"主角",warning:false,dashed:false,showsLabel:false)
+                            .frame(width:body.width*source.width*scale,height:body.height*source.height*scale)
+                            .offset(x:(body.x*source.width-crop.minX)*scale,y:(body.y*source.height-crop.minY)*scale)
+                    }.frame(width:viewport.width,height:viewport.height,alignment:.topLeading)
+                        .clipped().offset(x:viewportOrigin.x,y:viewportOrigin.y).allowsHitTesting(false)
+                }
             }
         }.frame(width:canvas.width,height:canvas.height,alignment:.topLeading)
             .contentShape(Rectangle()).clipped()

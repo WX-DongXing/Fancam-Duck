@@ -124,13 +124,56 @@ final class MediaIntegrationTests: XCTestCase {
         XCTAssertTrue(item.videoComposition?.customVideoCompositorClass == RedactionCompositor.self)
     }
 
-    private func makeVideo(rotated: Bool = false, animated:Bool=false) async throws -> URL {
+    @MainActor func testSubjectZoomPreviewAndEncodedFramesUseSameSourceTime() async throws {
+        let source=try await makeVideo(scale:4,grid:true)
+        defer {try? FileManager.default.removeItem(at:source)}
+        let metadata=try await MediaService.shared.metadata(url:source)
+        var project=VideoProject(title:"Subject crop fixture",metadata:metadata,settings:EditSettings())
+        project.settings.start=0.1;project.settings.end=0.9;project.settings.resolution = .init(width:54,height:96)
+        let samples=(0...6).map {i -> TargetSample in
+            let t=Double(i)/6,scale=1+t*0.2,x=0.42+t*0.12
+            var p=Array(repeating:PosePoint(x:x,y:0.5,confidence:0),count:17)
+            for j in [5,6] {p[j] = .init(x:x,y:0.5-0.12*scale,confidence:1)}
+            for j in [11,12] {p[j] = .init(x:x,y:0.5,confidence:1)}
+            return .init(time:t,body:.init(x:x-0.05,y:0.5-0.22*scale,width:0.1,height:0.4*scale),focusX:x,keypoints:p)
+        }
+        project.target=samples[0].body
+        let plan=CropPlan.renderFrames(CropPlan.make(samples:samples,source:metadata.size,settings:project.settings),frameRate:30)
+        XCTAssertGreaterThan(plan.last!.rect.height,plan.first!.rect.height*1.1)
+        let exporter=VideoExporter(),preview=try await exporter.preview(source:source,project:project,samples:samples)
+        let output=try await exporter.exportMovingCrop(source:source,project:project,samples:samples)
+        defer {try? FileManager.default.removeItem(at:output)}
+        let outputMetadata=try await MediaService.shared.metadata(url:output)
+        XCTAssertEqual(outputMetadata.duration,0.8,accuracy:1.0/30)
+        let expected=AVAssetImageGenerator(asset:preview.asset);expected.videoComposition=preview.videoComposition
+        let actual=AVAssetImageGenerator(asset:AVURLAsset(url:output))
+        let original=AVAssetImageGenerator(asset:AVURLAsset(url:source))
+        for generator in [expected,actual,original] {generator.requestedTimeToleranceBefore = .zero;generator.requestedTimeToleranceAfter = .zero}
+        let context=CIContext()
+        for t in [0.2,0.6] {
+            let time=CMTime(seconds:t,preferredTimescale:600)
+            let a=try await expected.image(at:time).image,b=try await actual.image(at:time).image
+            func pixel(_ image:CGImage,at point:CGPoint = .init(x:27,y:48))->[UInt8] {
+                var rgba=[UInt8](repeating:0,count:4)
+                context.render(CIImage(cgImage:image),toBitmap:&rgba,rowBytes:4,bounds:CGRect(x:point.x,y:point.y,width:1,height:1),format:.RGBA8,colorSpace:CGColorSpaceCreateDeviceRGB())
+                return rgba
+            }
+            let pa=pixel(a),pb=pixel(b)
+            for i in 0..<3 {XCTAssertEqual(Double(pa[i]),Double(pb[i]),accuracy:10)}
+            let crop=try XCTUnwrap(CropPlan.rect(at:project.settings.start+t,in:plan))
+            let sourceImage=try await original.image(at:CMTime(seconds:project.settings.start+t,preferredTimescale:600)).image
+            let sourcePixel=pixel(sourceImage,at:.init(x:crop.midX,y:metadata.height-crop.midY))
+            XCTAssertEqual(Double(pb[0]),Double(sourcePixel[0]),accuracy:10)
+        }
+    }
+
+    private func makeVideo(rotated: Bool = false, animated:Bool=false,scale:Int=1,grid:Bool=false) async throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mov")
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
-        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 192, AVVideoHeightKey: 108])
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 192*scale, AVVideoHeightKey: 108*scale])
         input.expectsMediaDataInRealTime = false
         if rotated { input.transform = CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: 108, ty: 0) }
-        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA, kCVPixelBufferWidthKey as String: 192, kCVPixelBufferHeightKey as String: 108])
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA, kCVPixelBufferWidthKey as String: 192*scale, kCVPixelBufferHeightKey as String: 108*scale])
         writer.add(input)
         XCTAssertTrue(writer.startWriting())
         writer.startSession(atSourceTime: .zero)
@@ -140,14 +183,14 @@ final class MediaIntegrationTests: XCTestCase {
                 try await Task.sleep(for: .milliseconds(5))
             }
             var pixelBuffer: CVPixelBuffer?
-            let result = CVPixelBufferCreate(kCFAllocatorDefault, 192, 108, kCVPixelFormatType_32BGRA, nil, &pixelBuffer)
+            let result = CVPixelBufferCreate(kCFAllocatorDefault, 192*scale, 108*scale, kCVPixelFormatType_32BGRA, nil, &pixelBuffer)
             guard result == kCVReturnSuccess, let buffer = pixelBuffer else { throw MediaError.exportFailed }
             CVPixelBufferLockBaseAddress(buffer, [])
             let base = CVPixelBufferGetBaseAddress(buffer)!.assumingMemoryBound(to: UInt8.self)
             let stride = CVPixelBufferGetBytesPerRow(buffer)
-            for y in 0..<108 { for x in 0..<192 {
+            for y in 0..<108*scale { for x in 0..<192*scale {
                 let p = base.advanced(by: y * stride + x * 4)
-                p[0] = animated ? UInt8(20+index*6) : 50; p[1] = 150; p[2] = 30; p[3] = 255
+                p[0] = animated ? UInt8(20+index*6) : 50; p[1] = grid ? UInt8(y*255/(108*scale)) : 150; p[2] = grid ? UInt8(x*255/(192*scale)) : 30; p[3] = 255
             }}
             CVPixelBufferUnlockBaseAddress(buffer, [])
             XCTAssertTrue(adaptor.append(buffer, withPresentationTime: CMTime(value: Int64(index), timescale: 30)))
