@@ -433,11 +433,7 @@ final class EditorFlowTests: XCTestCase {
         XCTAssertLessThanOrEqual(panel.frame.height,184)
         let styleFrame=style.frame,actionFrame=app.buttons["primaryAction"].frame
         XCTAssertFalse(region.isHittable)
-        app.buttons["redactionHelp"].tap()
-        XCTAssertTrue(app.staticTexts["对主角外人物进行打码"].waitForExistence(timeout:3))
-        XCTAssertEqual(app.alerts.count,0)
-        capture(app,"phone-redaction-help-popover")
-        app.coordinate(withNormalizedOffset:CGVector(dx:0.9,dy:0.25)).tap()
+        XCTAssertFalse(app.buttons["redactionHelp"].exists)
         XCTAssertFalse(app.staticTexts["对主角外人物进行打码"].exists)
         XCTAssertFalse(app.staticTexts["主角不打码"].exists)
         XCTAssertEqual(style.buttons.count,3)

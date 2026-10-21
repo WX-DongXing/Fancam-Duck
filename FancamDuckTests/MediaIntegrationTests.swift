@@ -124,6 +124,56 @@ final class MediaIntegrationTests: XCTestCase {
         XCTAssertTrue(item.videoComposition?.customVideoCompositorClass == RedactionCompositor.self)
     }
 
+    @MainActor func testRedactedSettingsCanPlayFromCachedAnalysisBeforeGeneration() async throws {
+        let source=try await makeVideo(animated:true)
+        defer {try? FileManager.default.removeItem(at:source)}
+        let directory=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer {try? FileManager.default.removeItem(at:directory)}
+        let store=ProjectStore(directory:directory)
+        try await store.prepare()
+        var project=VideoProject(title:"Redacted playback",sourceFileName:try await store.importFile(source).lastPathComponent,
+                                 metadata:try await MediaService.shared.metadata(url:source),settings:.init())
+        project.settings.end=1;project.settings.resolution = .init(width:54,height:96)
+        project.settings.redaction = .init(region:.person,allOthers:true)
+        let primary=NormalizedRect(x:0.1,y:0.1,width:0.15,height:0.8)
+        project.target=primary
+        let samples=(0...6).map {TargetSample(time:Double($0)/6,body:primary)}
+        let batches=Dictionary(uniqueKeysWithValues:samples.map {sample in
+            (AnalysisSampling.key(sample.time),DetectionBatch(primary:[
+                PersonObservation(id:1,body:primary,confidence:0.9,embedding:[1,0]),
+                PersonObservation(id:2,body:.init(x:0.7,y:0.1,width:0.15,height:0.8),confidence:0.9,embedding:[0,1])
+            ],relaxed:[]))
+        })
+        try await store.save(project);try await store.saveTrajectory(project:project,samples:samples,people:batches)
+        let model=AppModel(store:store);defer {model.goHome()}
+        model.open(project)
+        for _ in 0..<600 {if !model.restoringTracking {break};try await Task.sleep(for:.milliseconds(10))}
+        XCTAssertTrue(model.hasCompletedTracking)
+        model.beginComposition()
+        for _ in 0..<600 {if !model.compositionBusy {break};try await Task.sleep(for:.milliseconds(10))}
+        XCTAssertNil(model.errorMessage)
+        let item=try XCTUnwrap(model.previewPlayer?.currentItem,"Complete cached people must prepare protected playback before generation")
+        let instruction=try XCTUnwrap(item.videoComposition?.instructions.first as? RedactionInstruction)
+        XCTAssertFalse(instruction.plan.tracks.isEmpty)
+        XCTAssertTrue(instruction.plan.covers(model.project!))
+        XCTAssertNil(model.project?.redactionPlan,"A temporary preview must not mark export analysis as generated")
+        model.togglePreview()
+        XCTAssertTrue(model.isPlaying)
+        for _ in 0..<200 {if model.currentTime>0.15 {break};try await Task.sleep(for:.milliseconds(10))}
+        XCTAssertGreaterThan(model.currentTime,0.15,"The actual AVPlayer clock must advance")
+        model.pausePreview(refresh:false)
+        model.setRedactionStyle(.mosaic)
+        model.togglePreview()
+        for _ in 0..<600 {if !model.compositionBusy && model.isPlaying {break};try await Task.sleep(for:.milliseconds(10))}
+        XCTAssertTrue(model.isPlaying,"A play request during protected preview preparation must resume after the new recipe is ready")
+        let updated=try XCTUnwrap(model.previewPlayer?.currentItem?.videoComposition?.instructions.first as? RedactionInstruction)
+        XCTAssertEqual(updated.style,.mosaic)
+        model.pausePreview(refresh:false)
+        model.clearRedactions()
+        for _ in 0..<600 {if !model.compositionBusy {break};try await Task.sleep(for:.milliseconds(10))}
+        XCTAssertNotNil(model.previewPlayer?.currentItem)
+    }
+
     @MainActor func testSubjectZoomPreviewAndEncodedFramesUseSameSourceTime() async throws {
         let source=try await makeVideo(scale:4,grid:true)
         defer {try? FileManager.default.removeItem(at:source)}

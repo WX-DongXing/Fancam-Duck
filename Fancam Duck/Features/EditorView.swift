@@ -5,12 +5,11 @@ struct EditorView: View {
     @Bindable var model: AppModel
     @State private var savingFile=false
     @State private var generatedPlaying=false
-    @State private var showRedactionHelp=false
     @State private var drawnBox: NormalizedRect?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ScaledMetric(relativeTo: .body) private var settingsHeight = 184
+    @State private var settingsPanelHeights:[WorkspaceTool:CGFloat]=[:]
     @State private var activeTool: WorkspaceTool?
     @State private var lastSettingsTool:WorkspaceTool = .composition
     @State private var timelineTrimming = false
@@ -79,8 +78,9 @@ struct EditorView: View {
                                 editorTimeline
                                 if let tool=displayedTool,!isProcessing {
                                     inlineSettings(tool)
-                                        .frame(height:tool == .redaction ? min(184,geometry.size.height*0.30) : tool == .motion ? min(settingsHeight*104/184,140,geometry.size.height*0.30) : min(settingsHeight,208,geometry.size.height*0.38),alignment:.top)
+                                        .frame(height:settingsPanelHeight(tool,available:geometry.size.height),alignment:.top)
                                         .clipped()
+                                        .padding(.top,10)
                                         .transition(.opacity)
                                 }
                                 bottomToolbar.padding(.top,12).padding(.bottom,8)
@@ -463,7 +463,7 @@ struct EditorView: View {
                 else {model.togglePreview()}
         }
         .accessibilityIdentifier("editorPlayback").keyboardShortcut(.space,modifiers:[])
-        .disabled(isProcessing || model.isReviewing || model.manualSelection || timelineTrimming || (!isCompleted && model.hasCompletedTracking && model.project?.settings.redaction.enabled == true && model.project?.redactionPlan?.covers(model.project!) != true) || model.compositionEditing && !model.hasCompletedTracking)
+        .disabled(isProcessing || model.isReviewing || model.manualSelection || timelineTrimming || (!isCompleted && !model.compositionEditing && model.hasCompletedTracking && model.project?.settings.redaction.enabled == true && model.project?.redactionPlan?.covers(model.project!) != true) || model.compositionEditing && !model.hasCompletedTracking)
     }
 
     private var playbackRow: some View {
@@ -653,7 +653,6 @@ struct EditorView: View {
     private var settingsPanelAnimation:Animation? {reduceMotion ? nil : .smooth(duration:0.24,extraBounce:0)}
     private func inlineSettings(_ tool:WorkspaceTool)->some View {
         settingsPanel(tool).padding(.horizontal,18)
-            .accessibilityElement(children:.contain).accessibilityIdentifier("adjustmentPanel")
     }
     private func settingsPanel(_ tool:WorkspaceTool)->some View {
         // The explicit outer frame alone owns height. Outgoing controls in the overlay
@@ -667,12 +666,23 @@ struct EditorView: View {
                 }
             }
             .padding(panelInset)
+            .fixedSize(horizontal:false,vertical:true)
+            .onGeometryChange(for:CGFloat.self) {$0.size.height} action: {height in
+                guard displayedTool==tool,height>0,abs(height-(settingsPanelHeights[tool] ?? 0))>0.5 else {return}
+                withAnimation(settingsPanelAnimation) {settingsPanelHeights[tool]=height}
+            }
             .modifier(StudioGlassSurface(shape:RoundedRectangle(cornerRadius:24),interactive:false))
             .frame(maxWidth:.infinity)
+            .accessibilityElement(children:.contain)
+            .accessibilityIdentifier("adjustmentPanel")
             .id(tool)
             .transition(reduceMotion ? .identity : .opacity.combined(with:.offset(y:6)))
             .zIndex(1)
         }.dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+    }
+    private func settingsPanelHeight(_ tool:WorkspaceTool,available:CGFloat)->CGFloat {
+        let fallback:CGFloat=tool == .composition ? 164 : tool == .motion ? 104 : 152
+        return min(settingsPanelHeights[tool] ?? fallback,available*0.38)
     }
     // Shared control sizing and spacing for phone, wide layouts and Mac Catalyst.
     private let panelInset:CGFloat = 12
@@ -683,20 +693,9 @@ struct EditorView: View {
                     get:{model.project?.settings.redaction.enabled == true},
                     set:{if $0 {model.enableAutomaticRedaction()} else {model.clearRedactions()}}
                 )) {
-                    HStack(spacing:4) {
-                        Text("打码")
-                        Button {showRedactionHelp=true} label: {
-                            Image(systemName:"questionmark.circle").font(.subheadline)
-                                .frame(width:44,height:44,alignment:.leading).contentShape(Rectangle())
-                        }.buttonStyle(.plain).accessibilityLabel("打码说明").accessibilityIdentifier("redactionHelp")
-                        .popover(isPresented:$showRedactionHelp,attachmentAnchor:.point(UnitPoint(x:0.18,y:0.5)),arrowEdge:.bottom) {
-                            Text("对主角外人物进行打码")
-                                .font(.subheadline).padding(16)
-                                .presentationCompactAdaptation(.popover)
-                        }
-                    }
+                    Text("打码")
                 }
-                .font(.subheadline.weight(.medium)).toggleStyle(.switch)
+                .font(.subheadline.weight(.medium)).toggleStyle(.switch).tint(Color.acAccent)
                 .accessibilityIdentifier("redactionEnabled")
                 ZStack {
                 if model.project?.settings.redaction.enabled == true {
@@ -724,6 +723,8 @@ struct EditorView: View {
                 }.frame(width:model.project?.settings.redaction.enabled == true ? 88 : 0,height:44)
                     .padding(.leading,model.project?.settings.redaction.enabled == true ? 12 : 0)
             }.frame(height:44)
+                // The menu fills 44pt; only the bare native switch has spare vertical space.
+                .padding(.vertical,model.project?.settings.redaction.enabled == true ? 0 : -6)
                 .animation(reduceMotion ? nil : .easeInOut(duration:0.28),value:model.project?.settings.redaction.enabled)
             NativeSegmentedControl(title:"打码样式",options:RedactionSettings.Style.allCases.filter {model.project?.settings.redaction.region != .person || $0 != .image},selection:Binding(
                 get:{model.project?.settings.redaction.style ?? .frosted},set:{model.setRedactionStyle($0)}
@@ -745,7 +746,7 @@ struct EditorView: View {
                         .font(.caption.monospacedDigit()).frame(width:34,alignment:.trailing)
                         .accessibilityHidden(true)
                 }
-            }.frame(height:44)
+            }.frame(height:44).padding(.vertical,-6)
         }.accessibilityElement(children:.contain)
     }
     private var stickerChoices:some View {
@@ -805,10 +806,6 @@ struct EditorView: View {
                 compositionControl("水平居中", symbol: "align.horizontal.center",selected:model.compositionCentered(horizontal:true)) { model.centerComposition(horizontal: true) }
                 compositionControl("垂直居中", symbol: "align.vertical.center",selected:model.compositionCentered(horizontal:false)) { model.centerComposition(horizontal: false) }
             }.disabled(compositionControlsDisabled)
-            if let notice=model.editorActivityText ?? model.compositionNotice ?? model.compositionAlignmentNotice {
-                Text(notice)
-                    .font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
-            }
         }
     }
     private var compositionControlsDisabled: Bool { timelineTrimming || model.compositionAdjusting }

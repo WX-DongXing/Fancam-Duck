@@ -13,6 +13,7 @@ final class SubjectCompositionFlowTests:XCTestCase {
         XCTAssertTrue(status.label.contains("65%"))
         XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"selectedTargetFrame").firstMatch.exists)
         XCTAssertFalse(app.staticTexts["拖动位置 · 双指缩放"].exists)
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format:"label BEGINSWITH '原片边缘限制'")).firstMatch.exists)
         XCTAssertEqual(app.scrollViews.count,0)
         func activate(_ element:XCUIElement) {
             #if targetEnvironment(macCatalyst) || os(macOS)
@@ -56,13 +57,31 @@ final class SubjectCompositionFlowTests:XCTestCase {
         capture("subject-composition-timeline")
         #if !targetEnvironment(macCatalyst) && !os(macOS)
         let beforePinch=status.label
-        canvas.pinch(withScale:1.05,velocity:1)
+        canvas.pinch(withScale:1.2,velocity:1)
         XCTAssertNotEqual(status.label,beforePinch)
         capture("subject-composition-pinch")
         #endif
         let tools=app.segmentedControls["editorToolbar"]
+        #if !targetEnvironment(macCatalyst) && !os(macOS)
+        if app.windows.firstMatch.frame.width<600 {
+            var motionTopGap:CGFloat?
+            for tool in ["运镜","构图","打码"] {
+                activate(tools.buttons[tool])
+                let card=app.descendants(matching:.any).matching(identifier:"adjustmentPanel").firstMatch
+                XCTAssertTrue(card.waitForExistence(timeout:5))
+                XCTAssertEqual(app.buttons["primaryAction"].frame.minY-card.frame.maxY,12,accuracy:1)
+                let topGap=card.frame.minY-timeline.frame.maxY
+                if let motionTopGap {XCTAssertEqual(topGap,motionTopGap,accuracy:1)} else {motionTopGap=topGap}
+                capture("subject-panel-"+tool)
+            }
+        }
+        #endif
         activate(tools.buttons["打码"])
         capture("subject-redaction-padding")
+        let redaction=app.switches["redactionEnabled"]
+        redaction.coordinate(withNormalizedOffset:CGVector(dx:0.9,dy:0.5)).tap()
+        XCTAssertEqual(redaction.value as? String,"1")
+        capture("subject-redaction-theme")
         XCTAssertTrue(app.buttons["primaryAction"].isHittable)
         activate(tools.buttons["构图"])
         for button in [horizontal,vertical,app.buttons["构图放大"],app.buttons["primaryAction"]] {

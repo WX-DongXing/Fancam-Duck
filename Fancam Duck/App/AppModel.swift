@@ -91,6 +91,7 @@ final class AppModel {
     private var compositionDisplayTime:Double=0
     private var compositionAutomaticFrames:[CropPlan.Frame]=[]
     private var compositionTask:Task<Void,Never>?
+    private var compositionPreviewReady=false
     private var compositionID=UUID()
     var compositionDisplayedScale:Double {
         guard let automatic=compositionAutomatic,let crop=compositionCrop,crop.height>0 else {return project?.settings.compositionScale ?? 1}
@@ -538,10 +539,10 @@ final class AppModel {
     }
     func togglePreview() {
         guard phase == .editing else {return}
+        if compositionEditing {toggleCompositionPlayback();return}
         if let project,hasCompletedTracking,project.settings.redaction.enabled,project.redactionPlan?.covers(project) != true {
             detectionNotice="确认处理后可播放完整打码效果";return
         }
-        if compositionEditing { toggleCompositionPlayback();return }
         guard controlsEnabled, !manualSelection else { return }
         if isPlaying { pausePreview(); return }
         guard let project else { return }
@@ -935,7 +936,7 @@ final class AppModel {
         redactionIssue=nil;redactionPreviewID=UUID();redactionPreviewTask?.cancel()
         if compositionEditing { finishComposition(commit:true,refreshDetections:false) }
         restorationID=UUID();restorationTask?.cancel();restoringTracking=false;savingToPhotos=false;detectionNotice=nil;cancellingExport=false;exportProgress=0
-        compositionTask?.cancel();compositionID=UUID();compositionBusy=false;compositionFrames=[];compositionAutomaticFrames=[];compositionSubjects=[]
+        compositionTask?.cancel();compositionID=UUID();compositionBusy=false;compositionPreviewReady=false;compositionFrames=[];compositionAutomaticFrames=[];compositionSubjects=[]
         pausePreview(refresh:false);operationID=UUID();detectionID=UUID();importID=UUID();importing=false
         detectionTask?.cancel();detecting=false;observations=[]
         processingPreview=nil;trackedSample=nil
@@ -992,9 +993,12 @@ extension AppModel {
     }
     private func refreshComposition() {
         guard compositionEditing,let project else { return }
+        pausePreview(refresh:false)
         cancelTimelineScrubbing(settle:true)
+        compositionPreviewReady=false
         compositionTask?.cancel();let id=UUID();compositionID=id
         let samples=compositionSamples,settings=project.settings,source=project.metadata.size
+        let people=analyzedPeople.sorted {$0.key<$1.key}.map {(Double($0.key)/10000,$0.value)}
         compositionSubjects=SubjectFraming.make(samples,source:source)
         var automatic=settings;automatic.subjectComposition=settings.subjectComposition == nil ? nil : .init();automatic.compositionScale=1;automatic.compositionX=0;automatic.compositionY=0;automatic.compositionAnchor=nil
         let cachedAutomatic=compositionAutomaticSettings==automatic ? compositionAutomaticFrames : []
@@ -1014,17 +1018,27 @@ extension AppModel {
             self.synchronizeCompositionPosition(at:self.compositionDisplayTime)
 
             do {
-                if self.hasCompletedTracking,project.settings.redaction.enabled,project.redactionPlan?.covers(project) != true {
-                    // Camera editing remains available before the new masks are analyzed. Never
-                    // reuse a moving preview with an older (or missing) privacy plan.
+                var rendering=project
+                if self.hasCompletedTracking,settings.redaction.enabled,project.redactionPlan?.covers(project) != true,
+                   settings.redaction.allOthers,!people.isEmpty {
+                    let masks=Task.detached(priority:.userInitiated) {
+                        try AutomaticRedaction.build(frames:people,project:project,samples:samples)
+                    }
+                    let plan=try await withTaskCancellationHandler {try await masks.value} onCancel:{masks.cancel()}
+                    guard !Task.isCancelled,self.compositionEditing,self.compositionID==id,self.project?.id==project.id else {return}
+                    // Preview-only cache reuse must not mark the export recipe as generated.
+                    if plan.covers(project) {rendering.redactionPlan=plan}
+                }
+                if self.hasCompletedTracking,settings.redaction.enabled,rendering.redactionPlan?.covers(rendering) != true {
                     self.previewPlayer?.pause();self.previewPlayer=nil
-                    self.compositionNotice="打码设置已更改，确认处理后可播放"
+                    self.compositionNotice="完整打码轨迹尚未准备好"
                 } else if self.hasCompletedTracking,let url=self.store.sourceURL(for:project) {
-                    let item=try await self.exporter.preview(source:url,project:project,samples:samples)
+                    let item=try await self.exporter.preview(source:url,project:rendering,samples:samples)
                     guard !Task.isCancelled,self.compositionEditing,self.compositionID==id,self.project?.id==project.id else { return }
                     if let player=self.previewPlayer {player.replaceCurrentItem(with:item)}
                     else {self.previewPlayer=AVPlayer(playerItem:item)}
                     self.previewPlayer?.seek(to:CMTime(seconds:self.currentTime-settings.start,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero,completionHandler:{_ in})
+                    self.compositionPreviewReady=true
                 }
                 self.compositionBusy=false
             } catch {
@@ -1130,7 +1144,7 @@ extension AppModel {
         endCompositionGesture()
     }
     func compositionMove(x:Double,y:Double) {
-        guard let crop=compositionCrop else {return}
+        guard x.isFinite,y.isFinite,x != 0 || y != 0,let crop=compositionCrop else {return}
         beginCompositionGesture();guard compositionAdjusting else {return};applyCompositionCrop(crop.offsetBy(dx:-x*crop.width,dy:-y*crop.height));endCompositionGesture()
     }
     func setCompositionAspect(_ aspect: OutputAspectRatio) {
@@ -1236,7 +1250,7 @@ extension AppModel {
         },cancel:{ [weak item] in item?.cancelPendingSeeks() }))
     }
     private func toggleCompositionPlayback() {
-        guard hasCompletedTracking else {return}
+        guard hasCompletedTracking,!compositionAdjusting else {return}
         if compositionBusy,let task=compositionTask,let project {
             let id=compositionID,settings=project.settings
             previewTask?.cancel()
@@ -1249,8 +1263,8 @@ extension AppModel {
             return
         }
         if isPlaying {pausePreview(refresh:false);return}
-        guard isDemo || (previewPlayer?.currentItem != nil && previewPlayer?.currentItem?.status != .failed) else {
-            compositionNotice="预览暂不可用，请稍后重试";return
+        guard isDemo || (compositionPreviewReady && previewPlayer?.currentItem != nil && previewPlayer?.currentItem?.status != .failed) else {
+            errorMessage="播放预览尚未准备好，请稍后重试";return
         }
         if let project,currentTime>=project.settings.end-0.05 {seek(to:project.settings.start)}
         cancelTimelineScrubbing()
