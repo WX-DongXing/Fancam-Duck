@@ -817,10 +817,9 @@ struct EditorView: View {
             VStack(spacing: 5) {
                 Image(systemName: symbol).symbolRenderingMode(.monochrome).font(.system(size: 20))
                     .frame(height: 26)
-                    .foregroundStyle(selected ? Color.acAccent : Color.primary)
                 Text(title).font(.caption2).lineLimit(1).minimumScaleFactor(0.65)
             }.frame(maxWidth: .infinity).frame(height: 56).contentShape(Rectangle())
-                .foregroundStyle(Color.primary)
+                .foregroundStyle(selected ? Color.acAccent : Color.primary)
         }.buttonStyle(.plain).accessibilityLabel("构图" + title)
             .accessibilityAddTraits(selected ? .isSelected : [])
     }
