@@ -5,6 +5,8 @@ struct TrimTimeline:View {
     var onEditingChanged: (Bool) -> Void = { _ in }
     @State private var draftRange: ClosedRange<Double>?
     @State private var referenceTime = 0.0
+    @State private var scrubbing = false
+    @GestureState private var draggingPlayhead = false
     @GestureState private var draggingHandle = false
     private var canTrim: Bool {
         model.settingsEnabled && !model.manualSelection && !model.compositionAdjusting
@@ -24,10 +26,15 @@ struct TrimTimeline:View {
                                 else { Color.gray.opacity(0.2).frame(width:width/8,height:48) }
                             }
                         }.frame(width:width,height:48).clipShape(RoundedRectangle(cornerRadius:8)).offset(x:22)
-                            .contentShape(Rectangle()).gesture(DragGesture(minimumDistance:0).onChanged { value in
-                                guard model.controlsEnabled && !model.manualSelection && (!model.compositionEditing || model.hasCompletedTracking) else { return }
-                                model.pausePreview(refresh:false); model.scrub(to:value.location.x/width*duration)
-                            }.onEnded {_ in model.finishScrubbing()})
+                            .contentShape(Rectangle()).gesture(DragGesture(minimumDistance:0)
+                            .updating($draggingPlayhead) {_,dragging,_ in dragging=true}
+                            .onChanged { value in
+                                guard (model.controlsEnabled || model.canScrubGeneratedPreview) && !model.manualSelection && (!model.compositionEditing || model.hasCompletedTracking) else { return }
+                                if !scrubbing {scrubbing=true;onEditingChanged(true)}
+                                model.scrub(to:value.location.x/width*duration)
+                            }.onEnded {_ in
+                                finishScrub()
+                            })
                         Rectangle().fill(.black.opacity(0.55)).frame(width:max(0,startX-22),height:48).offset(x:22).allowsHitTesting(false)
                         Rectangle().fill(.black.opacity(0.55)).frame(width:max(0,22+width-endX),height:48).offset(x:endX).allowsHitTesting(false)
                         RoundedRectangle(cornerRadius:6).strokeBorder(Color.white,lineWidth:2).frame(width:max(0,endX-startX),height:48).offset(x:startX).allowsHitTesting(false)
@@ -53,11 +60,21 @@ struct TrimTimeline:View {
                     .accessibilityValue("起点 \((draftRange?.lowerBound ?? project.settings.start).videoTime)，终点 \((draftRange?.upperBound ?? project.settings.end).videoTime)，当前 \(model.currentTime.videoTime)")
 
             }.accessibilityElement(children: .contain).accessibilityIdentifier("trimTimeline")
+                .onChange(of:draggingPlayhead) {_,dragging in if !dragging {finishScrub()}}
                 .onChange(of: draggingHandle) { _, dragging in
                     if !dragging { cancelTrim() }
                 }
-                .onDisappear { cancelTrim() }
+                .onDisappear {
+                    if scrubbing {scrubbing=false;onEditingChanged(false)}
+                    cancelTrim()
+                }
         }
+    }
+    private func finishScrub() {
+        guard scrubbing else {return}
+        scrubbing=false
+        if model.route == .editor {model.finishScrubbing()}
+        onEditingChanged(false)
     }
     private func handle(_ isStart:Bool,x:Double,width:Double,duration:Double) -> some View {
         RoundedRectangle(cornerRadius:6).fill(Color.white).frame(width:18,height:48)
@@ -67,7 +84,6 @@ struct TrimTimeline:View {
                 .updating($draggingHandle) { _, dragging, _ in dragging = true }
                 .onChanged { value in
                 guard canTrim else { return }
-                model.pausePreview(refresh:false)
                 let time=(value.location.x-22)/width*duration
                 adjust(isStart: isStart, time: time)
             }.onEnded { _ in finishTrim(isStart: isStart) })

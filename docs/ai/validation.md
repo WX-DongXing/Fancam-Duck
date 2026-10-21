@@ -353,3 +353,11 @@ iPhone 17 Pro／iOS 26.3.1 原生设置 UI 回归 1 项通过：直接选择人�
 新增 ProjectIntegrityTests 共 5 项，使用纯模拟数据／可控读取闸门，不依赖私人视频：打码版本跨重启校验、未打码旧输出兼容、异常清单替换不误删文件／新清单、晚到相册读取不覆盖新请求及不清空其忙碌态、切项目后晚到错误被丢弃。iPhone 17 Pro／iOS 26.3.1 完整单元套件 177 项，125 通过、52 因真实素材等条件跳过、0 失败。
 
 最终 Mac Catalyst Debug 构建通过；iPhone 原生设置 UI 回归 1 项通过，覆盖工具切换、0／10／100 强度、范围菜单、贴片及生成时构图保留。本轮未进行真实视频性能测量或 Mac 窗口点击验收。
+
+## 分析后时间轴寻帧优化（2026-10-21）
+
+`VideoSeekCoalescerTests`、`CompositionTests`、`CodeReviewRegressionTests`、`ContinuousSettingsTests`、`AsyncStateTests` 共执行 41 项，25 通过、16 因缺少本地私人素材跳过、0 失败。新增用例验证连续请求只保留最新位置、取消后旧回调不推进新队列，以及 AppModel 拖动时不寻帧隐藏合成、松手使用零容差、退出后晚到回调不恢复旧构图。Mac Catalyst Debug 构建通过，`git diff --check` 通过。
+
+iPhone 17 Pro／iOS 26.3.1 实际打开原有 37.9 秒已分析项目，检查大范围正向与反向拖动、构图保持、切换运镜面板及从当前位置播放／暂停。保留原片与合成预览的当前构图；未重新运行人物识别。此轮仅验证模拟器交互与请求调度，没有测量真机延迟、FPS 或性能提升百分比。私人视频与截图未加入仓库。
+
+生成预览进度条修复（2026-10-21）：修复 `TrimTimeline` 在 completed 状态拦截拖动及 AppModel 未将成片寻帧转发到 previewPlayer 的问题。定向单元测试 22 项，20 通过、2 因私人素材缺失跳过、0 失败；新增用例覆盖非零片段起点的成片相对时间、边界夹取、松手精确寻帧、原片和设置不变及退出后回调。`testGeneratedPreviewTimelineCanScrubAndPlayAgain` UI 测试 1 项通过，验证生成后实际拖动会移动时间轴、暂停播放状态并允许再次播放；素材为模拟演示。Mac Catalyst 构建和 diff 检查通过。原有已生成的实际项目已恢复，但 Device Hub 窗口控制随后不可用，未完成该项目的手动拖动复核，不能将演示 UI 结果表述为真实视频实测。

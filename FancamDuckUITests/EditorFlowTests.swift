@@ -259,6 +259,29 @@ final class EditorFlowTests: XCTestCase {
         app.buttons["primaryAction"].tap()
         XCTAssertEqual(app.staticTexts["exportTitle"].label, "导出完成"); capture(app, "06-glass-export-complete")
     }
+    @MainActor func testGeneratedPreviewTimelineCanScrubAndPlayAgain() throws {
+        let app=launch()
+        app.buttons["dancer1"].tap();app.buttons["primaryAction"].tap()
+        XCTAssertTrue(app.buttons["dancer0"].waitForExistence(timeout:15))
+        app.buttons["dancer0"].tap();app.buttons["primaryAction"].tap()
+        XCTAssertTrue(app.segmentedControls["editorToolbar"].waitForExistence(timeout:15))
+        app.buttons["primaryAction"].tap()
+        let play=app.buttons["editorPlayback"]
+        XCTAssertTrue(app.buttons["返回修改"].waitForExistence(timeout:15))
+        let timeline=app.descendants(matching:.any).matching(identifier:"trimTimeline").firstMatch
+        let range=app.staticTexts["选中片段"]
+        let before=range.value as? String
+        play.tap()
+        XCTAssertEqual(play.label,"暂停预览")
+        timeline.coordinate(withNormalizedOffset:CGVector(dx:0.75,dy:0.3))
+            .press(forDuration:0.1,thenDragTo:timeline.coordinate(withNormalizedOffset:CGVector(dx:0.35,dy:0.3)))
+        XCTAssertNotEqual(range.value as? String,before)
+        XCTAssertEqual(play.label,"播放预览")
+        XCTAssertTrue(play.isEnabled)
+        play.tap()
+        XCTAssertEqual(play.label,"暂停预览")
+        capture(app,"generated-preview-timeline-scrub")
+    }
     @MainActor func testOutputPlaybackResetsAfterBackgrounding() throws {
         let app=launch();app.buttons["dancer1"].tap();app.buttons["primaryAction"].tap()
         let status=app.staticTexts["processingStatus"]

@@ -97,6 +97,8 @@ final class AppModel {
     private var detectionTask: Task<Void, Never>?
     var isPlaying = false
     private var previewTask: Task<Void,Never>?
+    @ObservationIgnored private let timelineSeeker = VideoSeekCoalescer()
+    @ObservationIgnored private var scrubID = UUID()
     var importing = false
     var errorMessage: String?
     var showGuide = false
@@ -571,11 +573,20 @@ final class AppModel {
         }
         if refresh && wasPlaying && !isDemo { detectPeople() }
     }
+    var canScrubGeneratedPreview:Bool {
+        if case .completed = phase {return true}
+        return phase == .readyToExport
+    }
     func seek(to time: Double) {
         guard let project else { return }
+        if canScrubGeneratedPreview {
+            cancelTimelineScrubbing()
+            scrubGeneratedPreview(to:time,exact:true);return
+        }
         if isReviewing {selectReviewFrame(at:time);return}
         if compositionEditing {
             guard hasCompletedTracking,time.isFinite else { return }
+            cancelTimelineScrubbing()
             currentTime=min(project.settings.end,max(project.settings.start,time))
             synchronizeCompositionPosition()
             player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
@@ -589,15 +600,14 @@ final class AppModel {
         if controlsEnabled, !isDemo { detectPeople() }
     }
     func scrub(to time:Double, within bounds:ClosedRange<Double>? = nil, sourceOnly:Bool = false) {
+        if canScrubGeneratedPreview {scrubGeneratedPreview(to:time,exact:false);return}
         guard phase == .editing else {return}
-        if compositionEditing && !sourceOnly {seek(to:time);return}
+        if compositionEditing && !hasCompletedTracking && !sourceOnly {return}
         if compositionEditing,hasCompletedTracking,let project,time.isFinite {
-            pausePreview(refresh:false)
+            if isPlaying {pausePreview(refresh:false)} else {previewTask?.cancel()}
             let limits=bounds ?? project.settings.start...project.settings.end
             currentTime=min(limits.upperBound,max(limits.lowerBound,time))
-            synchronizeCompositionPosition()
-            player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
-            previewPlayer?.seek(to:CMTime(seconds:max(0,currentTime-project.settings.start),preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
+            scrubComposition(exact:false)
             return
         }
         guard controlsEnabled,let project,time.isFinite else {return}
@@ -609,12 +619,35 @@ final class AppModel {
         player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:CMTime(seconds:0.1,preferredTimescale:600),toleranceAfter:CMTime(seconds:0.1,preferredTimescale:600))
     }
     func finishScrubbing(within bounds:ClosedRange<Double>? = nil) {
-        guard !compositionEditing else {return}
+        if canScrubGeneratedPreview {scrubGeneratedPreview(to:currentTime,exact:true);return}
+        if compositionEditing {
+            guard hasCompletedTracking else {return}
+            scrubComposition(exact:true)
+            if let project {
+                previewPlayer?.seek(to:CMTime(seconds:max(0,currentTime-project.settings.start),preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
+            }
+            return
+        }
         if let bounds, let project, controlsEnabled {
             currentTime = min(project.metadata.duration, min(bounds.upperBound, max(bounds.lowerBound, currentTime)))
             player?.seek(to: CMTime(seconds: currentTime, preferredTimescale: 60000), toleranceBefore: .zero, toleranceAfter: .zero)
             if !isDemo { detectPeople() }
         } else { seek(to:currentTime) }
+    }
+    private func scrubGeneratedPreview(to time:Double,exact:Bool) {
+        guard canScrubGeneratedPreview,time.isFinite,let project else {return}
+        currentTime=min(project.settings.end,max(project.settings.start,time))
+        guard let player=previewPlayer,let item=player.currentItem else {return}
+        if player.rate != 0 {player.pause()}
+        let position=currentTime-project.settings.start,id=scrubID,projectID=project.id
+        let tolerance=CMTime(seconds:exact ? 0 : 1/30,preferredTimescale:60000)
+        timelineSeeker.submit(.init(perform:{[weak self,weak player,weak item] done in
+            guard let self,let player,let item,self.scrubID==id,self.project?.id==projectID,
+                  self.canScrubGeneratedPreview,player.currentItem===item else {done();return}
+            player.seek(to:CMTime(seconds:position,preferredTimescale:60000),toleranceBefore:tolerance,toleranceAfter:tolerance) {_ in
+                Task {@MainActor in done()}
+            }
+        },cancel:{[weak item] in item?.cancelPendingSeeks()}))
     }
     // Completed trajectories retain the original analyzed bounds even after narrowing a trim.
     var trimBounds:ClosedRange<Double>? {
@@ -630,6 +663,7 @@ final class AppModel {
               start?.isFinite != false,end?.isFinite != false,previewTime?.isFinite != false,
               let project else { return }
         pausePreview(refresh:false)
+        cancelTimelineScrubbing()
         let wasAnalyzed=hasCompletedTracking
         let bounds=trimBounds ?? 0...project.metadata.duration
         let minimum = min(0.5, bounds.upperBound-bounds.lowerBound)
@@ -730,6 +764,7 @@ final class AppModel {
     }
     func export() {
         guard phase == .readyToExport, phase.issue == nil else { return }
+        cancelTimelineScrubbing()
         if isDemo { phase = .completed(nil); return }
         guard let project, let url = store.sourceURL(for: project), !targetSamples.isEmpty else { return }
         let previousTask=processingTask
@@ -885,8 +920,9 @@ final class AppModel {
         if accepted {manualSelection=false}
         return accepted
     }
-    func suspend() { pause();pausePreview(refresh:false);previewPlayer?.pause();persist() }
+    func suspend() { cancelTimelineScrubbing();pause();pausePreview(refresh:false);previewPlayer?.pause();persist() }
     private func cancelTasks(preserveAnalysis:Bool=false) {
+        cancelTimelineScrubbing()
         reviewID=UUID();reviewTasks.values.forEach {$0.cancel()};reviewTasks=[:]
         analysisReview=nil;reviewSelection=nil
         if redactionEditing { finishRedaction(commit:true) }
@@ -939,6 +975,7 @@ extension AppModel {
     }
     func finishComposition(commit:Bool,refreshDetections:Bool=true) {
         guard compositionEditing else { return }
+        cancelTimelineScrubbing()
         pausePreview(refresh:false)
         if commit,!hasCompletedTracking,project?.settings.compositionAnchor == nil,let crop=compositionCrop {saveCompositionAnchor(crop)}
         if !commit,let snapshot=compositionSnapshot {project?.settings=snapshot}
@@ -949,6 +986,7 @@ extension AppModel {
     }
     private func refreshComposition() {
         guard compositionEditing,let project else { return }
+        cancelTimelineScrubbing(settle:true)
         compositionTask?.cancel();let id=UUID();compositionID=id
         let samples=compositionSamples,settings=project.settings,source=project.metadata.size
         var automatic=settings;automatic.compositionScale=1;automatic.compositionX=0;automatic.compositionY=0;automatic.compositionAnchor=nil
@@ -1101,9 +1139,40 @@ extension AppModel {
         }
         refreshComposition()
     }
-    private func synchronizeCompositionPosition() {
-        compositionCrop=CropPlan.rect(at:currentTime,in:compositionFrames)
-        compositionAutomatic=CropPlan.rect(at:currentTime,in:compositionAutomaticFrames)
+    private func synchronizeCompositionPosition(at time:Double? = nil) {
+        compositionCrop=CropPlan.rect(at:time ?? currentTime,in:compositionFrames)
+        compositionAutomatic=CropPlan.rect(at:time ?? currentTime,in:compositionAutomaticFrames)
+    }
+    private func cancelTimelineScrubbing(settle:Bool=false) {
+        let wasSeeking=timelineSeeker.isSeeking
+        scrubID=UUID()
+        timelineSeeker.cancel()
+        if settle && wasSeeking {
+            player?.seek(to:CMTime(seconds:currentTime,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)
+        }
+    }
+    private func scrubComposition(exact:Bool) {
+        guard let project else {return}
+        guard !isDemo,let player,let item=player.currentItem else {
+            synchronizeCompositionPosition();return
+        }
+        let time=currentTime,id=scrubID,projectID=project.id
+        // While dragging, allow a nearby decoded frame; settle exactly only on release.
+        let tolerance=CMTime(seconds:exact ? 0 : 1/30,preferredTimescale:60000)
+        timelineSeeker.submit(.init(perform:{ [weak self,weak player,weak item] done in
+            guard let self,let player,let item,self.scrubID==id,
+                  self.project?.id==projectID,player.currentItem===item else {done();return}
+            player.seek(to:CMTime(seconds:time,preferredTimescale:60000),toleranceBefore:tolerance,toleranceAfter:tolerance) { [weak self,weak player,weak item] finished in
+                Task { @MainActor in
+                    if finished,let self,let player,let item,self.scrubID==id,
+                       self.project?.id==projectID,self.compositionEditing,player.currentItem===item {
+                        let displayed=player.currentTime().seconds
+                        if displayed.isFinite {self.synchronizeCompositionPosition(at:displayed)}
+                    }
+                    done()
+                }
+            }
+        },cancel:{ [weak item] in item?.cancelPendingSeeks() }))
     }
     private func toggleCompositionPlayback() {
         guard hasCompletedTracking else {return}
@@ -1123,6 +1192,9 @@ extension AppModel {
             compositionNotice="预览暂不可用，请稍后重试";return
         }
         if let project,currentTime>=project.settings.end-0.05 {seek(to:project.settings.start)}
+        cancelTimelineScrubbing()
+        synchronizeCompositionPosition()
+        if let project {previewPlayer?.seek(to:CMTime(seconds:max(0,currentTime-project.settings.start),preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero)}
         isPlaying=true;previewPlayer?.play()
         previewTask=Task { [weak self] in
             while !Task.isCancelled {

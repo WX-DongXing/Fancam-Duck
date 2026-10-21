@@ -568,7 +568,10 @@ struct EditorView: View {
     private var editorTimeline:some View {
         VStack(spacing:0) {
             playbackRow
-            TrimTimeline(model:model,onEditingChanged:{timelineTrimming=$0})
+            TrimTimeline(model:model,onEditingChanged:{ editing in
+                timelineTrimming=editing
+                if editing && isCompleted {generatedPlaying=false;model.previewPlayer?.pause()}
+            })
                 .coordinateSpace(.named("timeline")).padding(.horizontal,18)
                 .disabled(isProcessing || (isBlocked && !model.isReviewing)).allowsHitTesting(!isProcessing && (!isBlocked || model.isReviewing))
         }
