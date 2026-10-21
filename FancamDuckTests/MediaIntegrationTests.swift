@@ -166,6 +166,21 @@ final class MediaIntegrationTests: XCTestCase {
         model.togglePreview()
         for _ in 0..<600 {if !model.compositionBusy && model.isPlaying {break};try await Task.sleep(for:.milliseconds(10))}
         XCTAssertTrue(model.isPlaying,"A play request during protected preview preparation must resume after the new recipe is ready")
+        model.setRedactionStrength(0.6)
+        for _ in 0..<600 {if !model.compositionBusy && model.isPlaying {break};try await Task.sleep(for:.milliseconds(10))}
+        XCTAssertTrue(model.isPlaying,"Changing a live setting must resume playback after the latest recipe is ready")
+        model.pausePreview(refresh:false)
+        let position=model.currentTime
+        await model.openExportPreview()
+        XCTAssertEqual(model.route,.export)
+        XCTAssertEqual(model.phase,.readyToExport)
+        XCTAssertTrue(model.project?.redactionPlan?.covers(model.project!) == true)
+        XCTAssertNil(model.outputURL,"Opening export options must not encode a preview file")
+        model.backToEditor()
+        XCTAssertEqual(model.currentTime,position,accuracy:0.001)
+        model.beginComposition()
+        for _ in 0..<600 {if !model.compositionBusy {break};try await Task.sleep(for:.milliseconds(10))}
+
         let updated=try XCTUnwrap(model.previewPlayer?.currentItem?.videoComposition?.instructions.first as? RedactionInstruction)
         XCTAssertEqual(updated.style,.mosaic)
         model.pausePreview(refresh:false)

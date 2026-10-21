@@ -17,7 +17,7 @@ struct ExportView: View {
                 HStack {
                     StudioIcon(symbol: "chevron.left", label: "返回编辑") { model.backToEditor() }.disabled(model.phase == .exporting)
                     Spacer()
-                    Text(completed ? "导出完成" : "导出预览").font(.subheadline.weight(.semibold))
+                    Text(completed ? "导出完成" : "导出视频").font(.subheadline.weight(.semibold))
                         .accessibilityIdentifier("exportTitle")
                     Spacer()
                     Button { model.goHome() } label: {

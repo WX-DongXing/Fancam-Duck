@@ -266,9 +266,8 @@ final class EditorFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["dancer0"].waitForExistence(timeout:15))
         app.buttons["dancer0"].tap();app.buttons["primaryAction"].tap()
         XCTAssertTrue(app.segmentedControls["editorToolbar"].waitForExistence(timeout:15))
-        app.buttons["primaryAction"].tap()
+        XCTAssertFalse(app.buttons["primaryAction"].exists)
         let play=app.buttons["editorPlayback"]
-        XCTAssertTrue(app.buttons["返回修改"].waitForExistence(timeout:15))
         let timeline=app.descendants(matching:.any).matching(identifier:"trimTimeline").firstMatch
         let range=app.staticTexts["选中片段"]
         let before=range.value as? String
@@ -277,10 +276,10 @@ final class EditorFlowTests: XCTestCase {
         timeline.coordinate(withNormalizedOffset:CGVector(dx:0.75,dy:0.3))
             .press(forDuration:0.1,thenDragTo:timeline.coordinate(withNormalizedOffset:CGVector(dx:0.35,dy:0.3)))
         XCTAssertNotEqual(range.value as? String,before)
-        XCTAssertEqual(play.label,"播放预览")
-        XCTAssertTrue(play.isEnabled)
-        play.tap()
         XCTAssertEqual(play.label,"暂停预览")
+        XCTAssertTrue(play.isEnabled)
+        play.tap();XCTAssertEqual(play.label,"播放预览")
+        play.tap();XCTAssertEqual(play.label,"暂停预览")
         capture(app,"generated-preview-timeline-scrub")
     }
     @MainActor func testOutputPlaybackResetsAfterBackgrounding() throws {
@@ -388,12 +387,13 @@ final class EditorFlowTests: XCTestCase {
         let tools=app.segmentedControls["editorToolbar"]
         let tool=tools.buttons["构图"]
         XCTAssertTrue(tool.waitForExistence(timeout:15))
-        XCTAssertEqual(app.buttons["primaryAction"].label,"生成预览")
+        XCTAssertFalse(app.buttons["primaryAction"].exists)
+        XCTAssertTrue(app.buttons["previewExport"].exists)
         tool.tap()
         let picker=app.segmentedControls["compositionAspect"]
         XCTAssertTrue(picker.waitForExistence(timeout:5))
-        XCTAssertEqual(tools.frame.height,app.buttons["primaryAction"].frame.height,accuracy:1)
-        XCTAssertEqual(tools.frame.midY,app.buttons["primaryAction"].frame.midY,accuracy:1)
+        XCTAssertEqual(tools.frame.height,56,accuracy:1)
+        XCTAssertGreaterThan(tools.frame.width,app.frame.width*0.8)
         let first=picker.buttons.element(boundBy:0),last=picker.buttons.element(boundBy:2)
         XCTAssertEqual(picker.buttons.count,3)
         XCTAssertGreaterThanOrEqual(picker.frame.height,47)
@@ -431,7 +431,7 @@ final class EditorFlowTests: XCTestCase {
         let region=app.buttons["redactionRegionMenu"],style=app.segmentedControls["redactionStyle"]
         XCTAssertTrue(panel.waitForExistence(timeout:5))
         XCTAssertLessThanOrEqual(panel.frame.height,184)
-        let styleFrame=style.frame,actionFrame=app.buttons["primaryAction"].frame
+        let styleFrame=style.frame,actionFrame=tools.frame
         XCTAssertFalse(region.isHittable)
         XCTAssertFalse(app.buttons["redactionHelp"].exists)
         XCTAssertFalse(app.staticTexts["对主角外人物进行打码"].exists)
@@ -453,7 +453,7 @@ final class EditorFlowTests: XCTestCase {
         XCTAssertFalse(style.buttons["贴片"].exists)
         let strength=app.sliders["redactionStrength"]
         XCTAssertTrue(strength.isHittable)
-        XCTAssertEqual(strength.value as? String,"10")
+        XCTAssertEqual(strength.value as? String,"30")
         strength.adjust(toNormalizedSliderPosition:0)
         XCTAssertEqual(strength.value as? String,"0")
         strength.adjust(toNormalizedSliderPosition:1)
@@ -477,7 +477,7 @@ final class EditorFlowTests: XCTestCase {
         XCTAssertFalse(app.staticTexts["直拍鸭 Logo"].exists)
         XCTAssertEqual(style.frame,styleFrame)
         XCTAssertLessThanOrEqual(panel.frame.height,184)
-        XCTAssertEqual(app.buttons["primaryAction"].frame,actionFrame)
+        XCTAssertEqual(tools.frame,actionFrame)
         XCTAssertEqual(app.scrollViews.count,0)
         capture(app,"phone-redaction-inline-logo")
         region.tap();app.buttons["全身"].tap()
@@ -500,13 +500,9 @@ final class EditorFlowTests: XCTestCase {
         XCTAssertTrue(tools.exists,"Trimming within analyzed footage keeps settings available")
         XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"compositionCanvas").firstMatch.exists,"Trimming must retain the composition viewport")
         capture(app,"settings-selected-time-range")
-        ready(app.buttons["primaryAction"])
-        app.buttons["primaryAction"].tap()
-        let generatingStage=app.descendants(matching:.any).matching(identifier:"editorStage").firstMatch
-        XCTAssertTrue(generatingStage.waitForExistence(timeout:3))
-        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"compositionCanvas").firstMatch.exists)
-        capture(app,"generation-keeps-composition")
-        app.buttons["取消生成"].tap()
+        app.buttons["previewExport"].tap()
+        XCTAssertTrue(app.staticTexts["exportTitle"].waitForExistence(timeout:8))
+        capture(app,"preview-export-options")
     }
     @MainActor func testOutputAspectsAndIndependentCentering() throws {
         let app=launch();app.buttons["dancer1"].tap();app.buttons["tool-构图"].tap()

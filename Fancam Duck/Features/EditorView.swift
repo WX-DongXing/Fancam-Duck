@@ -5,6 +5,8 @@ struct EditorView: View {
     @Bindable var model: AppModel
     @State private var savingFile=false
     @State private var generatedPlaying=false
+    @State private var openingExport=false
+    @State private var resumeTimelinePlayback=false
     @State private var drawnBox: NormalizedRect?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -123,7 +125,12 @@ struct EditorView: View {
         .onReceive(NotificationCenter.default.publisher(for:.AVPlayerItemDidPlayToEndTime)) {notification in
             if let item=notification.object as? AVPlayerItem,item === model.previewPlayer?.currentItem {generatedPlaying=false}
         }
-        .onChange(of:model.project?.id) {_,_ in resetSelectionZoom()}
+        .task(id:openingExport) {
+            guard openingExport else {return}
+            await model.openExportPreview()
+            openingExport=false
+        }
+        .onChange(of:model.project?.id) {_,_ in openingExport=false;resumeTimelinePlayback=false;resetSelectionZoom()}
         .onChange(of:showsComposition) {_,_ in resetSelectionZoom()}
         .onChange(of:isProcessing) {_,processing in if processing {resetSelectionZoom()}}
         .onChange(of:model.manualSelection) {_,manual in if manual {resetSelectionZoom()}}
@@ -138,10 +145,10 @@ struct EditorView: View {
                 Rectangle().fill(DesktopPalette.border).frame(width:1,height:24)
                 VStack(alignment:.leading,spacing:3) {
                     Text(model.project?.title ?? "视频编辑").font(.system(size:14,weight:.semibold)).lineLimit(1)
-                    Text(model.hasCompletedTracking ? "FANCAM DUCK  /  预览设置" : "FANCAM DUCK  /  人物分析").font(.system(size:9,weight:.medium,design:.monospaced)).foregroundStyle(.secondary)
+                    Text(model.hasCompletedTracking ? "FANCAM DUCK  /  预览" : "FANCAM DUCK  /  人物分析").font(.system(size:9,weight:.medium,design:.monospaced)).foregroundStyle(.secondary)
                 }
                 Spacer(minLength:8)
-
+                if model.hasCompletedTracking && !isProcessing && !isCompleted {exportPreviewButton}
             }.padding(.horizontal,20).frame(height:64).background(DesktopPalette.panel).zIndex(100)
             Divider()
             HStack(spacing:0) {
@@ -198,8 +205,8 @@ struct EditorView: View {
                 }
             } else {
                 HStack(spacing:12) {
-                    if model.hasCompletedTracking {toolSelector.frame(width:156)}
-                    processingAction.frame(maxWidth:.infinity)
+                    if model.hasCompletedTracking {toolSelector}
+                    else {processingAction.frame(maxWidth:.infinity)}
                 }
             }
         }.padding(20).frame(maxHeight:.infinity,alignment:.top)
@@ -211,6 +218,7 @@ struct EditorView: View {
     private var header: some View {
         HStack {
             StudioIcon(symbol: "chevron.left", label: "返回项目首页") { returnToHome() }
+                .frame(width:model.hasCompletedTracking ? 72 : 44,alignment:.leading)
             Spacer()
             Group {
                 if isBlocked {
@@ -221,14 +229,15 @@ struct EditorView: View {
                     Text(model.phase.progress>=0.9 ? "补全片段" : "人物分析").font(.system(size:15,weight:.medium))
                         .accessibilityIdentifier("processingStatus").accessibilityLabel(model.statusText).accessibilityValue(model.currentTime.videoTime)
                 } else {
-                    Text(model.hasCompletedTracking || isCompleted ? "预览设置" : "人物分析").font(.system(size: 15, weight: .medium))
+                    Text(model.hasCompletedTracking || isCompleted ? "预览" : "人物分析").font(.system(size: 15, weight: .medium))
                 }
             }
             Spacer()
-            // Preserve header symmetry and expose source metadata without permanent screen clutter.
-            Color.clear.frame(width: 44, height: 44).accessibilityElement()
-                .accessibilityLabel("输出比例" + (model.project?.settings.aspectRatio.rawValue ?? "16:9")).accessibilityIdentifier("sourceVideoMetadata")
-                .accessibilityValue("原片 \(Int(model.project?.metadata.width ?? 0)) × \(Int(model.project?.metadata.height ?? 0))")
+            if model.hasCompletedTracking && !isProcessing && !isCompleted {
+                exportPreviewButton
+            } else {
+                Color.clear.frame(width:44,height:44).accessibilityHidden(true)
+            }
         }.padding(.horizontal, 18).frame(height: 52)
     }
     private var showsComposition: Bool {
@@ -333,8 +342,23 @@ struct EditorView: View {
                         .frame(width:max(1,geometry.size.width-36),height:60)
                         .position(x:geometry.size.width/2,y:max(30,geometry.size.height-100))
                 }
-                playbackControl
-                    .position(x:geometry.size.width/2,y:max(22,geometry.size.height-36))
+                if model.hasCompletedTracking && !isProcessing && !isCompleted {
+                    HStack(spacing:28) {
+                        StudioIcon(symbol:"gobackward.5",label:"后退 5 秒") {model.skipPreview(by:-5)}
+                            .accessibilityIdentifier("previewBackward")
+                        playbackControl
+                        StudioIcon(symbol:"goforward.5",label:"前进 5 秒") {model.skipPreview(by:5)}
+                            .accessibilityIdentifier("previewForward")
+                    }.disabled(timelineTrimming || model.compositionAdjusting)
+                        .position(x:geometry.size.width/2,y:max(22,geometry.size.height-36))
+                } else {playbackControl
+                    .position(x:geometry.size.width/2,y:max(22,geometry.size.height-36))}
+                if model.hasCompletedTracking && model.compositionBusy {
+                    HStack(spacing:6) {ProgressView().controlSize(.mini);Text("正在更新预览")}
+                        .font(.caption2).padding(.horizontal,10).padding(.vertical,6)
+                        .background(.ultraThinMaterial,in:Capsule()).allowsHitTesting(false)
+                        .position(x:geometry.size.width/2,y:max(22,geometry.size.height-82))
+                }
                 ZStack {
                     if selectionZoomEnabled && zoom>1.001 {
                         StudioIcon(symbol:"arrow.counterclockwise",label:"重置视频大小") {
@@ -451,8 +475,8 @@ struct EditorView: View {
     }
 
     private var playbackControl:some View {
-        StudioIcon(symbol:(isCompleted ? generatedPlaying : model.isPlaying) ? "pause.fill" : "play.fill",
-                   label:(isCompleted ? generatedPlaying : model.isPlaying) ? "暂停预览" : "播放预览") {
+        StudioIcon(symbol:model.previewPlaybackPending ? "hourglass" : (isCompleted ? generatedPlaying : model.isPlaying) ? "pause.fill" : "play.fill",
+                   label:model.previewPlaybackPending ? "取消等待播放" : (isCompleted ? generatedPlaying : model.isPlaying) ? "暂停预览" : "播放预览") {
                 if isCompleted {
                     generatedPlaying.toggle()
                     if generatedPlaying {
@@ -503,7 +527,8 @@ struct EditorView: View {
                     }.font(.subheadline)
                         .buttonStyle(.plain).modifier(StudioGlassSurface(shape:Capsule()))
                 }
-                if isCompleted {completedActions} else {processingAction}
+                if isCompleted {completedActions}
+                else if !model.hasCompletedTracking || isProcessing {processingAction}
             }
         }.dynamicTypeSize(...DynamicTypeSize.xxxLarge).padding(.horizontal, 18).frame(height: 58)
     }
@@ -546,6 +571,18 @@ struct EditorView: View {
                     .accessibilityHint(isProcessing ? (isPaused ? "点按继续分析" : "请使用旁边的重新选择或取消操作") : "按当前工作台状态继续")
                     .accessibilityIdentifier("primaryAction")
     }
+    private var exportPreviewButton:some View {
+        Button {openingExport=true} label: {
+            HStack(spacing:5) {
+                if openingExport {ProgressView().controlSize(.mini)}
+                else {Image(systemName:"square.and.arrow.up")}
+                Text("导出")
+            }.font(.subheadline.weight(.medium)).frame(minWidth:72,minHeight:44).contentShape(Capsule())
+        }.buttonStyle(.plain).modifier(StudioGlassSurface(shape:Capsule()))
+            .disabled(openingExport || !model.settingsEnabled || timelineTrimming || model.compositionAdjusting)
+            .accessibilityIdentifier("previewExport").accessibilityLabel("导出视频")
+            .keyboardShortcut("e",modifiers:.command)
+    }
     private var completedActions:some View {
         HStack(spacing:12) {
             StudioTextButton(title:"返回修改",height:50) {generatedPlaying=false;model.backToEditor();selectTool(.composition)}
@@ -570,7 +607,15 @@ struct EditorView: View {
             playbackRow
             TrimTimeline(model:model,onEditingChanged:{ editing in
                 timelineTrimming=editing
-                if editing && isCompleted {generatedPlaying=false;model.previewPlayer?.pause()}
+                if editing {
+                    resumeTimelinePlayback=isCompleted ? generatedPlaying : (model.isPlaying || model.previewPlaybackPending)
+                    if isCompleted {generatedPlaying=false;model.previewPlayer?.pause()}
+                    else {model.pausePreview(refresh:false)}
+                } else if resumeTimelinePlayback {
+                    resumeTimelinePlayback=false
+                    if model.route == .editor && model.hasCompletedTracking && model.settingsEnabled {model.togglePreview()}
+                    else if model.route == .editor && isCompleted {generatedPlaying=true;model.previewPlayer?.play()}
+                }
             })
                 .coordinateSpace(.named("timeline")).padding(.horizontal,18)
                 .disabled(isProcessing || (isBlocked && !model.isReviewing)).allowsHitTesting(!isProcessing && (!isBlocked || model.isReviewing))
@@ -624,7 +669,6 @@ struct EditorView: View {
     private func selectTool(_ tool: WorkspaceTool) {
         guard model.hasCompletedTracking,!model.compositionAdjusting else { return }
         guard activeTool != tool else {return}
-        model.pausePreview(refresh: false)
         if model.redactionEditing && tool != .redaction {model.finishRedaction(commit:true,keepComposition:true)}
         if tool == .composition || tool == .motion {model.beginComposition();guard model.compositionEditing else {return}}
         if tool == .redaction {model.beginRedaction()}

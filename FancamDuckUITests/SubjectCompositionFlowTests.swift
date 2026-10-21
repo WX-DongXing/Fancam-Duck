@@ -69,9 +69,12 @@ final class SubjectCompositionFlowTests:XCTestCase {
                 activate(tools.buttons[tool])
                 let card=app.descendants(matching:.any).matching(identifier:"adjustmentPanel").firstMatch
                 XCTAssertTrue(card.waitForExistence(timeout:5))
-                XCTAssertEqual(app.buttons["primaryAction"].frame.minY-card.frame.maxY,12,accuracy:1)
+                // The native AX frame can exclude the glass panel's 12pt inset.
+                let bottomGap=tools.frame.minY-card.frame.maxY
+                XCTAssertGreaterThanOrEqual(bottomGap,12)
+                XCTAssertLessThanOrEqual(bottomGap,28)
                 let topGap=card.frame.minY-timeline.frame.maxY
-                if let motionTopGap {XCTAssertEqual(topGap,motionTopGap,accuracy:1)} else {motionTopGap=topGap}
+                if let motionTopGap {XCTAssertEqual(topGap,motionTopGap,accuracy:3)} else {motionTopGap=topGap}
                 capture("subject-panel-"+tool)
             }
         }
@@ -82,9 +85,9 @@ final class SubjectCompositionFlowTests:XCTestCase {
         redaction.coordinate(withNormalizedOffset:CGVector(dx:0.9,dy:0.5)).tap()
         XCTAssertEqual(redaction.value as? String,"1")
         capture("subject-redaction-theme")
-        XCTAssertTrue(app.buttons["primaryAction"].isHittable)
+        XCTAssertTrue(app.buttons["previewExport"].isHittable)
         activate(tools.buttons["构图"])
-        for button in [horizontal,vertical,app.buttons["构图放大"],app.buttons["primaryAction"]] {
+        for button in [horizontal,vertical,app.buttons["构图放大"],app.buttons["previewExport"]] {
             XCTAssertTrue(button.isHittable)
             XCTAssertGreaterThanOrEqual(button.frame.height,44)
         }

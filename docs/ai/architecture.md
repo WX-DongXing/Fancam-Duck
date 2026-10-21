@@ -27,7 +27,7 @@ editing（已分析）→ processing（准备打码／生成）→ completed（�
                                         editing（复用分析）
 ```
 
-图示为主要业务路径，不是所有方法的调用表。`ProcessingGate.canContinue` 校验目标与明确选择；`AppModel.canConfirm` 还校验检测、恢复、构图手势等忙状态。新工作台通过 `advanceWorkflow` 区分首次分析与已有分析后的生成。首次分析完成留在 editor；生成实际 MP4 后使用 completed 状态，仍留在 editor，导出仅保存文件。`readyToExport` 与独立 export 路由保留给现有兼容调用，不作为新工作台的首次分析完成态。
+图示为主要业务路径，不是所有方法的调用表。`ProcessingGate.canContinue` 校验目标与明确选择；`AppModel.canConfirm` 还校验检测、恢复、构图手势等忙状态。新工作台的 `advanceWorkflow` 用于首次分析；已有分析直接在 editing 中预览，`openExportPreview` 等待最新合成后打开 readyToExport，最终编码由导出页的 `export` 启动。兼容接口仍支持已有分析后的生成。首次分析完成留在 editor；生成实际 MP4 后使用 completed 状态，仍留在 editor，导出仅保存文件。`readyToExport` 与独立 export 路由保留给现有兼容调用，不作为新工作台的首次分析完成态。
 
 `togglePreview` 用于 editing 的原片／构图播放；工作台成片播放由 EditorView 控制。普通 `scrub` 在 editing 寻帧原片，completed／readyToExport 寻帧成片并减去片段起点；处理和身份阻塞期间仍禁用普通拖动。`seek` 保留阻塞纠正中的明确帧检查，不能连同普通拖动一起禁用。
 
@@ -77,3 +77,5 @@ AnalysisReview 的可选 failureMessages 保存每个失败时刻的具体提示
 取消任务时，保留完整分析的返回编辑保留当前构图直至新预览准备完成；切项目、回首页后重新进入或重新选择导致分析失效时清除构图，避免复用上一项目的视窗。
 
 视频导入的 importID 在相册读取／文件临时复制之前建立，由 AppModel.importMovie(load:) 统一管理忙碌状态、错误和临时文件所有权。较早读取晚到时只清理其临时副本，不覆盖后选项目、清除新请求忙碌态或显示旧错误；离开／切项目／删除当前项目继续通过 cancelTasks 作废导入代次。HomeView 不再独立维护重复的 importing／错误收尾，较早相册任务也不能清空后来的选择。
+
+实时预览由 compositionPlaybackRequested 记录播放意图，previewPlaybackPending 对 UI 暴露等待状态。配置更新取消旧合成，保留意图并在最新任务完成后播放；明确暂停、后台和路由退出清除意图。openExportPreview 在 await 前保存项目／配置／compositionID，并在返回后重新校验，退出或切换项目不打开旧导出页。

@@ -92,6 +92,9 @@ final class AppModel {
     private var compositionAutomaticFrames:[CropPlan.Frame]=[]
     private var compositionTask:Task<Void,Never>?
     private var compositionPreviewReady=false
+    private var compositionPreviewRedactions:RedactionPlan?
+    private var compositionPlaybackRequested=false
+    var previewPlaybackPending:Bool {compositionPlaybackRequested && !isPlaying}
     private var compositionID=UUID()
     var compositionDisplayedScale:Double {
         guard let automatic=compositionAutomatic,let crop=compositionCrop,crop.height>0 else {return project?.settings.compositionScale ?? 1}
@@ -560,6 +563,7 @@ final class AppModel {
         }
     }
     func pausePreview(refresh:Bool = true) {
+        compositionPlaybackRequested=false
         if compositionEditing {
             let wasPlaying=isPlaying
             isPlaying=false;previewTask?.cancel();previewPlayer?.pause();player?.pause()
@@ -764,9 +768,36 @@ final class AppModel {
         route = .home
     }
     func backToEditor() {
-        let preserve=hasCompletedTracking
+        let preserve=hasCompletedTracking,time=currentTime
         cancelTasks(preserveAnalysis:preserve);route = .editor;phase = .editing
-        seek(to:project?.targetTime ?? currentTime)
+        seek(to:preserve ? time : (project?.targetTime ?? time))
+    }
+    func openExportPreview() async {
+        guard route == .editor,settingsEnabled,hasCompletedTracking,!compositionAdjusting,let project else {return}
+        pausePreview(refresh:false)
+        if !compositionEditing {beginComposition()}
+        let id=compositionID,settings=project.settings
+        await compositionTask?.value
+        guard !Task.isCancelled,route == .editor,settingsEnabled,compositionID==id,
+              self.project?.id==project.id,self.project?.settings==settings,
+              isDemo || compositionPreviewReady else {return}
+        if settings.redaction.enabled,!isDemo {
+            guard let plan=compositionPreviewRedactions,plan.covers(project) else {return}
+            self.project?.redactionPlan=plan
+        }
+        if redactionEditing {finishRedaction(commit:true,keepComposition:true)}
+        finishComposition(commit:true,refreshDetections:false)
+        if hasReusableOutput,let outputURL {
+            previewPlayer=AVPlayer(url:outputURL);phase = .completed(outputURL)
+        } else {phase = .readyToExport}
+        route = .export
+    }
+    func skipPreview(by seconds:Double) {
+        guard settingsEnabled,hasCompletedTracking,compositionEditing,seconds.isFinite else {return}
+        let resume=isPlaying || previewPlaybackPending,target=currentTime+seconds
+        pausePreview(refresh:false)
+        scrub(to:target);finishScrubbing()
+        if resume {togglePreview()}
     }
     func export() {
         guard phase == .readyToExport, phase.issue == nil else { return }
@@ -993,9 +1024,10 @@ extension AppModel {
     }
     private func refreshComposition() {
         guard compositionEditing,let project else { return }
-        pausePreview(refresh:false)
+        pauseForPreviewChange()
         cancelTimelineScrubbing(settle:true)
         compositionPreviewReady=false
+        compositionPreviewRedactions=nil
         compositionTask?.cancel();let id=UUID();compositionID=id
         let samples=compositionSamples,settings=project.settings,source=project.metadata.size
         let people=analyzedPeople.sorted {$0.key<$1.key}.map {(Double($0.key)/10000,$0.value)}
@@ -1039,17 +1071,20 @@ extension AppModel {
                     else {self.previewPlayer=AVPlayer(playerItem:item)}
                     self.previewPlayer?.seek(to:CMTime(seconds:self.currentTime-settings.start,preferredTimescale:60000),toleranceBefore:.zero,toleranceAfter:.zero,completionHandler:{_ in})
                     self.compositionPreviewReady=true
+                    self.compositionPreviewRedactions=rendering.redactionPlan
                 }
                 self.compositionBusy=false
+                if self.compositionPlaybackRequested {self.startCompositionPlayback()}
             } catch {
                 guard self.compositionID==id,!Task.isCancelled else {return}
+                self.compositionPlaybackRequested=false
                 self.compositionBusy=false;self.errorMessage=error.localizedDescription
             }
         }
     }
     func beginCompositionGesture() {
         guard compositionEditing,settingsEnabled,compositionCrop != nil,compositionSubject != nil else {return}
-        pausePreview(refresh:false)
+        pauseForPreviewChange()
         // A new edit supersedes the pending calculation instead of locking the canvas.
         compositionTask?.cancel();compositionID=UUID();compositionBusy=false
         compositionGestureSettings=project?.settings;compositionAdjusting=true;compositionNotice=nil
@@ -1151,7 +1186,7 @@ extension AppModel {
         // A newer selection supersedes the pending preview through compositionID/cancellation.
         guard compositionEditing,!compositionAdjusting,
               let project,project.settings.aspectRatio != aspect else {return}
-        pausePreview(refresh:false)
+        pauseForPreviewChange()
         compositionUndo.append(project.settings)
         let target=currentSubjectTarget()
         self.project?.settings.subjectComposition=target;self.project?.settings.compositionAnchor=nil
@@ -1187,7 +1222,7 @@ extension AppModel {
     func setFollowSpeed(_ speed: EditSettings.FollowSpeed) {
         guard settingsEnabled, !compositionAdjusting,
               project?.settings.followSpeed != speed else { return }
-        pausePreview(refresh: false)
+        pauseForPreviewChange()
         project?.settings.followSpeed = speed
         if compositionEditing { refreshComposition() }
         persist()
@@ -1249,22 +1284,22 @@ extension AppModel {
             }
         },cancel:{ [weak item] in item?.cancelPendingSeeks() }))
     }
+    private func pauseForPreviewChange() {
+        let requested=compositionEditing && hasCompletedTracking && (isPlaying || compositionPlaybackRequested)
+        pausePreview(refresh:false)
+        compositionPlaybackRequested=requested
+    }
     private func toggleCompositionPlayback() {
         guard hasCompletedTracking,!compositionAdjusting else {return}
-        if compositionBusy,let task=compositionTask,let project {
-            let id=compositionID,settings=project.settings
-            previewTask?.cancel()
-            previewTask=Task { [weak self] in
-                await task.value
-                guard let self,!Task.isCancelled,self.compositionID==id,self.project?.id==project.id,
-                      self.project?.settings==settings,self.settingsEnabled,self.compositionEditing,!self.compositionBusy else {return}
-                self.toggleCompositionPlayback()
-            }
-            return
-        }
-        if isPlaying {pausePreview(refresh:false);return}
+        if isPlaying || compositionPlaybackRequested {pausePreview(refresh:false);return}
+        compositionPlaybackRequested=true
+        startCompositionPlayback()
+    }
+    private func startCompositionPlayback() {
+        guard compositionPlaybackRequested,compositionEditing,settingsEnabled,!compositionBusy,!compositionAdjusting else {return}
         guard isDemo || (compositionPreviewReady && previewPlayer?.currentItem != nil && previewPlayer?.currentItem?.status != .failed) else {
-            errorMessage="播放预览尚未准备好，请稍后重试";return
+            compositionPlaybackRequested=false
+            errorMessage=compositionNotice ?? "播放预览尚未准备好，请稍后重试";return
         }
         if let project,currentTime>=project.settings.end-0.05 {seek(to:project.settings.start)}
         cancelTimelineScrubbing()
@@ -1293,7 +1328,7 @@ extension AppModel {
     func beginRedaction() {
         guard settingsEnabled,let project,project.target != nil,!redactionEditing else {return}
         let retainedComposition=compositionEditing
-        pausePreview(refresh:false)
+        if !retainedComposition {pausePreview(refresh:false)}
         if !hasCompletedTracking,abs(currentTime-project.targetTime)>0.05 {seek(to:project.targetTime)}
         if hasCompletedTracking {beginComposition()}
         redactionEditing=true;redactionSnapshot=project.settings.redaction;redactionPlanSnapshot=project.redactionPlan

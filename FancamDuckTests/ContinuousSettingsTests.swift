@@ -50,6 +50,27 @@ final class ContinuousSettingsTests:XCTestCase {
         XCTAssertEqual(final.width/final.height,0.75,accuracy:0.0001)
         model.goHome()
     }
+    @MainActor func testLeavingWhileExportWaitsForPreviewDoesNotOpenOldExportPage() async throws {
+        let directory=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer {try? FileManager.default.removeItem(at:directory)}
+        let store=ProjectStore(directory:directory),gate=SettingsPreviewGate()
+        try await store.prepare();try Data([1]).write(to:directory.appendingPathComponent("source.mp4"))
+        let body=NormalizedRect(x:0.4,y:0.2,width:0.2,height:0.6)
+        var project=VideoProject(title:"Export waiting",sourceFileName:"source.mp4",metadata:.init(width:1920,height:1080,duration:1,frameRate:30),settings:.init())
+        project.settings.end=1;project.target=body
+        let model=AppModel(store:store,exporter:DelayedSettingsExporter(gate:gate))
+        model.project=project;model.route = .editor;model.hasCompletedTracking=true
+        model.targetSamples=(0...6).map {.init(time:Double($0)/6,body:body)}
+        model.beginComposition()
+        for _ in 0..<400 {if await gate.count>0 {break};try await Task.sleep(for:.milliseconds(10))}
+        let opening=Task {await model.openExportPreview()}
+        await Task.yield()
+        model.goHome()
+        await gate.release();await opening.value
+        XCTAssertEqual(model.route,.home)
+        XCTAssertNil(model.outputURL)
+        XCTAssertFalse(model.previewPlaybackPending)
+    }
     @MainActor func testGenerateDuringPreviewBuildSupersedesLatePreview() async throws {
         let directory=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer {try? FileManager.default.removeItem(at:directory)}
