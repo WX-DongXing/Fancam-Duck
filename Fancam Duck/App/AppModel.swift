@@ -65,8 +65,6 @@ final class AppModel {
         return FileManager.default.fileExists(atPath:outputURL.path)
     }
     private var compositionAutomaticSettings:EditSettings?
-    var importingRedactionImage=false
-    private var redactionImageID=UUID()
     var redactionEditing=false
     var redactionIssue: RedactionIssue?
     private var redactionSnapshot: RedactionSettings?
@@ -123,7 +121,7 @@ final class AppModel {
     }
     var isDemo: Bool { project?.isDemo == true }
     var canConfirm: Bool {
-        guard !isReviewing,!restoringTracking,!detecting,!importingRedactionImage,!isPlaying,!manualSelection,(!compositionBusy || hasCompletedTracking),!compositionAdjusting,let project,
+        guard !isReviewing,!restoringTracking,!detecting,!isPlaying,!manualSelection,(!compositionBusy || hasCompletedTracking),!compositionAdjusting,let project,
               (hasCompletedTracking || hasReusableOutput || (project.targetTime>=project.settings.start && project.targetTime<=project.settings.end)) else { return false }
         return ProcessingGate.canContinue(phase: phase, target: project.target, explicitlySelected: targetExplicitlySelected)
     }
@@ -132,7 +130,6 @@ final class AppModel {
     var editorActivityText: String? {
         if restoringTracking {return "正在恢复项目 · 设置稍后可用"}
         if compositionBusy && !hasCompletedTracking {return "正在准备构图预览 · 可取消"}
-        if importingRedactionImage {return "正在准备遮挡图片"}
         if detecting {return project?.target == nil ? "正在识别人物 · 请稍候" : "正在识别当前帧 · 可调整设置"}
         return nil
     }
@@ -176,15 +173,25 @@ final class AppModel {
         savedToPhotos = false
     }
     func importMovie(_ movie: ImportedMovie) async {
+        await importMovie(load:{movie})
+    }
+    func importMovie(load:() async throws -> ImportedMovie?) async {
         let id=UUID();importID=id
         importing = true
+        var received:ImportedMovie?
         defer {
             if importID==id { importing=false }
-            try? FileManager.default.removeItem(at: movie.url)
+            if let received {try? FileManager.default.removeItem(at:received.url)}
         }
         var copied:URL?
         var savedProject:VideoProject?
         do {
+            guard let movie=try await load() else {
+                if importID==id,!Task.isCancelled {errorMessage="未能读取所选视频，请重试。"}
+                return
+            }
+            received=movie
+            guard importID==id else {throw CancellationError()}
             try Task.checkCancellation()
             let source=try await store.importFile(movie.url)
             copied=source
@@ -884,7 +891,7 @@ final class AppModel {
         analysisReview=nil;reviewSelection=nil
         if redactionEditing { finishRedaction(commit:true) }
         generatingVideo=false;analysisOnly=false;generateAfterAnalysis=false
-        redactionIssue=nil;redactionPreviewID=UUID();redactionPreviewTask?.cancel();redactionImageID=UUID();importingRedactionImage=false
+        redactionIssue=nil;redactionPreviewID=UUID();redactionPreviewTask?.cancel()
         if compositionEditing { finishComposition(commit:true,refreshDetections:false) }
         restorationID=UUID();restorationTask?.cancel();restoringTracking=false;savingToPhotos=false;detectionNotice=nil;cancellingExport=false;exportProgress=0
         compositionTask?.cancel();compositionID=UUID();compositionBusy=false;compositionFrames=[];compositionAutomaticFrames=[]
@@ -1147,7 +1154,6 @@ extension AppModel {
     }
     func finishRedaction(commit:Bool,keepComposition:Bool=false) {
         if !commit,let snapshot=redactionSnapshot {project?.settings.redaction=snapshot;project?.redactionPlan=redactionPlanSnapshot}
-        redactionImageID=UUID();importingRedactionImage=false
         redactionEditing=false;redactionSnapshot=nil;redactionPlanSnapshot=nil
         if compositionEditing && !keepComposition {finishComposition(commit:true,refreshDetections:false)}
         if !commit {refreshRedactionPreview()}
@@ -1282,20 +1288,7 @@ extension AppModel {
         project?.settings.redaction.imageData=data;project?.settings.redaction.style = .image
         refreshRedactionPreview();persist()
     }
-    func importRedactionImage(_ data:Data) async {
-        guard settingsEnabled,redactionEditing,project?.settings.redaction.region == .face,let projectID=project?.id else {return}
-        let id=UUID();redactionImageID=id;importingRedactionImage=true
-        do {
-            let prepared=try await Task.detached(priority:.userInitiated) {try RedactionImage.prepare(data)}.value
-            guard redactionImageID==id,project?.id==projectID,redactionEditing else {return}
-            guard project?.settings.redaction.region == .face else {importingRedactionImage=false;return}
-            project?.settings.redaction.imageData=prepared;project?.settings.redaction.style = .image
-            importingRedactionImage=false;refreshRedactionPreview();persist()
-        } catch {
-            guard redactionImageID==id else {return}
-            importingRedactionImage=false;errorMessage="图片读取失败，请选择其他图片。"
-        }
-    }
+
 }
 
 extension AppModel {

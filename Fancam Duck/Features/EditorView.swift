@@ -611,7 +611,6 @@ struct EditorView: View {
         if !model.hasCompletedTracking {return model.detecting ? "正在识别人物…" : "分析所选片段"}
 
         if model.restoringTracking {return "正在恢复项目…"}
-        if model.importingRedactionImage {return "正在准备图片…"}
         if model.detecting {return "正在识别人物…"}
         if model.isPlaying {return "请先暂停预览"}
         if model.needsRegeneration {return "重新生成"}

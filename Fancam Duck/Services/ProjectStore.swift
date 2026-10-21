@@ -128,9 +128,15 @@ actor ProjectStore {
         let targetTime:Double
         let fileName:String
         var savedToPhotos:Bool
+        var redactionVersion:Int? = nil
         func matches(_ project:VideoProject) -> Bool {
+            (!settings.redaction.enabled || redactionVersion == RedactionPlan.currentSmoothingVersion) &&
             sourceFileName==project.sourceFileName && metadata==project.metadata && settings==project.settings && target==project.target && targetTime==project.targetTime
         }
+    }
+    private static func isOutputFileName(_ name:String) -> Bool {
+        let url=URL(fileURLWithPath:name)
+        return name==url.lastPathComponent && url.pathExtension.lowercased()=="mp4"
     }
     private func artifactsURL(_ id:UUID) -> URL {directory.appendingPathComponent("artifacts-\(id)",isDirectory:true)}
     func saveOutput(project:VideoProject,url:URL) throws -> URL {
@@ -141,17 +147,17 @@ actor ProjectStore {
         let destination=folder.appendingPathComponent(UUID().uuidString+".mp4")
         try FileManager.default.copyItem(at:url,to:destination)
         do {
-            let record=OutputRecord(sourceDigest:try digest(source),sourceFileName:project.sourceFileName,metadata:project.metadata,settings:project.settings,target:project.target,targetTime:project.targetTime,fileName:destination.lastPathComponent,savedToPhotos:false)
+            let record=OutputRecord(sourceDigest:try digest(source),sourceFileName:project.sourceFileName,metadata:project.metadata,settings:project.settings,target:project.target,targetTime:project.targetTime,fileName:destination.lastPathComponent,savedToPhotos:false,redactionVersion:project.settings.redaction.enabled ? project.redactionPlan?.smoothingVersion : nil)
             try JSONEncoder().encode(record).write(to:manifest,options:.atomic)
         } catch {try? FileManager.default.removeItem(at:destination);throw error}
-        if let old,old.fileName != destination.lastPathComponent {try? FileManager.default.removeItem(at:folder.appendingPathComponent(old.fileName))}
+        if let old,Self.isOutputFileName(old.fileName),old.fileName != destination.lastPathComponent {try? FileManager.default.removeItem(at:folder.appendingPathComponent(old.fileName))}
         return destination
     }
     func output(for project:VideoProject) throws -> StoredOutput? {
         let folder=artifactsURL(project.id)
         guard let source=sourceURL(for:project),let data=try? Data(contentsOf:folder.appendingPathComponent("output.json")),
               let record=try? JSONDecoder().decode(OutputRecord.self,from:data),record.matches(project),
-              record.fileName==URL(fileURLWithPath:record.fileName).lastPathComponent,
+              Self.isOutputFileName(record.fileName),
               record.sourceDigest == (try digest(source)) else {return nil}
         let file=folder.appendingPathComponent(record.fileName)
         guard FileManager.default.fileExists(atPath:file.path) else {return nil}
@@ -159,7 +165,7 @@ actor ProjectStore {
     }
     func markOutputSaved(project:VideoProject,url:URL) throws {
         let manifest=artifactsURL(project.id).appendingPathComponent("output.json")
-        guard let data=try? Data(contentsOf:manifest),var record=try? JSONDecoder().decode(OutputRecord.self,from:data),record.matches(project),record.fileName==url.lastPathComponent else {return}
+        guard let data=try? Data(contentsOf:manifest),var record=try? JSONDecoder().decode(OutputRecord.self,from:data),record.matches(project),Self.isOutputFileName(record.fileName),record.fileName==url.lastPathComponent else {return}
         record.savedToPhotos=true;try JSONEncoder().encode(record).write(to:manifest,options:.atomic)
     }
     func importFile(_ url: URL) throws -> URL {

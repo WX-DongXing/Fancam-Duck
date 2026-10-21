@@ -93,15 +93,13 @@ struct HomeView: View {
             .fileImporter(isPresented:$importingFile,allowedContentTypes:[.movie]) {result in
                 guard case .success(let url)=result else {return}
                 Task {
-                    model.importing=true
-                    defer {model.importing=false}
-                    let scoped=url.startAccessingSecurityScopedResource()
-                    defer {if scoped {url.stopAccessingSecurityScopedResource()}}
-                    do {
+                    await model.importMovie(load:{
+                        let scoped=url.startAccessingSecurityScopedResource()
+                        defer {if scoped {url.stopAccessingSecurityScopedResource()}}
                         let copy=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension(url.pathExtension)
                         try FileManager.default.copyItem(at:url,to:copy)
-                        await model.importMovie(.init(url:copy))
-                    } catch {model.errorMessage=error.localizedDescription}
+                        return ImportedMovie(url:copy)
+                    })
                 }
             }
             .sheet(isPresented: $model.showGuide) {
@@ -125,13 +123,8 @@ struct HomeView: View {
             .onChange(of: selection) { _, item in
                 guard let item else { return }
                 Task {
-                    model.importing = true
-                    defer { model.importing = false }
-                    do {
-                        if let movie = try await item.loadTransferable(type: ImportedMovie.self) { await model.importMovie(movie) }
-                        else { model.errorMessage = "未能读取所选视频，请重试。" }
-                    } catch { model.errorMessage = error.localizedDescription }
-                    selection = nil
+                    await model.importMovie(load:{try await item.loadTransferable(type:ImportedMovie.self)})
+                    if selection == item {selection=nil}
                 }
             }
         }.preferredColorScheme(.dark)
