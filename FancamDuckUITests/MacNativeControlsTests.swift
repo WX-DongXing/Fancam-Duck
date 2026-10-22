@@ -32,11 +32,11 @@ final class MacNativeControlsTests:XCTestCase {
         XCTAssertTrue(option(aspect,"1:1").isSelected)
         option(tools,"打码").click()
         let enabled=app.switches["redactionEnabled"]
-        let region=app.buttons["redactionRegionMenu"]
+        let region=app.descendants(matching:.any).matching(identifier:"redactionRegion").firstMatch
         let style=app.descendants(matching:.any).matching(identifier:"redactionStyle").firstMatch
         XCTAssertTrue(enabled.waitForExistence(timeout:5))
         XCTAssertEqual(enabled.value as? String,"0")
-        XCTAssertFalse(region.isHittable)
+        XCTAssertTrue(region.isHittable)
         XCTAssertFalse(app.buttons["开启打码"].exists)
         XCTAssertFalse(app.buttons["打码强度设置"].exists)
         let offSwitchFrame=enabled.frame
@@ -44,11 +44,9 @@ final class MacNativeControlsTests:XCTestCase {
         XCTAssertEqual(enabled.value as? String,"1")
         XCTAssertTrue(region.waitForExistence(timeout:3))
         XCTAssertTrue(region.isHittable)
-        XCTAssertLessThan(enabled.frame.maxX,offSwitchFrame.maxX)
+        XCTAssertEqual(enabled.frame.maxX,offSwitchFrame.maxX,accuracy:1)
         XCTAssertTrue(app.sliders["redactionStrength"].isHittable)
-        app.buttons["redactionHelp"].click()
-        XCTAssertTrue(app.staticTexts["对主角外人物进行打码"].waitForExistence(timeout:3))
-        app.typeKey(.escape,modifierFlags:[])
+        XCTAssertFalse(app.buttons["redactionHelp"].exists)
         option(style,"贴片").click()
         XCTAssertFalse(app.sliders["redactionStrength"].exists)
         let sticker=app.buttons["redactionSticker-star"]
@@ -56,14 +54,14 @@ final class MacNativeControlsTests:XCTestCase {
         XCTAssertTrue(sticker.isHittable)
         sticker.click()
         XCTAssertTrue(sticker.isSelected)
-        region.click();option(app,"全身").click()
-        XCTAssertEqual(region.value as? String,"全身")
+        option(region,"全身").click()
+        XCTAssertTrue(option(region,"全身").isSelected)
         XCTAssertFalse(option(style,"贴片").exists)
         XCTAssertTrue(app.sliders["redactionStrength"].isHittable)
         option(style,"马赛克").click()
         XCTAssertTrue(option(style,"马赛克").isSelected)
         enabled.click()
-        XCTAssertFalse(region.isHittable)
+        XCTAssertTrue(region.isHittable)
         XCTAssertEqual(enabled.frame.maxX,offSwitchFrame.maxX,accuracy:1)
         let shot=XCTAttachment(screenshot:app.screenshot())
         shot.name="mac-native-redaction-controls";shot.lifetime = .keepAlways;add(shot)

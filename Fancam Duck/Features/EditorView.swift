@@ -11,7 +11,7 @@ struct EditorView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var floatingControlsHeight:CGFloat=200
+    @State private var previewToolbarHeight:CGFloat=72
     @State private var previewPanelExpanded=true
     @State private var settingsPanelHeights:[WorkspaceTool:CGFloat]=[:]
     @State private var activeTool: WorkspaceTool?
@@ -80,6 +80,7 @@ struct EditorView: View {
                                 .allowsHitTesting(!previewPanelExpanded)
                                 .accessibilityHidden(previewPanelExpanded)
                             bottomToolbar.padding(.bottom,8)
+                                .onGeometryChange(for:CGFloat.self) {$0.size.height} action: {previewToolbarHeight=$0}
                         }
                     }
                     else {
@@ -102,10 +103,21 @@ struct EditorView: View {
                     }
                 }
                 .overlay(alignment:.bottom) {
-                    if floatsPreviewControls && previewPanelExpanded {
-                        floatingPreviewControls(available:geometry.size.height)
-                            .padding(.bottom,76)
-                            .transition(.opacity.combined(with:.offset(y:16)))
+                    if floatsPreviewControls {
+                        VStack(spacing:0) {
+                            Spacer(minLength:0)
+                            if previewPanelExpanded {
+                                VStack(spacing:12) {
+                                    previewTransport
+                                        .overlay(alignment:.top) {
+                                            if model.compositionBusy {previewUpdatingBadge.offset(y:-36)}
+                                        }
+                                    floatingPreviewControls
+                                }.transition(.move(edge:.bottom).combined(with:.opacity))
+                            }
+                        }
+                        .clipped()
+                        .padding(.bottom,previewToolbarHeight+12)
                     }
                 }
                 .animation(settingsPanelAnimation,value:previewPanelExpanded)
@@ -361,21 +373,13 @@ struct EditorView: View {
                         .position(x:geometry.size.width/2,y:max(30,geometry.size.height-100))
                 }
                 if model.showsPreviewSettings && !isProcessing && !isCompleted {
-                    HStack(spacing:28) {
-                        StudioIcon(symbol:"gobackward.5",label:"后退 5 秒") {model.skipPreview(by:-5)}
-                            .accessibilityIdentifier("previewBackward")
-                        playbackControl
-                        StudioIcon(symbol:"goforward.5",label:"前进 5 秒") {model.skipPreview(by:5)}
-                            .accessibilityIdentifier("previewForward")
-                    }.disabled(timelineTrimming || model.compositionAdjusting)
-                        .position(x:geometry.size.width/2,y:max(22,geometry.size.height-(floatsPreviewControls && previewPanelExpanded ? max(36,floatingControlsHeight-80) : 36)))
+                    if !floatsPreviewControls || !previewPanelExpanded {
+                        previewTransport.position(x:geometry.size.width/2,y:max(22,geometry.size.height-36))
+                    }
                 } else {playbackControl
                     .position(x:geometry.size.width/2,y:max(22,geometry.size.height-36))}
-                if model.showsPreviewSettings && model.compositionBusy {
-                    HStack(spacing:6) {ProgressView().controlSize(.mini);Text("正在更新预览")}
-                        .font(.caption2).padding(.horizontal,10).padding(.vertical,6)
-                        .background(.ultraThinMaterial,in:Capsule()).allowsHitTesting(false)
-                        .position(x:geometry.size.width/2,y:max(22,geometry.size.height-(floatsPreviewControls && previewPanelExpanded ? max(82,floatingControlsHeight-34) : 82)))
+                if model.showsPreviewSettings && model.compositionBusy && (!floatsPreviewControls || !previewPanelExpanded) {
+                    previewUpdatingBadge.position(x:geometry.size.width/2,y:max(22,geometry.size.height-82))
                 }
                 ZStack {
                     if selectionZoomEnabled && zoom>1.001 {
@@ -493,6 +497,20 @@ struct EditorView: View {
         }
     }
 
+    private var previewTransport:some View {
+        HStack(spacing:28) {
+            StudioIcon(symbol:"gobackward.5",label:"后退 5 秒") {model.skipPreview(by:-5)}
+                .accessibilityIdentifier("previewBackward")
+            playbackControl
+            StudioIcon(symbol:"goforward.5",label:"前进 5 秒") {model.skipPreview(by:5)}
+                .accessibilityIdentifier("previewForward")
+        }.disabled(timelineTrimming || model.compositionAdjusting)
+    }
+    private var previewUpdatingBadge:some View {
+        HStack(spacing:6) {ProgressView().controlSize(.mini);Text("正在更新预览")}
+            .font(.caption2).padding(.horizontal,10).padding(.vertical,6)
+            .background(.ultraThinMaterial,in:Capsule()).allowsHitTesting(false)
+    }
     private var playbackControl:some View {
         StudioIcon(symbol:model.previewPlaybackPending ? "hourglass" : (isCompleted ? generatedPlaying : model.isPlaying) ? "pause.fill" : "play.fill",
                    label:model.previewPlaybackPending ? "取消等待播放" : (isCompleted ? generatedPlaying : model.isPlaying) ? "暂停预览" : "播放预览") {
@@ -531,23 +549,11 @@ struct EditorView: View {
         !usesExpandedWorkspace && model.showsPreviewSettings && model.phase == .editing && !isBlocked && !model.manualSelection
         #endif
     }
-    private func floatingPreviewControls(available:CGFloat)->some View {
-        VStack(spacing:0) {
-            Button {
-                withAnimation(settingsPanelAnimation) {previewPanelExpanded=false}
-            } label: {
-                Capsule().fill(.secondary).frame(width:36,height:4)
-                    .frame(maxWidth:.infinity).frame(height:28).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityLabel("收起设置")
-                .accessibilityIdentifier("previewPanelClose")
-                .gesture(DragGesture(minimumDistance:15).onEnded {value in
-                    if abs(value.translation.height)>abs(value.translation.width) {
-                        withAnimation(settingsPanelAnimation) {previewPanelExpanded=value.translation.height<0}
-                    }
-                })
-            if previewPanelExpanded,let tool=displayedTool {
+    private var floatingPreviewControls:some View {
+        PreviewSettingsSheet(animation:settingsPanelAnimation,onDismiss:{previewPanelExpanded=false}) {
+            if let tool=displayedTool {
                 settingsContent(tool)
-                    .padding(.horizontal,12).padding(.bottom,12)
+                    .padding(panelInset)
                     .fixedSize(horizontal:false,vertical:true)
                     .accessibilityElement(children:.contain).accessibilityIdentifier("adjustmentPanel")
                     .disabled(model.restoringTracking)
@@ -555,12 +561,7 @@ struct EditorView: View {
                     .transition(.opacity.combined(with:.offset(y:8)))
             }
         }
-        .background(.regularMaterial,in:RoundedRectangle(cornerRadius:24))
-        .overlay {RoundedRectangle(cornerRadius:24).strokeBorder(.white.opacity(0.1))}
-        .padding(.horizontal,18).padding(.bottom,6)
-        .onGeometryChange(for:CGFloat.self) {$0.size.height} action: {height in
-            if abs(floatingControlsHeight-height)>0.5 {floatingControlsHeight=height}
-        }
+        .padding(.horizontal,18)
         .animation(settingsPanelAnimation,value:previewPanelExpanded)
         .animation(settingsPanelAnimation,value:displayedTool)
         .accessibilityElement(children:.contain).accessibilityIdentifier("floatingPreviewControls")
@@ -627,7 +628,8 @@ struct EditorView: View {
                 if isCompleted {completedActions}
                 else if !model.showsPreviewSettings || isProcessing {processingAction}
             }
-        }.dynamicTypeSize(...DynamicTypeSize.xxxLarge).padding(.horizontal, 18).frame(height: 58)
+        }.dynamicTypeSize(...DynamicTypeSize.xxxLarge).padding(.horizontal, 18)
+            .frame(height:floatsPreviewControls ? bottomControlHeight+8 : 58)
     }
     private var processingAction:some View {
                 Button {
@@ -825,27 +827,16 @@ struct EditorView: View {
     // Shared control sizing and spacing for phone, wide layouts and Mac Catalyst.
     private let panelInset:CGFloat = 12
     private var redactionPanel: some View {
-        VStack(spacing:8) {
-            HStack(spacing:0) {
-                Toggle(isOn:Binding(
-                    get:{model.project?.settings.redaction.enabled == true},
-                    set:{if $0 {model.enableAutomaticRedaction()} else {model.clearRedactions()}}
-                )) {
-                    Text("打码")
-                }
-                .font(.subheadline.weight(.medium)).toggleStyle(.switch).tint(Color.acAccent)
-                .accessibilityIdentifier("redactionEnabled")
-                ZStack {
-                if model.project?.settings.redaction.enabled == true {
-                RedactionRegionMenu(model:model)
-                    .transition(reduceMotion ? .identity : .opacity.combined(with:.offset(y:4)))
-                }
-                }.frame(width:model.project?.settings.redaction.enabled == true ? 88 : 0,height:44)
-                    .padding(.leading,model.project?.settings.redaction.enabled == true ? 12 : 0)
-            }.frame(height:44)
-                // The menu fills 44pt; only the bare native switch has spare vertical space.
-                .padding(.vertical,model.project?.settings.redaction.enabled == true ? 0 : -6)
-                .animation(reduceMotion ? nil : .easeInOut(duration:0.28),value:model.project?.settings.redaction.enabled)
+        VStack(spacing:12) {
+            Toggle(isOn:Binding(
+                get:{model.project?.settings.redaction.enabled == true},
+                set:{if $0 {model.enableAutomaticRedaction()} else {model.clearRedactions()}}
+            )) {
+                Text("打码")
+            }
+            .font(.subheadline.weight(.medium)).toggleStyle(.switch).tint(Color.acAccent)
+            .frame(height:44).accessibilityIdentifier("redactionEnabled")
+            RedactionRegionControl(model:model)
             NativeSegmentedControl(title:"打码样式",options:RedactionSettings.Style.allCases.filter {model.project?.settings.redaction.region != .person || $0 != .image},selection:Binding(
                 get:{model.project?.settings.redaction.style ?? .frosted},set:{model.setRedactionStyle($0)}
             ),label:{$0 == .image ? "贴片" : $0.rawValue})
@@ -854,7 +845,7 @@ struct EditorView: View {
                 if model.project?.settings.redaction.style == .image {
                     stickerChoices
                 } else {
-                    Text("强度").font(.caption)
+                    Text("强度").font(.subheadline).foregroundStyle(.secondary)
                     Slider(value:Binding(
                         get:{(model.project?.settings.redaction.strength ?? RedactionSettings.defaultStrength)*100},
                         set:{model.setRedactionStrength($0/100)}
@@ -862,11 +853,11 @@ struct EditorView: View {
                     .tint(.white).accessibilityLabel("打码强度")
                     .accessibilityValue("\(RedactionSettings.displayStrength(model.project?.settings.redaction.strength ?? RedactionSettings.defaultStrength))")
                     .accessibilityIdentifier("redactionStrength")
-                    Text("\(RedactionSettings.displayStrength(model.project?.settings.redaction.strength ?? RedactionSettings.defaultStrength))")
-                        .font(.caption.monospacedDigit()).frame(width:34,alignment:.trailing)
+                    Text("\(RedactionSettings.displayStrength(model.project?.settings.redaction.strength ?? RedactionSettings.defaultStrength))%")
+                        .font(.caption.monospacedDigit()).frame(width:44,alignment:.trailing)
                         .accessibilityHidden(true)
                 }
-            }.frame(height:44).padding(.vertical,-6)
+            }.frame(height:44)
         }.accessibilityElement(children:.contain)
     }
     private var stickerChoices:some View {
@@ -1008,29 +999,13 @@ private struct ProcessingButtonFill: View {
     }
 }
 
-// Keep the presented menu independent of the editor's per-frame playback updates.
-private struct RedactionRegionMenu:View {
+private struct RedactionRegionControl:View {
     let model:AppModel
     var body:some View {
-        Menu {
-            Picker("打码范围",selection:Binding(
-                get:{model.project?.settings.redaction.region ?? .face},
-                set:{model.setRedactionRegion($0)}
-            )) {
-                ForEach(RedactionSettings.Region.allCases,id:\.self) {region in
-                    Text(region == .face ? "人脸" : "全身").tag(region)
-                }
-            }.pickerStyle(.inline).labelsHidden()
-        } label: {
-            HStack(spacing:5) {
-                Text(model.project?.settings.redaction.region == .person ? "全身" : "人脸")
-                    .lineLimit(1).minimumScaleFactor(0.8)
-                Image(systemName:"chevron.down").font(.caption2.weight(.semibold))
-            }.font(.subheadline).padding(.horizontal,10).frame(minWidth:76,minHeight:44)
-                .background(.white.opacity(0.06),in:Capsule())
-        }.accessibilityLabel("打码范围")
-            .accessibilityValue(model.project?.settings.redaction.region == .person ? "全身" : "人脸")
-            .accessibilityIdentifier("redactionRegionMenu")
+        NativeSegmentedControl(title:"打码范围",options:RedactionSettings.Region.allCases,selection:Binding(
+            get:{model.project?.settings.redaction.region ?? .face},set:{model.setRedactionRegion($0)}
+        ),label:{$0 == .face ? "人脸" : "全身"})
+        .frame(height:48).accessibilityIdentifier("redactionRegion")
     }
 }
 
