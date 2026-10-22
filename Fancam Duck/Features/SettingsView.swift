@@ -18,6 +18,9 @@ struct SettingsView:View {
                 } label: {
                     Label("开源许可",systemImage:"doc.text")
                 }.accessibilityIdentifier("openSourceLicenses")
+                Link(destination:URL(string:"https://fancam-duck.vercel.app/privacy")!) {
+                    Label("隐私政策",systemImage:"hand.raised")
+                }.accessibilityIdentifier("privacyPolicy")
                 Button {requestReview()} label: {
                     Label("评价",systemImage:"star")
                 }.accessibilityIdentifier("rateDuck")

@@ -39,7 +39,7 @@ Apple 参考：[隐私清单](https://developer.apple.com/documentation/bundlere
 
 ## 隐私与支持网站
 
-仓库 `website/public` 提供首页、`/privacy` 与 `/support`，根目录 vercel.json 配置只输出该静态目录。Vercel 部署按钮与 CLI 脚本、本地预览方法见 [网站说明](../../website/README.md)。当前支持联系人为 GitHub Issues，未虚构邮箱。正式生产域名尚未确定，App 尚未添加隐私链接，后台链接也未填报；部署后需验证匿名可访问再接入。
+仓库 `website/public` 提供首页、`/privacy` 与 `/support`，根目录 vercel.json 配置只输出该静态目录。Vercel 部署按钮与 CLI 脚本、本地预览方法见 [网站说明](../../website/README.md)。当前支持联系人为 GitHub Issues，未虚构邮箱。已部署网站为 `https://fancam-duck.vercel.app`；设置中的“隐私政策”原生链接通过系统浏览器打开 `https://fancam-duck.vercel.app/privacy`。2026-10-22 匿名 HTTP 检查返回 200，正文为现有隐私政策。提交商店时仍需在 App Store Connect 的隐私政策 URL 字段填写同一公开链接；应用内入口不代替后台填写。Apple 要求应用内也提供易于访问的入口，见 [审核指南 5.1.1(i)](https://developer.apple.com/app-store/review/guidelines/#privacy)。
 
 ## 应用内开源许可
 

@@ -10,6 +10,7 @@ final class SettingsFlowTests:XCTestCase {
         let about=app.buttons["aboutDuck"]
         XCTAssertTrue(about.waitForExistence(timeout:5))
         XCTAssertTrue(app.buttons["rateDuck"].isHittable)
+        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"privacyPolicy").firstMatch.isHittable)
         // The row's blank space must navigate, not only its text.
         about.coordinate(withNormalizedOffset:CGVector(dx:0.85,dy:0.5)).tap()
         XCTAssertTrue(app.staticTexts["appVersion"].waitForExistence(timeout:5))
