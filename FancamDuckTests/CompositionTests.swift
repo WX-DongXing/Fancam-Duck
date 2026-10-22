@@ -150,7 +150,10 @@ final class CompositionTests:XCTestCase {
     }
     func testOldSettingsDecodeAndNewSettingsRoundTrip() throws {
         let old=try JSONDecoder().decode(EditSettings.self,from:Data("{\"start\":1,\"end\":3,\"personHeight\":0.6}".utf8))
-        XCTAssertEqual(old.aspectRatio,.portrait);XCTAssertEqual(old.followSpeed, .gentle); XCTAssertEqual(EditSettings().followSpeed, .gentle)
+        XCTAssertEqual(old.aspectRatio,.portrait);XCTAssertEqual(old.followSpeed, .standard); XCTAssertEqual(EditSettings().followSpeed, .standard)
+        XCTAssertFalse(EditSettings().redaction.enabled)
+        let saved=try JSONDecoder().decode(EditSettings.self,from:Data("{\"followSpeed\":\"舒缓\"}".utf8))
+        XCTAssertEqual(saved.followSpeed,.gentle)
         XCTAssertEqual(old.compositionScale,1);XCTAssertEqual(old.compositionX,0);XCTAssertEqual(old.start,1)
         var settings=old;settings.compositionScale=1.4;settings.compositionX=0.1;settings.compositionY = -0.1
         XCTAssertEqual(try JSONDecoder().decode(EditSettings.self,from:JSONEncoder().encode(settings)),settings)

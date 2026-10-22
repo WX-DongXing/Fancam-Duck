@@ -30,6 +30,27 @@ private actor RedactionReviewPipeline: TargetTracking {
 }
 
 @MainActor final class RedactionStateTests: XCTestCase {
+    func testCombinedModeRetainsSettingsAcrossOffAndRespectsEditingGate() {
+        let model=AppModel();model.startDemo();defer {model.goHome()}
+        model.setRedactionMode(.face)
+        XCTAssertTrue(model.project!.settings.redaction.enabled)
+        model.setRedactionStyle(.mosaic);model.setRedactionStrength(0.47)
+        let saved=model.project!.settings.redaction
+        model.setRedactionMode(nil)
+        XCTAssertFalse(model.project!.settings.redaction.enabled)
+        XCTAssertEqual(model.project!.settings.redaction.region,saved.region)
+        XCTAssertEqual(model.project!.settings.redaction.style,saved.style)
+        XCTAssertEqual(model.project!.settings.redaction.strength,saved.strength)
+        model.setRedactionMode(.face)
+        XCTAssertEqual(model.project!.settings.redaction,saved)
+        model.setRedactionStyle(.image);model.setRedactionMode(.person)
+        XCTAssertEqual(model.project!.settings.redaction.style,.frosted)
+        XCTAssertEqual(model.project!.settings.redaction.strength,0.3)
+        let before=model.project!.settings.redaction
+        model.phase = .processing(progress:0)
+        model.setRedactionMode(nil)
+        XCTAssertEqual(model.project!.settings.redaction,before)
+    }
     func testChangingRegionAppliesItsDefaultWithoutOverwritingUnchangedRegion() {
         let model=AppModel();model.startDemo();defer {model.goHome()}
         XCTAssertEqual(model.project?.settings.redaction.strength,0.8)

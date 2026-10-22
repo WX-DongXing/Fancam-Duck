@@ -1393,6 +1393,21 @@ extension AppModel {
         if region == .person,project?.settings.redaction.style == .image {project?.settings.redaction.style = .frosted}
         refreshRedactionPreview();persist()
     }
+    func setRedactionMode(_ region:RedactionSettings.Region?) {
+        guard settingsEnabled,var settings=project?.settings.redaction else {return}
+        if let region {
+            if settings.region != region {
+                settings.region=region
+                settings.strength=RedactionSettings.defaultStrength(for:region)
+                if region == .person,settings.style == .image {settings.style = .frosted}
+            }
+            settings.allOthers=true
+        } else {settings.allOthers=false}
+        settings.subjects=[]
+        guard settings != project?.settings.redaction else {return}
+        project?.settings.redaction=settings;project?.redactionPlan=nil
+        refreshRedactionPreview();persist()
+    }
     func setRedactionStrength(_ value:Double) {
         guard settingsEnabled,value.isFinite else {return}
         project?.settings.redaction.strength=min(1,max(0,value))

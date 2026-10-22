@@ -31,20 +31,19 @@ final class MacNativeControlsTests:XCTestCase {
         option(aspect,"1:1").click()
         XCTAssertTrue(option(aspect,"1:1").isSelected)
         option(tools,"打码").click()
-        let enabled=app.switches["redactionEnabled"]
         let region=app.descendants(matching:.any).matching(identifier:"redactionRegion").firstMatch
         let style=app.descendants(matching:.any).matching(identifier:"redactionStyle").firstMatch
-        XCTAssertTrue(enabled.waitForExistence(timeout:5))
-        XCTAssertEqual(enabled.value as? String,"0")
+        XCTAssertTrue(region.waitForExistence(timeout:5))
+        XCTAssertTrue(option(region,"关闭").isSelected)
         XCTAssertTrue(region.isHittable)
         XCTAssertFalse(app.buttons["开启打码"].exists)
         XCTAssertFalse(app.buttons["打码强度设置"].exists)
-        let offSwitchFrame=enabled.frame
-        enabled.click()
-        XCTAssertEqual(enabled.value as? String,"1")
+        let offFrame=region.frame
+        option(region,"人脸").click()
+        XCTAssertTrue(option(region,"人脸").isSelected)
         XCTAssertTrue(region.waitForExistence(timeout:3))
         XCTAssertTrue(region.isHittable)
-        XCTAssertEqual(enabled.frame.maxX,offSwitchFrame.maxX,accuracy:1)
+        XCTAssertEqual(region.frame,offFrame)
         XCTAssertTrue(app.sliders["redactionStrength"].isHittable)
         XCTAssertFalse(app.buttons["redactionHelp"].exists)
         option(style,"贴片").click()
@@ -60,9 +59,9 @@ final class MacNativeControlsTests:XCTestCase {
         XCTAssertTrue(app.sliders["redactionStrength"].isHittable)
         option(style,"马赛克").click()
         XCTAssertTrue(option(style,"马赛克").isSelected)
-        enabled.click()
+        option(region,"关闭").click()
         XCTAssertTrue(region.isHittable)
-        XCTAssertEqual(enabled.frame.maxX,offSwitchFrame.maxX,accuracy:1)
+        XCTAssertEqual(region.frame,offFrame)
         let shot=XCTAttachment(screenshot:app.screenshot())
         shot.name="mac-native-redaction-controls";shot.lifetime = .keepAlways;add(shot)
         option(tools,"构图").click()

@@ -7,22 +7,20 @@ final class LivePreviewFlowTests:XCTestCase {
         XCTAssertTrue(play.waitForExistence(timeout:15))
         let compositionControlFrame=app.segmentedControls["compositionAspect"].frame
         app.buttons["previewTool-打码"].tap()
-        let enabled=app.switches["redactionEnabled"]
         let region=app.segmentedControls["redactionRegion"]
-        XCTAssertTrue(region.buttons["人脸"].isSelected)
-        region.buttons["全身"].tap()
-        XCTAssertTrue(region.buttons["全身"].isSelected)
-        XCTAssertEqual(enabled.value as? String,"0","Presetting the range must not enable redaction")
-        region.buttons["人脸"].tap()
+        XCTAssertFalse(app.switches["redactionEnabled"].exists)
+        XCTAssertEqual(region.buttons.count,3)
+        XCTAssertTrue(region.buttons["关闭"].isSelected)
         let sheet=app.otherElements["floatingPreviewControls"]
+        let settled=NSPredicate {_,_ in abs(sheet.frame.height-216)<0.01 && abs(region.frame.minY-sheet.frame.minY-40)<0.01}
+        XCTAssertTrue(XCTWaiter.wait(for:[XCTNSPredicateExpectation(predicate:settled,object:nil)],timeout:3) == .completed)
         let offFrame=sheet.frame,rangeFrame=region.frame
-        if enabled.value as? String != "1" {enabled.coordinate(withNormalizedOffset:CGVector(dx:0.9,dy:0.5)).tap()}
-        XCTAssertEqual(enabled.value as? String,"1")
-        XCTAssertEqual(sheet.frame,offFrame,"The switch must not change sheet size or position")
+        region.buttons["人脸"].tap()
+        XCTAssertTrue(region.buttons["人脸"].isSelected)
+        XCTAssertEqual(sheet.frame,offFrame)
         XCTAssertEqual(region.frame,rangeFrame)
         let style=app.segmentedControls["redactionStyle"]
         let strength=app.sliders["redactionStrength"]
-        XCTAssertGreaterThanOrEqual(region.frame.minY-enabled.frame.maxY,11)
         XCTAssertEqual(style.frame.minY-region.frame.maxY,12,accuracy:1)
         XCTAssertGreaterThanOrEqual(strength.frame.minY-style.frame.maxY,11)
         XCTAssertEqual(style.frame.minX,compositionControlFrame.minX,accuracy:1)
@@ -32,11 +30,22 @@ final class LivePreviewFlowTests:XCTestCase {
         strength.adjust(toNormalizedSliderPosition:0.45)
         XCTAssertTrue((1...99).contains(Int(strength.value as? String ?? "") ?? -1))
         XCTAssertTrue(app.buttons["previewPanelClose"].exists,"Adjusting strength must not dismiss the sheet")
+        let retainedStrength=strength.value as? String
+        region.buttons["关闭"].tap()
+        XCTAssertTrue(region.buttons["关闭"].isSelected)
+        XCTAssertEqual(sheet.frame,offFrame)
+        region.buttons["人脸"].tap()
+        XCTAssertEqual(strength.value as? String,retainedStrength)
         let shot=XCTAttachment(screenshot:app.screenshot());shot.name="redaction-spaced-groups";shot.lifetime = .keepAlways;add(shot)
         play.tap()
         XCTAssertEqual(play.label,"暂停预览")
+        region.buttons["关闭"].tap()
+        XCTAssertTrue(region.buttons["关闭"].isSelected)
+        XCTAssertEqual(play.label,"暂停预览")
+        XCTAssertEqual(sheet.frame,offFrame)
         region.buttons["全身"].tap()
         XCTAssertTrue(region.buttons["全身"].isSelected)
+        XCTAssertEqual(sheet.frame,offFrame)
         XCTAssertTrue(app.segmentedControls["redactionStyle"].buttons["贴片"].waitForNonExistence(timeout:3))
         XCTAssertTrue(NSPredicate(format:"label == %@","暂停预览").evaluate(with:play))
         region.buttons["人脸"].tap()

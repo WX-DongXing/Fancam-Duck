@@ -86,7 +86,7 @@ struct EditSettings: Codable, Equatable, Sendable {
     var end: Double = 0
     var personHeight: Double = 0.75
     var horizontalOffset: Double = 0
-    var followSpeed: FollowSpeed = .gentle
+    var followSpeed: FollowSpeed = .standard
     var protectFullBody = true
     var aspectRatio: OutputAspectRatio = .portrait
     var resolution = OutputResolution(width: 1080, height: 1920)

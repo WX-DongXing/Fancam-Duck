@@ -81,9 +81,9 @@ final class SubjectCompositionFlowTests:XCTestCase {
         #endif
         activate(tools.buttons["打码"])
         capture("subject-redaction-padding")
-        let redaction=app.switches["redactionEnabled"]
-        redaction.coordinate(withNormalizedOffset:CGVector(dx:0.9,dy:0.5)).tap()
-        XCTAssertEqual(redaction.value as? String,"1")
+        let redaction=app.segmentedControls["redactionRegion"]
+        activate(redaction.buttons["人脸"])
+        XCTAssertTrue(redaction.buttons["人脸"].isSelected)
         capture("subject-redaction-theme")
         XCTAssertTrue(app.buttons["previewExport"].isHittable)
         activate(tools.buttons["构图"])

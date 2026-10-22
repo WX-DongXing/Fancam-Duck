@@ -828,14 +828,6 @@ struct EditorView: View {
     private let panelInset:CGFloat = 12
     private var redactionPanel: some View {
         VStack(spacing:12) {
-            Toggle(isOn:Binding(
-                get:{model.project?.settings.redaction.enabled == true},
-                set:{if $0 {model.enableAutomaticRedaction()} else {model.clearRedactions()}}
-            )) {
-                Text("打码")
-            }
-            .font(.subheadline.weight(.medium)).toggleStyle(.switch).tint(Color.acAccent)
-            .frame(height:44).accessibilityIdentifier("redactionEnabled")
             RedactionRegionControl(model:model)
             NativeSegmentedControl(title:"打码样式",options:RedactionSettings.Style.allCases.filter {model.project?.settings.redaction.region != .person || $0 != .image},selection:Binding(
                 get:{model.project?.settings.redaction.style ?? .frosted},set:{model.setRedactionStyle($0)}
@@ -876,7 +868,7 @@ struct EditorView: View {
     private var motionPanel: some View {
         VStack(alignment:.leading,spacing:12) {
             NativeSegmentedControl(title:"运镜速度",options:EditSettings.FollowSpeed.allCases,selection:Binding(
-                get:{model.project?.settings.followSpeed ?? .gentle},set:{model.setFollowSpeed($0)}
+                get:{model.project?.settings.followSpeed ?? .standard},set:{model.setFollowSpeed($0)}
             ),label:{$0.rawValue})
             .frame(height:48).accessibilityIdentifier("motionSpeed")
             .disabled(compositionControlsDisabled)
@@ -885,7 +877,7 @@ struct EditorView: View {
         }
     }
     private var motionDescription:String {
-        switch model.project?.settings.followSpeed ?? .gentle {
+        switch model.project?.settings.followSpeed ?? .standard {
         case .gentle: "平缓跟随主角，减少画面移动。"
         case .standard: "兼顾画面稳定与跟随速度。"
         case .responsive: "快速跟随主角，适合大幅移动。"
@@ -1001,10 +993,12 @@ private struct ProcessingButtonFill: View {
 
 private struct RedactionRegionControl:View {
     let model:AppModel
+    private let modes:[RedactionSettings.Region?]=[nil,.face,.person]
     var body:some View {
-        NativeSegmentedControl(title:"打码范围",options:RedactionSettings.Region.allCases,selection:Binding(
-            get:{model.project?.settings.redaction.region ?? .face},set:{model.setRedactionRegion($0)}
-        ),label:{$0 == .face ? "人脸" : "全身"})
+        NativeSegmentedControl(title:"打码范围",options:modes,selection:Binding(
+            get:{model.project?.settings.redaction.enabled == true ? model.project?.settings.redaction.region : nil},
+            set:{model.setRedactionMode($0)}
+        ),label:{$0 == nil ? "关闭" : $0 == .face ? "人脸" : "全身"})
         .frame(height:48).accessibilityIdentifier("redactionRegion")
     }
 }

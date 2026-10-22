@@ -169,14 +169,17 @@ final class MediaIntegrationTests: XCTestCase {
         model.setRedactionStrength(0.6)
         for _ in 0..<600 {if !model.compositionBusy && model.isPlaying {break};try await Task.sleep(for:.milliseconds(10))}
         XCTAssertTrue(model.isPlaying,"Changing a live setting must resume playback after the latest recipe is ready")
-        for region:RedactionSettings.Region in [.face,.person] {
-            model.setRedactionRegion(region)
-            XCTAssertEqual(model.project?.settings.redaction.region,region)
+        for region:RedactionSettings.Region? in [nil,.face,.person] {
+            model.setRedactionMode(region)
+            XCTAssertEqual(model.project?.settings.redaction.enabled,region != nil)
             for _ in 0..<600 {if !model.compositionBusy && model.isPlaying {break};try await Task.sleep(for:.milliseconds(10))}
             XCTAssertTrue(model.isPlaying)
-            let live=try XCTUnwrap(model.previewPlayer?.currentItem?.videoComposition?.instructions.first as? RedactionInstruction)
-            XCTAssertEqual(live.plan.region,region)
-            XCTAssertTrue(live.plan.covers(model.project!))
+            let live=model.previewPlayer?.currentItem?.videoComposition?.instructions.first as? RedactionInstruction
+            if let region {
+                let instruction=try XCTUnwrap(live)
+                XCTAssertEqual(instruction.plan.region,region)
+                XCTAssertTrue(instruction.plan.covers(model.project!))
+            } else {XCTAssertTrue(live?.plan.tracks.isEmpty ?? true)}
             XCTAssertNil(model.errorMessage)
         }
         model.pausePreview(refresh:false)
