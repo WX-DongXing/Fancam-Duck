@@ -27,9 +27,9 @@ final class RedactionInstruction: NSObject, AVVideoCompositionInstructionProtoco
 }
 
 final class RedactionCompositor: NSObject, AVVideoCompositing {
-    let sourcePixelBufferAttributes: [String: Any]? = [kCVPixelBufferPixelFormatTypeKey as String:kCVPixelFormatType_32BGRA,
+    let sourcePixelBufferAttributes: [String: any Sendable]? = [kCVPixelBufferPixelFormatTypeKey as String:kCVPixelFormatType_32BGRA,
                                                      kCVPixelBufferMetalCompatibilityKey as String:true]
-    let requiredPixelBufferAttributesForRenderContext: [String: Any] = [kCVPixelBufferPixelFormatTypeKey as String:kCVPixelFormatType_32BGRA,
+    let requiredPixelBufferAttributesForRenderContext: [String: any Sendable] = [kCVPixelBufferPixelFormatTypeKey as String:kCVPixelFormatType_32BGRA,
                                                                       kCVPixelBufferMetalCompatibilityKey as String:true]
     private let queue = DispatchQueue(label:"com.fancamduck.redaction-render",qos:.userInitiated)
     // Decode and encode already agree on Rec.709 display RGB. A second CI working-space

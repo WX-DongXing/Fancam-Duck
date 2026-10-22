@@ -1,5 +1,15 @@
 # 开发验证指南
 
+## 编译警告修正（2026-10-22）
+
+Xcode 27.0：`RedactionCompositor` 的像素缓冲属性值改用 `any Sendable`，匹配 `AVVideoCompositing` 的并发协议要求；`DeferredTargetRecovery` 移除非可选 `trackID` 上无效的 `?? 0`。iOS 模拟器双架构与 Mac Catalyst arm64 Debug 构建通过，无 Swift 编译警告；跟踪恢复及合成视频打码回归共 25 项通过、0 失败。仍有 Xcode 的“未依赖 AppIntents.framework，跳过元数据提取”工具提示；未隐藏警告或引入无用框架。未进行真机与私人视频验证。
+
+## 播放中切换打码范围（2026-10-22）
+
+症状：播放预览时，人脸／全身菜单选择受阻。界面回归在旧实现打开菜单后等待超过 60 秒，直到演示视频播完才完成选择；播放持续性的断言失败。原因是范围菜单内联于随播放时间不断刷新的编辑视图。将原生菜单提取为只依赖打码配置的独立 `RedactionRegionMenu`，保留原有 Picker、设置入口、预览取消／重建和续播行为；不暂停整段视频来规避交互。
+
+`LivePreviewFlowTests.testRedactionRegionCanChangeWhilePreviewIsPlaying` 修复后两轮通过，验证播放中双向切换、全身禁用贴片且保持播放。合成视频集成测试补充双向范围切换后新 `RedactionInstruction.plan.region`、覆盖检查与续播断言。独立定向测试正常返回 TEST SUCCEEDED；完整运行日志记录单元／媒体 201 项：147 通过、54 因本地素材等条件跳过、0 失败；实时预览 UI 2 项通过。完整运行在所有用例结束后的收尾阶段停滞，终止本次 xcodebuild，不将其未完成的结果包视为有效验证产物。Mac Catalyst arm64 构建通过。未对用户私人原片、真机或 Mac 窗口进行交互验收。
+
 ## 工具链
 
 部署基线 iOS18。历史验证使用 Xcode27.1；2026-10-19 当前本机工具链为 Xcode27.0（27A266a）。Duo 原生分区布局需要含相应 API 的 SDK 及显式编译标志，默认使用自适应布局。使用 `xcodebuild -showdestinations -project 'Fancam Duck.xcodeproj' -scheme 'Fancam Duck'` 查看本机目标，不在文档固化模拟器 UUID。

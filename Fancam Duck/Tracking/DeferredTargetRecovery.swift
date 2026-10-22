@@ -56,7 +56,7 @@ struct DeferredTargetRecovery {
                     return ((batch?.primary ?? [])+(batch?.relaxed ?? [])).first {$0.body.iou(s.body)>0.999 && !$0.embedding.isEmpty}
                 }
                 let decision=bridge.step(time:time,reference:left,predicted:left.body,candidate:known,directReliable:known != nil,
-                    observations:known.map {[$0]} ?? [],gallery:[],unavailableIDs:[],trackID:left.trackID ?? 0,confirmedIdentity:known != nil)
+                    observations:known.map {[$0]} ?? [],gallery:[],unavailableIDs:[],trackID:left.trackID,confirmedIdentity:known != nil)
                 if case .observed(_,let samples)=decision {
                     result+=samples.filter {self.times[Int(($0.time*10000).rounded())] != nil}
                 }

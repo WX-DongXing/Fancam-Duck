@@ -1,6 +1,27 @@
 import XCTest
 
 final class LivePreviewFlowTests:XCTestCase {
+    @MainActor func testRedactionRegionCanChangeWhilePreviewIsPlaying() {
+        let app=XCUIApplication();app.launchArguments=["--demo-composition"];app.launch()
+        let play=app.buttons["editorPlayback"]
+        XCTAssertTrue(play.waitForExistence(timeout:15))
+        app.buttons["previewTool-打码"].tap()
+        let enabled=app.switches["redactionEnabled"]
+        if enabled.value as? String != "1" {enabled.coordinate(withNormalizedOffset:CGVector(dx:0.9,dy:0.5)).tap()}
+        XCTAssertEqual(enabled.value as? String,"1")
+        play.tap()
+        XCTAssertEqual(play.label,"暂停预览")
+        let region=app.buttons["redactionRegionMenu"]
+        region.tap()
+        app.buttons["全身"].tap()
+        XCTAssertEqual(region.value as? String,"全身")
+        XCTAssertTrue(app.segmentedControls["redactionStyle"].buttons["贴片"].waitForNonExistence(timeout:3))
+        XCTAssertTrue(NSPredicate(format:"label == %@","暂停预览").evaluate(with:play))
+        region.tap()
+        app.buttons["人脸"].tap()
+        XCTAssertEqual(region.value as? String,"人脸")
+    }
+
     @MainActor func testPreviewPlaysAdjustsScrubsAndOpensExportWithoutGenerationButton() {
         let app=XCUIApplication();app.launchArguments=["--demo-composition"];app.launch()
         let composition=app.buttons["previewTool-构图"]

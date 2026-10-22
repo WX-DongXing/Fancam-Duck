@@ -837,25 +837,7 @@ struct EditorView: View {
                 .accessibilityIdentifier("redactionEnabled")
                 ZStack {
                 if model.project?.settings.redaction.enabled == true {
-                Menu {
-                    Picker("打码范围",selection:Binding(
-                        get:{model.project?.settings.redaction.region ?? .face},
-                        set:{model.setRedactionRegion($0)}
-                    )) {
-                        ForEach(RedactionSettings.Region.allCases,id:\.self) {region in
-                            Text(region == .face ? "人脸" : "全身").tag(region)
-                        }
-                    }.pickerStyle(.inline).labelsHidden()
-                } label: {
-                    HStack(spacing:5) {
-                        Text(model.project?.settings.redaction.region == .person ? "全身" : "人脸")
-                            .lineLimit(1).minimumScaleFactor(0.8)
-                        Image(systemName:"chevron.down").font(.caption2.weight(.semibold))
-                    }.font(.subheadline).padding(.horizontal,10).frame(minWidth:76,minHeight:44)
-                        .background(.white.opacity(0.06),in:Capsule())
-                }.accessibilityLabel("打码范围")
-                    .accessibilityValue(model.project?.settings.redaction.region == .person ? "全身" : "人脸")
-                    .accessibilityIdentifier("redactionRegionMenu")
+                RedactionRegionMenu(model:model)
                     .transition(reduceMotion ? .identity : .opacity.combined(with:.offset(y:4)))
                 }
                 }.frame(width:model.project?.settings.redaction.enabled == true ? 88 : 0,height:44)
@@ -1023,6 +1005,32 @@ private struct ProcessingButtonFill: View {
                 .frame(width:geometry.size.width*progress,height:geometry.size.height)
                 .animation(reduceMotion || paused ? nil : .linear(duration:0.15),value:progress)
         }.clipShape(Capsule()).allowsHitTesting(false).accessibilityHidden(true)
+    }
+}
+
+// Keep the presented menu independent of the editor's per-frame playback updates.
+private struct RedactionRegionMenu:View {
+    let model:AppModel
+    var body:some View {
+        Menu {
+            Picker("打码范围",selection:Binding(
+                get:{model.project?.settings.redaction.region ?? .face},
+                set:{model.setRedactionRegion($0)}
+            )) {
+                ForEach(RedactionSettings.Region.allCases,id:\.self) {region in
+                    Text(region == .face ? "人脸" : "全身").tag(region)
+                }
+            }.pickerStyle(.inline).labelsHidden()
+        } label: {
+            HStack(spacing:5) {
+                Text(model.project?.settings.redaction.region == .person ? "全身" : "人脸")
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                Image(systemName:"chevron.down").font(.caption2.weight(.semibold))
+            }.font(.subheadline).padding(.horizontal,10).frame(minWidth:76,minHeight:44)
+                .background(.white.opacity(0.06),in:Capsule())
+        }.accessibilityLabel("打码范围")
+            .accessibilityValue(model.project?.settings.redaction.region == .person ? "全身" : "人脸")
+            .accessibilityIdentifier("redactionRegionMenu")
     }
 }
 
