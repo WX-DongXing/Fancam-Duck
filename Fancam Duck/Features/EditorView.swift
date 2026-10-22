@@ -11,7 +11,8 @@ struct EditorView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var previewToolbarHeight:CGFloat=72
+    @State private var adaptivePanelHeight:CGFloat=216
+    @State private var previewDivision:CGRect?
     @State private var previewPanelExpanded=true
     @State private var settingsPanelHeights:[WorkspaceTool:CGFloat]=[:]
     @State private var activeTool: WorkspaceTool?
@@ -59,29 +60,34 @@ struct EditorView: View {
         }
         return model.observations.sorted { $0.body.center.x < $1.body.center.x }.enumerated().map { (id: $0.element.id, number: $0.offset, box: $0.element.body) }
     }
-    var body: some View {
+    private var workspaceContent:some View {
         GeometryReader { geometry in
             #if targetEnvironment(macCatalyst)
             desktopWorkspace
             #else
+            let workspaceSize=CGSize(width:geometry.size.width,height:max(1,geometry.size.height-headerHeight))
+            let expanded=WorkspaceLayout.usesColumns(in:workspaceSize)
+            if floatsPreviewControls {
+                if #available(iOS 27.1,*) {
+                    PreviewVerticalBarReader { edge in
+                        adaptivePreviewWorkspace(size:geometry.size,sideInsets:geometry.safeAreaInsets.leading>0 || geometry.safeAreaInsets.trailing>0,systemRail:edge != nil && horizontalSizeClass != .regular)
+                    }
+                } else {
+                adaptivePreviewWorkspace(size:geometry.size,sideInsets:geometry.safeAreaInsets.leading>0 || geometry.safeAreaInsets.trailing>0)
+                }
+            } else {
             VStack(spacing: 0) {
                 header.zIndex(100)
-                WorkspaceArrangement(size:CGSize(width:geometry.size.width,height:max(1,geometry.size.height-52))) {
+                WorkspaceArrangement(size:workspaceSize) {
                     VStack(spacing:0) {
                         sourceStage.accessibilityElement(children:.contain).accessibilityIdentifier("editorStage")
-                        if usesExpandedWorkspace && ((!isBlocked && !model.manualSelection) || model.isReviewing) {editorTimeline.padding(.bottom,12)}
+                        if expanded && ((!isBlocked && !model.manualSelection) || model.isReviewing) {editorTimeline.padding(.bottom,12)}
                     }
                 } controls: {
-                    if usesExpandedWorkspace {expandedControls}
-                    else if floatsPreviewControls {
-                        VStack(spacing:10) {
-                            editorTimeline
-                                .opacity(previewPanelExpanded ? 0 : 1)
-                                .allowsHitTesting(!previewPanelExpanded)
-                                .accessibilityHidden(previewPanelExpanded)
-                            bottomToolbar.padding(.bottom,8)
-                                .onGeometryChange(for:CGFloat.self) {$0.size.height} action: {previewToolbarHeight=$0}
-                        }
+                    if expanded {
+                        if workspaceSize.height<440 {
+                            ScrollView {expandedControls}.scrollBounceBehavior(.basedOnSize)
+                        } else {expandedControls}
                     }
                     else {
                         VStack(spacing:0) {
@@ -102,27 +108,31 @@ struct EditorView: View {
                         }
                     }
                 }
-                .overlay(alignment:.bottom) {
-                    if floatsPreviewControls {
-                        VStack(spacing:0) {
-                            Spacer(minLength:0)
-                            if previewPanelExpanded {
-                                VStack(spacing:12) {
-                                    previewTransport
-                                        .overlay(alignment:.top) {
-                                            if model.compositionBusy {previewUpdatingBadge.offset(y:-36)}
-                                        }
-                                    floatingPreviewControls
-                                }.transition(.move(edge:.bottom).combined(with:.opacity))
-                            }
-                        }
-                        .clipped()
-                        .padding(.bottom,previewToolbarHeight+12)
-                    }
-                }
-                .animation(settingsPanelAnimation,value:previewPanelExpanded)
-                .animation(settingsPanelAnimation,value:displayedTool)
             }.frame(width: geometry.size.width, height: geometry.size.height)
+            }
+            #endif
+        }
+        .onGeometryChange(for:CGRect?.self) {reservedPreviewDivision(in:$0)} action: {previewDivision=$0}
+    }
+    private func reservedPreviewDivision(in geometry:GeometryProxy)->CGRect? {
+        #if !targetEnvironment(macCatalyst)
+        if #available(iOS 27.1,*) {
+            guard let region=geometry.reservedRegions(kind:.division).first else {return nil}
+            let horizontal=max(region.margins.leading,region.margins.trailing)
+            let vertical=max(region.margins.top,region.margins.bottom)
+            return region.frame.insetBy(dx:-horizontal,dy:-vertical)
+        }
+        #endif
+        return nil
+    }
+    var body:some View {
+        Group {
+            #if targetEnvironment(macCatalyst)
+            workspaceContent
+            #else
+            NavigationStack {
+                workspaceContent.background {StudioBackground()}.toolbar(.hidden,for:.navigationBar)
+            }
             #endif
         }
         .animation(reduceMotion ? nil : .smooth(duration:0.28),value:workspaceState)
@@ -189,7 +199,7 @@ struct EditorView: View {
                         Text("\(Int(model.project?.metadata.width ?? 0)) × \(Int(model.project?.metadata.height ?? 0))")
                             .monospacedDigit()
                     }.font(.system(size:11)).foregroundStyle(.secondary).padding(.horizontal,20).frame(height:38)
-                    sourceStage.padding(.horizontal,8)
+                    sourceStage.padding(.horizontal,8).padding(.top,12)
                         .accessibilityElement(children:.contain).accessibilityIdentifier("editorStage")
                     Divider()
                     if (!isBlocked && !model.manualSelection) || model.isReviewing {
@@ -245,6 +255,7 @@ struct EditorView: View {
     private func returnToHome() {
         model.goHome()
     }
+    private let headerHeight:CGFloat=64
     private var header: some View {
         HStack {
             StudioIcon(symbol: "chevron.left", label: "返回项目首页") { returnToHome() }
@@ -268,7 +279,7 @@ struct EditorView: View {
             } else {
                 Color.clear.frame(width:44,height:44).accessibilityHidden(true)
             }
-        }.padding(.horizontal, 18).frame(height: 52)
+        }.padding(.horizontal, 18).frame(height:52).padding(.bottom,12)
     }
     private var showsComposition: Bool {
         (model.compositionEditing || model.showsPreviewSettings && !isBlocked)
@@ -373,12 +384,12 @@ struct EditorView: View {
                         .position(x:geometry.size.width/2,y:max(30,geometry.size.height-100))
                 }
                 if model.showsPreviewSettings && !isProcessing && !isCompleted {
-                    if !floatsPreviewControls || !previewPanelExpanded {
+                    if !floatsPreviewControls {
                         previewTransport.position(x:geometry.size.width/2,y:max(22,geometry.size.height-36))
                     }
                 } else {playbackControl
                     .position(x:geometry.size.width/2,y:max(22,geometry.size.height-36))}
-                if model.showsPreviewSettings && model.compositionBusy && (!floatsPreviewControls || !previewPanelExpanded) {
+                if model.showsPreviewSettings && model.compositionBusy && !floatsPreviewControls {
                     previewUpdatingBadge.position(x:geometry.size.width/2,y:max(22,geometry.size.height-82))
                 }
                 ZStack {
@@ -546,15 +557,111 @@ struct EditorView: View {
         #if targetEnvironment(macCatalyst)
         false
         #else
-        !usesExpandedWorkspace && model.showsPreviewSettings && model.phase == .editing && !isBlocked && !model.manualSelection
+        model.showsPreviewSettings && model.phase == .editing && !isBlocked && !model.manualSelection
         #endif
     }
-    private var floatingPreviewControls:some View {
-        PreviewSettingsSheet(animation:settingsPanelAnimation,onDismiss:{previewPanelExpanded=false}) {
+    /// Position the existing controls without changing their settings or player session.
+    private func adaptivePreviewWorkspace(size:CGSize,sideInsets:Bool,systemRail:Bool=false)->some View {
+        let layout=PreviewWorkspaceLayout.resolve(size:size,regularWidth:horizontalSizeClass == .regular,sideInsets:sideInsets)
+        let outer=layout == .outer
+        let wide=layout == .wide
+        let sideWidth:CGFloat=systemRail ? 0 : 80
+        let dockHeight:CGFloat=wide ? 92 : 168
+        let division=wide && (previewDivision?.height ?? 0) > (previewDivision?.width ?? 0) ? previewDivision : nil
+        let horizontalDivision=(previewDivision?.width ?? 0) > (previewDivision?.height ?? 0) ? previewDivision : nil
+        let divisionGap=max(12,division?.width ?? 0)
+        let leftDockWidth=max(1,division.map {$0.minX-18} ?? ((size.width-36-divisionGap)/2))
+        let rightDockWidth=max(1,size.width-36-leftDockWidth-divisionGap)
+        let panelWidth=max(1,outer ? min(360,size.width-sideWidth-36) : wide ? rightDockWidth : layout == .portrait ? size.width-36 : min(420,size.width-36))
+        let panelBottom:CGFloat=outer ? 8 : bottomControlHeight+8+8+12
+        let contentLimit=max(48,size.height-max(headerHeight,horizontalDivision?.maxY ?? 0)-panelBottom-40)
+        let contentHeight=settingsPanelHeights[displayedTool ?? .composition] ?? (displayedTool == .motion ? 104 : 216)
+        let canvasBottom=max(layout == .portrait ? 210 : outer ? 110 : dockHeight,horizontalDivision.map {size.height-$0.minY+12} ?? 0)
+        let transportBesidePanel=outer && previewPanelExpanded && size.height-headerHeight<panelBottom+adaptivePanelHeight+68
+        let transportX:CGFloat=transportBesidePanel ? (panelWidth+36+size.width-sideWidth)/2 : wide && previewPanelExpanded ? 18+leftDockWidth/2 : outer ? (size.width-sideWidth)/2 : size.width/2
+        let transportBottom=previewPanelExpanded && !wide && !transportBesidePanel ? panelBottom+adaptivePanelHeight+12 : canvasBottom+14
+        let transportY=horizontalDivision.map {max(22,$0.minY-headerHeight-34)} ?? max(22,size.height-headerHeight-transportBottom-22)
+        return VStack(spacing:0) {
+            header.zIndex(100)
+            ZStack(alignment:.bottom) {
+                sourceStage
+                    .padding(.trailing,outer ? sideWidth : 0)
+                    .padding(.bottom,canvasBottom)
+                    .accessibilityElement(children:.contain).accessibilityIdentifier("editorStage")
+                Group {
+                if wide {
+                    HStack(alignment:.bottom,spacing:divisionGap) {
+                        editorTimeline.frame(width:leftDockWidth)
+                        previewToolButtons(vertical:false).frame(width:rightDockWidth)
+                    }.padding(.horizontal,18).padding(.bottom,8)
+                } else if outer {
+                    HStack(alignment:.bottom,spacing:12) {
+                        editorTimeline.frame(maxWidth:.infinity)
+                            .allowsHitTesting(!previewPanelExpanded)
+                        if !systemRail {previewToolButtons(vertical:true).frame(width:64)}
+                    }.padding(.horizontal,18).padding(.bottom,8)
+                } else {
+                    VStack(spacing:10) {
+                        editorTimeline
+                            .allowsHitTesting(!previewPanelExpanded)
+                        previewToolButtons(vertical:false).padding(.horizontal,18)
+                    }.padding(.bottom,8)
+                }
+                }
+                if previewPanelExpanded {
+                    floatingPreviewControls(maximumContentHeight:contentHeight>contentLimit ? contentLimit : nil)
+                        .frame(width:panelWidth+36)
+                        .onGeometryChange(for:CGFloat.self) {$0.size.height} action: {height in
+                            guard height>0,abs(height-adaptivePanelHeight)>0.5 else {return}
+                            withAnimation(settingsPanelAnimation) {adaptivePanelHeight=height}
+                        }
+                        .padding(.bottom,panelBottom)
+                        .frame(maxWidth:.infinity,alignment:wide ? .trailing : outer ? .leading : .center)
+                        .transition(.opacity.combined(with:.offset(y:8)))
+                }
+                previewTransport
+                    .overlay(alignment:.top) {
+                        if model.compositionBusy {previewUpdatingBadge.offset(y:-36)}
+                    }
+                    .fixedSize()
+                    .position(x:transportX,y:transportY)
+            }
+            .clipped()
+            .animation(settingsPanelAnimation,value:previewPanelExpanded)
+            .animation(settingsPanelAnimation,value:displayedTool)
+            .accessibilityElement(children:.contain)
+            .accessibilityIdentifier("previewWorkspace-"+layout.rawValue)
+        }.frame(width:size.width,height:size.height)
+        .toolbar {
+            if systemRail {
+                ToolbarItemGroup(placement:.bottomBar) {
+                    ForEach(availableTools,id:\.self) {tool in
+                        Toggle(isOn:Binding(get:{previewPanelExpanded && displayedTool == tool},set:{_ in togglePreviewTool(tool)})) {
+                            Label(tool.rawValue,systemImage:tool.symbol)
+                        }
+                            .toggleStyle(.button)
+                            .tint(previewPanelExpanded && displayedTool == tool ? Color.acAccent : .white)
+                            .accessibilityValue(previewPanelExpanded && displayedTool == tool ? "已打开" : "已关闭")
+                            .accessibilityIdentifier("previewTool-"+tool.rawValue)
+                            .disabled(!model.settingsEnabled || timelineTrimming || model.compositionAdjusting)
+                    }
+                }
+            }
+        }
+    }
+    private func togglePreviewTool(_ tool:WorkspaceTool) {
+        let close=previewPanelExpanded && displayedTool==tool
+        selectTool(tool)
+        withAnimation(settingsPanelAnimation) {previewPanelExpanded = !close}
+    }
+    private func floatingPreviewControls(maximumContentHeight:CGFloat?=nil)->some View {
+        PreviewSettingsSheet(animation:settingsPanelAnimation,allowsContentDismissal:maximumContentHeight == nil,onDismiss:{previewPanelExpanded=false}) {
             if let tool=displayedTool {
-                settingsContent(tool)
-                    .padding(panelInset)
-                    .fixedSize(horizontal:false,vertical:true)
+                ViewThatFits(in:.vertical) {
+                    measuredPreviewSettings(tool)
+                    ScrollView {measuredPreviewSettings(tool)}
+                }
+                    .frame(maxHeight:maximumContentHeight)
                     .accessibilityElement(children:.contain).accessibilityIdentifier("adjustmentPanel")
                     .disabled(model.restoringTracking)
                     .id(tool)
@@ -566,6 +673,13 @@ struct EditorView: View {
         .animation(settingsPanelAnimation,value:displayedTool)
         .accessibilityElement(children:.contain).accessibilityIdentifier("floatingPreviewControls")
     }
+    private func measuredPreviewSettings(_ tool:WorkspaceTool)->some View {
+        settingsContent(tool).padding(.horizontal,panelInset).padding(.bottom,panelInset).fixedSize(horizontal:false,vertical:true)
+            .onGeometryChange(for:CGFloat.self) {$0.size.height} action: {height in
+                guard displayedTool==tool,height>0,abs(height-(settingsPanelHeights[tool] ?? 0))>0.5 else {return}
+                settingsPanelHeights[tool]=height
+            }
+    }
     @ViewBuilder private func settingsContent(_ tool:WorkspaceTool)->some View {
         switch tool {
         case .composition:compositionPanel
@@ -573,14 +687,13 @@ struct EditorView: View {
         case .redaction:redactionPanel
         }
     }
-    private var floatingToolButtons:some View {
-        HStack(spacing:8) {
+    private func previewToolButtons(vertical:Bool)->some View {
+        let layout=vertical ? AnyLayout(VStackLayout(spacing:8)) : AnyLayout(HStackLayout(spacing:8))
+        return layout {
             ForEach(availableTools,id:\.self) {tool in
                 let opened=previewPanelExpanded && displayedTool==tool
                 Button {
-                    let close=previewPanelExpanded && displayedTool==tool
-                    selectTool(tool)
-                    withAnimation(settingsPanelAnimation) {previewPanelExpanded = !close}
+                    togglePreviewTool(tool)
                 } label: {
                     VStack(spacing:4) {
                         Image(systemName:tool.symbol)
@@ -616,7 +729,7 @@ struct EditorView: View {
         StudioGlassGroup(spacing: 12) {
             HStack(spacing: 12) {
                 if model.showsPreviewSettings && !isProcessing && !isCompleted {
-                    if floatsPreviewControls {floatingToolButtons} else {toolSelector}
+                    toolSelector
                 }
                 if isProcessing {
                     StudioTextButton(title:model.generatingVideo ? "取消生成" : "重新选择",height:56) {
@@ -629,7 +742,7 @@ struct EditorView: View {
                 else if !model.showsPreviewSettings || isProcessing {processingAction}
             }
         }.dynamicTypeSize(...DynamicTypeSize.xxxLarge).padding(.horizontal, 18)
-            .frame(height:floatsPreviewControls ? bottomControlHeight+8 : 58)
+            .frame(height:58)
     }
     private var processingAction:some View {
                 Button {
@@ -654,7 +767,7 @@ struct EditorView: View {
                             Image(systemName:"arrow.right").font(.system(size:16,weight:.medium))
                         }
                     }.padding(.horizontal,14)
-                        .frame(maxWidth:isProcessing || usesExpandedWorkspace || !model.showsPreviewSettings ? .infinity : nil).frame(width:isProcessing || usesExpandedWorkspace || !model.showsPreviewSettings ? nil : 132,height:bottomControlHeight)
+                        .frame(maxWidth:.infinity).frame(height:bottomControlHeight)
                         .background {
                             if isProcessing {
                                 ProcessingButtonFill(progress:min(1,max(0,model.phase.progress)),paused:isPaused)
@@ -694,13 +807,6 @@ struct EditorView: View {
             #endif
         }.buttonStyle(.plain).accessibilityIdentifier("completedActions")
     }
-    private var usesExpandedWorkspace:Bool {
-        #if targetEnvironment(macCatalyst)
-        true
-        #else
-        horizontalSizeClass == .regular
-        #endif
-    }
     private var editorTimeline:some View {
         VStack(spacing:0) {
             playbackRow
@@ -725,7 +831,7 @@ struct EditorView: View {
             HStack {
                 Image(systemName:isProcessing ? "viewfinder" : displayedTool?.symbol ?? "person.crop.circle")
                     .foregroundStyle(Color.acAccent)
-                Text(isBlocked ? "确认主角" : isProcessing ? (isPaused ? "处理已暂停" : "正在跟随主角") : displayedTool?.rawValue ?? "主角选择")
+                Text(isBlocked ? "确认主角" : isCompleted ? "成片预览" : isProcessing ? (isPaused ? "处理已暂停" : "正在跟随主角") : displayedTool?.rawValue ?? "主角选择")
                     .font(.headline)
                 Spacer(minLength:0)
             }.padding(.horizontal,18).padding(.top,20)
@@ -746,7 +852,7 @@ struct EditorView: View {
                 }.padding(.horizontal,18)
             }
             Spacer(minLength:0)
-            if !isBlocked && !model.manualSelection {bottomToolbar.padding(.bottom,12)}
+            if !isBlocked && !model.manualSelection && !isCompleted {bottomToolbar.padding(.bottom,12)}
         }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)
     }
 
@@ -1016,3 +1122,12 @@ private struct CandidateCorners: Shape {
         }
     }
 }
+
+#if !targetEnvironment(macCatalyst)
+@available(iOS 27.1,*)
+private struct PreviewVerticalBarReader<Content:View>:View {
+    @Environment(\.toolbarVerticalEdge) private var edge
+    @ViewBuilder var content:(HorizontalEdge?)->Content
+    var body:some View {content(edge)}
+}
+#endif

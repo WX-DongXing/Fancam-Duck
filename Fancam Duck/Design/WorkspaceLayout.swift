@@ -4,10 +4,24 @@ import SwiftUI
 /// the canvas. AnyLayout preserves the player and editor state while the window changes shape.
 enum WorkspaceLayout {
     static let panelWidth:CGFloat=360
-    static let minimumCanvasWidth:CGFloat=360
+    static let minimumCanvasWidth:CGFloat=220
+    static let minimumPanelWidth:CGFloat=320
     static let spacing:CGFloat=20
+    static func controlsWidth(in size:CGSize)->CGFloat {
+        min(panelWidth,max(minimumPanelWidth,size.width-minimumCanvasWidth-spacing-18))
+    }
     static func usesColumns(in size:CGSize) -> Bool {
-        size.width>=minimumCanvasWidth+panelWidth+spacing && size.height>=440
+        size.width>=minimumCanvasWidth+minimumPanelWidth+spacing+18 && size.height>=240
+    }
+}
+
+/// Compact short windows use a side dock; regular windows retain the user's
+/// bottom split or stacked dock. No device names or global screen bounds are used.
+enum PreviewWorkspaceLayout:String {
+    case phone,outer,wide,portrait
+    static func resolve(size:CGSize,regularWidth:Bool,sideInsets:Bool=false)->Self {
+        if regularWidth {return size.width>size.height ? .wide : .portrait}
+        return sideInsets || size.width>size.height ? .outer : .phone
     }
 }
 
@@ -40,7 +54,7 @@ struct WorkspaceArrangement<Canvas:View,Controls:View>:View {
         return layout {
             canvas.frame(maxWidth:.infinity,maxHeight:.infinity)
             controls
-                .frame(width:columns ? WorkspaceLayout.panelWidth : nil)
+                .frame(width:columns ? WorkspaceLayout.controlsWidth(in:size) : nil)
                 .frame(maxHeight:columns ? .infinity : nil,alignment:.bottom)
                 .padding(.trailing,columns ? 18 : 0)
         }.accessibilityElement(children:.contain).accessibilityIdentifier(columns ? "workspaceColumns" : "workspaceStack")

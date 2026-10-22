@@ -34,6 +34,14 @@ Xcode 27.0：`RedactionCompositor` 的像素缓冲属性值改用 `any Sendable`
 
 `LivePreviewFlowTests.testRedactionRegionCanChangeWhilePreviewIsPlaying` 修复后两轮通过，验证播放中双向切换、全身禁用贴片且保持播放。合成视频集成测试补充双向范围切换后新 `RedactionInstruction.plan.region`、覆盖检查与续播断言。独立定向测试正常返回 TEST SUCCEEDED；完整运行日志记录单元／媒体 201 项：147 通过、54 因本地素材等条件跳过、0 失败；实时预览 UI 2 项通过。完整运行在所有用例结束后的收尾阶段停滞，终止本次 xcodebuild，不将其未完成的结果包视为有效验证产物。Mac Catalyst arm64 构建通过。未对用户私人原片、真机或 Mac 窗口进行交互验收。
 
+## Duo 预览适配（2026-10-22）
+
+编辑器预览按最新用户草图复用浮动设置：紧凑侧边布局、regular 横向底部左右分区、regular 竖向底部上下排列。横向分区的时间轴始终可操作；其他布局按最新确认在打开设置时覆盖时间轴、收起后恢复操作，面板切换不改变画布尺寸。iPhone 支持方向补充左右横屏；这会让普通 iPhone 横屏也使用紧凑侧边布局。iOS 27.1 的 reservedRegions 查询仅用于 iOS，Catalyst 不编译该 API 路径。原生 SDK API 位于 SwiftUICore，不能只搜索 SwiftUI 接口判断是否支持。
+
+本次 iOS 源码使用 Xcode 27.1 SDK 编译，iOS 18 部署基线保持不变；旧 SDK 无法仅靠运行时 availability 编译新 reservedRegions 符号。
+
+本轮专项结果和后续 CR 修正见 [Duo 适配验证](../validation/2026-10-22-duo-adaptation.md)：横屏分析／确认与导出共用分栏判断，可滚动设置不再触发面板下拉关闭，所有预览布局限制设置高度，兼容成片态操作去重。此前普通 iPhone／iPad 仅作替代检查；现已补充 iPhone Duo／iOS 27.1 实际模拟器的外屏、内屏横竖与半折验证，见同一记录的最新一节。尚未做 Duo 真机和真实视频性能验收。
+
 ## 工具链
 
 部署基线 iOS18。历史验证使用 Xcode27.1；2026-10-19 当前本机工具链为 Xcode27.0（27A266a）。Duo 原生分区布局需要含相应 API 的 SDK 及显式编译标志，默认使用自适应布局。使用 `xcodebuild -showdestinations -project 'Fancam Duck.xcodeproj' -scheme 'Fancam Duck'` 查看本机目标，不在文档固化模拟器 UUID。

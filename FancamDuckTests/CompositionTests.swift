@@ -12,6 +12,26 @@ private actor CompositionTracker:TargetTracking {
     }
 }
 final class CompositionTests:XCTestCase {
+    func testShortWorkspaceCanKeepCanvasBesideRecoveryOrExportControls() {
+        XCTAssertTrue(WorkspaceLayout.usesColumns(in:.init(width:734,height:281)))
+        XCTAssertTrue(WorkspaceLayout.usesColumns(in:.init(width:667,height:271)))
+        XCTAssertFalse(WorkspaceLayout.usesColumns(in:.init(width:390,height:700)))
+        XCTAssertFalse(WorkspaceLayout.usesColumns(in:.init(width:560,height:900)))
+        XCTAssertTrue(WorkspaceLayout.usesColumns(in:.init(width:594,height:350)))
+        XCTAssertEqual(WorkspaceLayout.controlsWidth(in:.init(width:594,height:350)),336)
+        XCTAssertEqual(WorkspaceLayout.controlsWidth(in:.init(width:900,height:600)),360)
+        XCTAssertFalse(WorkspaceLayout.usesColumns(in:.init(width:900,height:200)))
+    }
+    func testPreviewWorkspaceAdaptsToWindowInsteadOfDeviceName() {
+        XCTAssertEqual(PreviewWorkspaceLayout.resolve(size:.init(width:390,height:750),regularWidth:false),.phone)
+        XCTAssertEqual(PreviewWorkspaceLayout.resolve(size:.init(width:450,height:600),regularWidth:false,sideInsets:true),.outer)
+        XCTAssertEqual(PreviewWorkspaceLayout.resolve(size:.init(width:640,height:390),regularWidth:false),.outer)
+        XCTAssertEqual(PreviewWorkspaceLayout.resolve(size:.init(width:980,height:650),regularWidth:true),.wide)
+        XCTAssertEqual(PreviewWorkspaceLayout.resolve(size:.init(width:650,height:980),regularWidth:true),.portrait)
+        XCTAssertEqual(PreviewWorkspaceLayout.resolve(size:.init(width:650,height:650),regularWidth:true),.portrait)
+        XCTAssertEqual(PreviewWorkspaceLayout.resolve(size:.init(width:450,height:650),regularWidth:false),.phone)
+    }
+
     func testAllAspectPathsPreserveViewportAndSourceBounds() throws {
         let source=CGSize(width:1920,height:1080)
         let samples=(0...10).map {TargetSample(time:Double($0)/10,body:.init(x:0.3+Double($0)*0.01,y:0.2,width:0.15,height:0.6))}

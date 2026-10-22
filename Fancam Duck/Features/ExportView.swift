@@ -4,7 +4,6 @@ import AVKit
 struct ExportView: View {
     @Bindable var model: AppModel
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var playing = false
     @State private var savingFile=false
     private var completed: Bool { if case .completed = model.phase { true } else { false } }
@@ -13,6 +12,7 @@ struct ExportView: View {
             #if targetEnvironment(macCatalyst)
             desktopExport
             #else
+            let workspaceSize=CGSize(width:geometry.size.width,height:max(1,geometry.size.height-64))
             VStack(spacing: 12) {
                 HStack {
                     StudioIcon(symbol: "chevron.left", label: "返回编辑") { model.backToEditor() }.disabled(model.phase == .exporting)
@@ -25,22 +25,13 @@ struct ExportView: View {
                     }.buttonStyle(.plain)
                         .disabled(model.phase == .exporting)
                 }.padding(.horizontal, 18).frame(height: 52)
-                WorkspaceArrangement(size:CGSize(width:geometry.size.width,height:max(1,geometry.size.height-64))) {
+                WorkspaceArrangement(size:workspaceSize) {
                     exportCanvas
                 } controls: {
-                    if horizontalSizeClass == .regular {
-                        VStack(alignment:.leading,spacing:20) {
-                            Label(completed ? "成片已就绪" : "输出设置",systemImage:completed ? "checkmark.circle" : "film")
-                                .font(.title3.weight(.semibold))
-                            Text(completed ? "预览画面后，保存到相册。" : "确认构图与画质，生成最终视频。")
-                                .font(.subheadline).foregroundStyle(.secondary)
-                            Divider()
-                            Text(model.project?.settings.resolution.label ?? "").font(.headline).monospacedDigit()
-                            Text("保留原音 · 本机处理").font(.caption).foregroundStyle(.secondary)
-                            Spacer(minLength:0)
-                            actions
-                        }.padding(.top,24).padding(.horizontal,16)
-                            .background(.white.opacity(0.035),in:RoundedRectangle(cornerRadius:28))
+                    if WorkspaceLayout.usesColumns(in:workspaceSize) {
+                        if workspaceSize.height<440 {
+                            ScrollView {expandedExportControls}.scrollBounceBehavior(.basedOnSize)
+                        } else {expandedExportControls}
                     } else {actions.frame(height:128,alignment:.bottom)}
                 }
             }.frame(width: geometry.size.width, height: geometry.size.height)
@@ -57,6 +48,20 @@ struct ExportView: View {
                       ended === model.previewPlayer?.currentItem else {return}
                 playing=false
             }
+    }
+    private var expandedExportControls:some View {
+        VStack(alignment:.leading,spacing:20) {
+            Label(completed ? "成片已就绪" : "输出设置",systemImage:completed ? "checkmark.circle" : "film")
+                .font(.title3.weight(.semibold))
+            Text(completed ? "预览画面后，保存到相册。" : "确认构图与画质，生成最终视频。")
+                .font(.subheadline).foregroundStyle(.secondary)
+            Divider()
+            Text(model.project?.settings.resolution.label ?? "").font(.headline).monospacedDigit()
+            Text("保留原音 · 本机处理").font(.caption).foregroundStyle(.secondary)
+            Spacer(minLength:0)
+            actions
+        }.padding(.top,24).padding(.horizontal,16)
+            .background(.white.opacity(0.035),in:RoundedRectangle(cornerRadius:28))
     }
     #if targetEnvironment(macCatalyst)
     private var desktopExport:some View {

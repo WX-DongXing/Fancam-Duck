@@ -3,6 +3,7 @@ import SwiftUI
 /// Keep drag updates local so moving the sheet does not redraw the video workspace.
 struct PreviewSettingsSheet<Content:View>:View {
     let animation:Animation?
+    var allowsContentDismissal=true
     let onDismiss:()->Void
     @ViewBuilder var content:Content
     @State private var dragOffset:CGFloat=0
@@ -21,7 +22,7 @@ struct PreviewSettingsSheet<Content:View>:View {
         .background(.regularMaterial,in:RoundedRectangle(cornerRadius:24))
         .overlay {RoundedRectangle(cornerRadius:24).strokeBorder(.white.opacity(0.1))}
         .offset(y:dragOffset)
-        .simultaneousGesture(sheetDrag)
+        .simultaneousGesture(sheetDrag,including:allowsContentDismissal ? .all : .subviews)
         .accessibilityAction(.escape) {dismiss()}
     }
 
